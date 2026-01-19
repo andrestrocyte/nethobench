@@ -9,6 +9,8 @@ NethoBench merges **neural** (NeuroBench) and **behavioral** (EthoBench) plausib
 3) **Cross-modal scores** – consistency of neural ↔ behavior coupling (encoding/decoding alignment).  
 4) A **composite** that averages available axes (single-modality if only one axis is present).
 
+**Motivation.** NethoBench evaluates models along three axes: neural realism, behavioral realism, and cross-modal plausibility. Neural fidelity uses a four-level analysis of population activity—distributional statistics, temporal structure, network interactions, and low-dimensional geometry—yielding composite scores that support hypothesis-driven evaluation of simulated neural dynamics. Behavioral fidelity uses complementary metrics on pose trajectories (kinematics, geometric structure, behavioral syllables/motifs, trajectory statistics, and distribution-based plausibility). Cross-modal metrics quantify how well neural activity and behavior stay coupled across three tasks: Neural→Behavior decoding, Behavior→Neural encoding, and joint neural–behavior generation. These expose failure modes invisible to unimodal metrics (e.g., high decoding but implausible neural structure, or realistic behavior that is uncoupled from neural activity).
+
 ## Quick install
 ```bash
 pip install -e .
@@ -73,6 +75,39 @@ from nethobench import (
 - CLI prints scores and saves JSON when `--json-out` is passed (per-sequence stats included).  
 - `neuro-analysis`, `etho-scores --run-notebook`, and `cross-analysis` save figures + executed notebook under `./outputs/…/`.  
 - `cross-scores` also reports the per-axis composites and the final multimodal composite.
+
+## Example core-score output (CLI)
+```
+Neuro scores:
+  mean_diff_score          : 0.812  0 |>===========>............| 1
+  kl_score                 : 0.744  0 |>========>..............| 1
+  correlation_score        : 0.665  0 |>=======>...............| 1
+  dimensionality_score     : 0.903  0 |>=============>.........| 1
+  graph_score              : 0.701  0 |>========>..............| 1
+  autocorr_score           : 0.882  0 |>============>..........| 1
+  psd_similarity_score     : 0.915  0 |>==============>........| 1
+  composite_score          : 0.278  0 |>==>....................| 1
+
+Behavior scores:
+  position_kl_score        : 0.791  0 |>==========>............| 1
+  stationary_score         : 0.732  0 |>========>..............| 1
+  velocity_score           : 0.756  0 |>=========>.............| 1
+  acceleration_score       : 0.702  0 |>========>..............| 1
+  direction_score          : 0.688  0 |>=======>...............| 1
+  quadrant_score           : 0.740  0 |>========>..............| 1
+  syllable_score           : 0.803  0 |>==========>............| 1
+  trajectory_shape_score   : 0.721  0 |>========>..............| 1
+  composite_score          : 0.197  0 |>=>.....................| 1
+
+Cross-modal scores:
+  cca_alignment_score      : 0.812  0 |>===========>............| 1
+  neural_to_behavior_similarity : 0.701  0 |>========>..............| 1
+  behavior_to_neural_similarity : 0.676  0 |>=======>...............| 1
+  lead_lag_score           : 0.740  0 |>========>..............| 1
+  cross_composite          : 0.561  0 |>==========>............| 1
+
+Final composite: average(neuro, etho, cross) over finite axes.
+```
 
 ## Status
 - Focused on reproducible metrics; exploratory notebooks (ethology) can still be run via `ethobench`-style capture if you place the notebook under `nethobench/notebooks/`.  
