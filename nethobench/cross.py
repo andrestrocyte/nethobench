@@ -217,7 +217,7 @@ def compute_cross_scores(predictions_csv: Path, ground_truth_csv: Path, config: 
     # --- Neuro axis ---
     gt_neuro = _arrays_from_aligned(aligned, neuro_cols, "gt", cfg)
     pr_neuro = _arrays_from_aligned(aligned, neuro_cols, "inf", cfg)
-    neuro_scores = _compute_scores_from_arrays(gt_neuro, pr_neuro)
+    neuro_scores = _compute_scores_from_arrays(gt_neuro, pr_neuro, region_names=neuro_cols)
 
     # --- Behavior axis (reuse ethobench metrics on merged df) ---
     beh_scores = {}

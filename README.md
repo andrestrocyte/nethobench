@@ -1,39 +1,46 @@
-# NethoBench: Unified Neural & Behavioral Benchmark
+# NethoBench
+
+Unified evaluation of neural realism (NeuroBench-style), behavioral realism (EthoBench-style), and cross-modal coupling.
 
 ![NethoBench Logo](assets/nethobench.png)
 
-NethoBench merges **neural** (NeuroBench) and **behavioral** (EthoBench) plausibility checks with a new **cross-modal axis** that tests whether brain and body stay coupled. It produces:
+NethoBench outputs:
+1) Neuro scores (neural realism)
+2) Behavior scores (pose / kinematics realism)
+3) Cross-modal scores (neural <-> behavior coupling)
+4) A final composite (average over available axes)
 
-1) **Neuro scores** – distributional / temporal / network / geometric fidelity of neural activity.  
-2) **Behavior scores** – kinematics / geometry / syllables / trajectory plausibility of pose tracks.  
-3) **Cross-modal scores** – consistency of neural ↔ behavior coupling (encoding/decoding alignment).  
-4) A **composite** that averages available axes (single-modality if only one axis is present).
-
-**Motivation.** NethoBench evaluates models along three axes: neural realism, behavioral realism, and cross-modal plausibility. Neural fidelity uses a four-level analysis of population activity—distributional statistics, temporal structure, network interactions, and low-dimensional geometry—yielding composite scores that support hypothesis-driven evaluation of simulated neural dynamics. Behavioral fidelity uses complementary metrics on pose trajectories (kinematics, geometric structure, behavioral syllables/motifs, trajectory statistics, and distribution-based plausibility). Cross-modal metrics quantify how well neural activity and behavior stay coupled across three tasks: Neural→Behavior decoding, Behavior→Neural encoding, and joint neural–behavior generation. These expose failure modes invisible to unimodal metrics (e.g., high decoding but implausible neural structure, or realistic behavior that is uncoupled from neural activity).
-
-## Quick install
+## Install
 ```bash
 pip install -e .
 ```
 
+Recommended (clean environment):
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+```
+
 ## Data expectations
-- Files must include `sequenceId` and `itemPosition` for alignment.  
-- **Neural**: numeric columns listed under `neuro_cols` in the config (or all non-index columns for the neuro-only command).  
-- **Behavior**: keypoint columns with `_X/_Y` pairs (e.g., `CENTER_X`, `CENTER_Y`, `NOSE_X`, `NOSE_Y`, `TAIL_BASE_X`, `TAIL_BASE_Y`). List bases under `behavior_parts` in the config.  
-- For multimodal runs, GT and prediction CSVs should contain both neural and behavior columns.
+- Files must include `sequenceId` and `itemPosition` for alignment.
+- Neural: region columns (one column per region).
+- Behavior: keypoint columns with `_X/_Y` pairs (e.g., `CENTER_X`, `CENTER_Y`).
+- For multimodal runs, GT and prediction CSVs should contain both neural and behavior columns (or provide a config that lists them).
 
 ## CLI
-- Neuro-only:  
-  `nethobench neuro-scores --gt gt_neural.csv --preds pred_neural.csv`
-- Neuro full analysis (saves figures):  
-  `nethobench neuro-analysis --gt gt_neural.csv --preds pred_neural.csv --ddconfig configs/data-clean-all.json`
-- Behavior-only:  
-  `nethobench etho-scores --gt-dir /path/to/gt_dir --inf-dir /path/to/inf_dir`
-  - Add `--run-notebook` to also execute the bundled ethology notebook headlessly.
-- Multimodal (neural + behavior + coupling):  
-  `nethobench cross-scores --gt gt_multimodal.csv --preds pred_multimodal.csv --config config.json`
- - Cross full analysis (headless notebook):  
-  `nethobench cross-analysis --gt gt_multimodal.csv --preds pred_multimodal.csv --config config.json`
+- Neuro scores (core metrics + neuro composite):
+  - `nethobench neuro-scores --gt gt_neural.csv --preds pred_neural.csv`
+- Neuro full analysis (runs the bundled notebook headlessly; saves plots + executed notebook):
+  - `nethobench neuro-analysis --gt gt_neural.csv --preds pred_neural.csv --ddconfig configs/data-clean-all.json`
+- Behavior-only:
+  - `nethobench etho-scores --gt-dir /path/to/gt_dir --inf-dir /path/to/inf_dir`
+  - add `--run-notebook` to also execute the bundled ethology notebook headlessly
+- Multimodal scores (neuro + behavior + coupling):
+  - `nethobench cross-scores --gt gt_multimodal.csv --preds pred_multimodal.csv --config config.json`
+- Cross full analysis (headless notebook):
+  - `nethobench cross-analysis --gt gt_multimodal.csv --preds pred_multimodal.csv --config config.json`
 
 ### Config schema (JSON)
 ```json
@@ -46,15 +53,30 @@ pip install -e .
 }
 ```
 
-## What gets scored
-- **Neuro** (from NeuroBench): mean-diff, symmetric-KL, correlation-graph overlap, PCA spectrum, autocorr, PSD similarity, multiplicative composite.
+## Neuro scoring (benchmark v1)
+Neuro uses mismatch-corrected realism scores grouped into buckets, then computes a weighted geometric-mean composite.
+
+Core metric families:
+- Distribution / marginals: tail-binned JSD (worst-q), symmetric KL (geo mean of `1/(1+KL)`), normalized W1 (`W1/IQR`), mean-shift realism (MeanShiftZ), and quantile-shape realism (tail + full).
+- Dependence: kNN mutual information realism (mismatch-corrected).
+- Point error: nRMSE and nMAE realism (IQR-normalized, mismatch-corrected).
+- Temporal dynamics: autocorr realism, crosscorr realism, bandpower realism, CV-CCA realism.
+- Inter-region structure: FC core realism, correlation-graph realism, PCA realism.
+- Higher-order: skew/kurtosis realism.
+- Manifold: kNN overlap, spectral similarity, Procrustes alignment, geodesic W1.
+
+See `nethobench/notebooks/final_implementation_benchmark.ipynb` for exact definitions, parameters, and the final composite formula.
 - **Behavior** (from EthoBench): position KL, quadrant KL, stationary fraction, velocity/acceleration KL, direction alignment (velocity vs body axis), syllable (k-means) distribution similarity, trajectory-shape similarity, multiplicative composite.
 - **Cross-modal** (new):  
   - `cca_alignment_score`: gap between GT vs Pred **neural–behavior canonical correlations** (0–1).  
   - `neural_to_behavior_r2` / `behavior_to_neural_r2`: linear predictive R² in GT and Pred, with similarity scores.  
   - `lead_lag_score`: agreement of peak lead/lag between neural PCs and behavior speed.  
   - `cross_composite`: geometric mean of the above (ignoring NaNs).
-- Bundled notebooks: `notebooks/final_implementation_benchmark.ipynb` (neuro), `notebooks/full_comprehensive_behavioral_analysis.ipynb` (etho), and `notebooks/cross_modal_full_analysis.ipynb` (cross). Headless runners save figures + executed notebooks under `./outputs/...`.
+- Bundled notebooks:
+  - `notebooks/final_implementation_benchmark.ipynb` (neuro)
+  - `notebooks/full_comprehensive_behavioral_analysis.ipynb` (etho)
+  - `notebooks/cross_modal_full_analysis.ipynb` (cross)
+  Headless runners save figures + executed notebooks under `./outputs/...`.
 
 ### Composite logic
 - If only neuro: composite = neuro composite.  
@@ -72,41 +94,43 @@ from nethobench import (
 ```
 
 ## Outputs
-- CLI prints scores and saves JSON when `--json-out` is passed (per-sequence stats included).  
-- `neuro-analysis`, `etho-scores --run-notebook`, and `cross-analysis` save figures + executed notebook under `./outputs/…/`.  
-- `cross-scores` also reports the per-axis composites and the final multimodal composite.
+- CLI prints scores and saves JSON when `--json-out` is passed.
+- `neuro-analysis`, `etho-scores --run-notebook`, and `cross-analysis` save figures + executed notebook under `./outputs/.../`.
+- `cross-scores` reports per-axis composites and the final multimodal composite.
 
 ## Example core-score output (CLI)
 ```
 Neuro scores:
-  mean_diff_score          : 0.812  0 |>===========>............| 1
-  kl_score                 : 0.744  0 |>========>..............| 1
-  correlation_score        : 0.665  0 |>=======>...............| 1
-  dimensionality_score     : 0.903  0 |>=============>.........| 1
-  graph_score              : 0.701  0 |>========>..............| 1
-  autocorr_score           : 0.882  0 |>============>..........| 1
-  psd_similarity_score     : 0.915  0 |>==============>........| 1
-  composite_score          : 0.278  0 |>==>....................| 1
-
-Behavior scores:
-  position_kl_score        : 0.791  0 |>==========>............| 1
-  stationary_score         : 0.732  0 |>========>..............| 1
-  velocity_score           : 0.756  0 |>=========>.............| 1
-  acceleration_score       : 0.702  0 |>========>..............| 1
-  direction_score          : 0.688  0 |>=======>...............| 1
-  quadrant_score           : 0.740  0 |>========>..............| 1
-  syllable_score           : 0.803  0 |>==========>............| 1
-  trajectory_shape_score   : 0.721  0 |>========>..............| 1
-  composite_score          : 0.197  0 |>=>.....................| 1
-
-Cross-modal scores:
-  cca_alignment_score      : 0.812  0 |>===========>............| 1
-  neural_to_behavior_similarity : 0.701  0 |>========>..............| 1
-  behavior_to_neural_similarity : 0.676  0 |>=======>...............| 1
-  lead_lag_score           : 0.740  0 |>========>..............| 1
-  cross_composite          : 0.561  0 |>==========>............| 1
-
-Final composite: average(neuro, etho, cross) over finite axes.
+  JSD_worstq_score01_avg        : 0.xxx
+  KL_geo_score01_avg            : 0.xxx
+  W1n_mean_score01_avg          : 0.xxx
+  MeanShiftZ_mean               : 0.xxx
+  QNT_tail_score01_avg          : 0.xxx
+  QNT_full_score01_avg          : 0.xxx
+  MI_mean_score01_avg           : 0.xxx
+  ERR_nRMSE_score01_avg         : 0.xxx
+  ERR_nMAE_score01_avg          : 0.xxx
+  AUTO_core_score01_avg         : 0.xxx
+  CC_core_score01_avg           : 0.xxx
+  Bandpower_score01_avg         : 0.xxx
+  FC_core_score01_avg           : 0.xxx
+  GRAPH_core_score01_avg        : 0.xxx
+  PCA_comp_score01_avg          : 0.xxx
+  CCA_core_score01_avg          : 0.xxx
+  MOM_core_score01_avg          : 0.xxx
+  MANI_core_score01_avg         : 0.xxx
+  MANI_s_knn_score01_avg        : 0.xxx
+  MANI_s_spec_score01_avg       : 0.xxx
+  MANI_s_proc_score01_avg       : 0.xxx
+  MANI_s_geo_score01_avg        : 0.xxx
+  bucket_distribution           : 0.xxx
+  bucket_dependence             : 0.xxx
+  bucket_point_error            : 0.xxx
+  bucket_temporal_dynamics      : 0.xxx
+  bucket_inter_region_structure : 0.xxx
+  bucket_higher_order           : 0.xxx
+  bucket_manifold_components    : 0.xxx
+  FINAL_NEURO_COMPOSITE_SCORE   : 0.xxx
 ```
 
 ## Status

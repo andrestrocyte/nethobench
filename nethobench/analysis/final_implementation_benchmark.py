@@ -289,6 +289,11 @@ def neurobench_analysis(preds_fname, gt_fname, ddconfig_path):
     
     mi_mean = np.nanmean(mi_all, axis=0)
     mi_std  = np.nanstd(mi_all, axis=0)
+    # Map MI (nats) -> [0, 1) as an interpretable "higher-is-better" score.
+    # We score per-sequence first, then average across sequences (sessions).
+    mi_seq_mean = np.nanmean(mi_all, axis=1)
+    mi_seq_score = mi_seq_mean / (1.0 + mi_seq_mean)
+    mi_global_score = float(np.nanmean(mi_seq_score)) if np.isfinite(mi_seq_score).any() else np.nan
     mi_df = pd.DataFrame({
         'region': gt_regions,
         'mi_mean': mi_mean,
@@ -320,6 +325,7 @@ def neurobench_analysis(preds_fname, gt_fname, ddconfig_path):
     print("- MI is now computed independently per sequence, avoiding mixed distributions.")
     print("- Bars show the average MI per region ± across-sequence variability.")
     print("- The histogram shows how much information each sequence carries overall.")
+    print(f"- Global MI score (0–1, mean of per-sequence MI/(1+MI)): {mi_global_score:.3f}")
     
     
     

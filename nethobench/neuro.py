@@ -6,6 +6,9 @@ from typing import Dict, Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import json
+import tempfile
+import nbformat
 from scipy import signal, stats
 
 # --------------------------------------------------------------------------- #
@@ -82,140 +85,142 @@ def _load_and_align(predictions_csv: Path, ground_truth_csv: Path, neuro_cols: O
 # --------------------------------------------------------------------------- #
 
 
+def _exec_notebook_metrics(
+    notebook_path: Path,
+    predictions_csv: Path,
+    ground_truth_csv: Path,
+    ddconfig_path: Path,
+    *,
+    skip_heavy_diagnostics: bool = True,
+) -> dict:
+    nb = nbformat.read(notebook_path, as_version=4)
+    env: dict = {"__name__": "__main__"}
+
+    env["display"] = lambda *args, **kwargs: None
+    exec(
+        "import matplotlib\n"
+        "matplotlib.use('Agg')\n"
+        "import matplotlib.pyplot as plt\n"
+        "plt.show = lambda *args, **kwargs: None\n",
+        env,
+    )
+
+    pred_str = str(predictions_csv)
+    gt_str = str(ground_truth_csv)
+    dd_str = str(ddconfig_path)
+
+    for cell in nb.cells:
+        if cell.get("cell_type") != "code":
+            continue
+        if skip_heavy_diagnostics:
+            src = cell.source
+            # These cells are expensive and do not contribute to METRICS/BUCKETS.
+            if (
+                "UMAP baseline embedding" in src
+                or "Trajectory similarity in embedding space" in src
+                or "Advanced dynamical similarity metrics" in src
+                or "Animated trajectory visualizer" in src
+                or "Trajectory similarity permutation test" in src
+            ):
+                continue
+        src_lines = []
+        for line in cell.source.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("%") or stripped.startswith("!"):
+                continue
+            if stripped.startswith("preds_fname ="):
+                line = f'preds_fname = r\"{pred_str}\"'
+            elif stripped.startswith("gt_fname ="):
+                line = f'gt_fname = r\"{gt_str}\"'
+            elif stripped.startswith("ddconfig_path ="):
+                line = f'ddconfig_path = r\"{dd_str}\"'
+            src_lines.append(line)
+        if not src_lines:
+            continue
+        exec("\n".join(src_lines), env)
+
+    return env
+
+
+def _ensure_ddconfig(ddconfig_path: Optional[Path]) -> tuple[Path, Optional[Path]]:
+    if ddconfig_path is not None:
+        return Path(ddconfig_path), None
+    tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+    json.dump({"selected_columns_statistics": {}}, tmp)
+    tmp.flush()
+    tmp.close()
+    return Path(tmp.name), Path(tmp.name)
+
+
+def _flatten_scores(metrics: dict, buckets: dict, composite: float) -> Dict[str, float]:
+    scores: Dict[str, float] = {k: float(v) for k, v in metrics.items()}
+    for k, v in buckets.items():
+        scores[f"bucket_{k}"] = float(v)
+    scores["composite_score"] = float(composite)
+    scores["FINAL_COMPOSITE_SCORE"] = float(composite)
+    scores["FINAL_NEURO_COMPOSITE_SCORE"] = float(composite)
+    return scores
+
+
+def _compute_neuro_scores_from_notebook(
+    predictions_csv: Path,
+    ground_truth_csv: Path,
+    *,
+    ddconfig_path: Optional[Path] = None,
+) -> Dict[str, float]:
+    nb_path = Path(__file__).parent / "notebooks" / "final_implementation_benchmark.ipynb"
+    if not nb_path.is_file():
+        raise FileNotFoundError(f"Neuro notebook missing at {nb_path}")
+    dd_path, cleanup_path = _ensure_ddconfig(ddconfig_path)
+
+    env = _exec_notebook_metrics(
+        nb_path,
+        Path(predictions_csv),
+        Path(ground_truth_csv),
+        dd_path,
+        skip_heavy_diagnostics=True,
+    )
+    metrics = env.get("METRICS")
+    buckets = env.get("BUCKETS")
+    composite = env.get("FINAL_COMPOSITE_SCORE", env.get("FINAL_NEURO_COMPOSITE_SCORE"))
+    if metrics is None or buckets is None or composite is None:
+        raise RuntimeError("Notebook execution did not produce METRICS/BUCKETS/FINAL_COMPOSITE_SCORE.")
+    if cleanup_path and cleanup_path.exists():
+        cleanup_path.unlink(missing_ok=True)
+    return _flatten_scores(metrics, buckets, composite)
+
+
 def _compute_scores_from_arrays(
     gt: np.ndarray,
     pred: np.ndarray,
     *,
-    rng_seed: int = 0,
+    region_names: Optional[list[str]] = None,
+    ddconfig_path: Optional[Path] = None,
 ) -> Dict[str, float]:
-    rng = np.random.default_rng(rng_seed)
-    gt_flat = gt.reshape(-1, gt.shape[-1])
-    pred_flat = pred.reshape(-1, pred.shape[-1])
+    if gt.ndim != 3 or pred.ndim != 3:
+        raise ValueError("Expected gt/pred arrays with shape [n_seq, n_time, n_reg].")
+    if gt.shape != pred.shape:
+        raise ValueError(f"Shape mismatch: {gt.shape} vs {pred.shape}")
+    n_seq, n_time, n_reg = gt.shape
+    region_names = region_names or [f"R{i}" for i in range(n_reg)]
 
-    # Mean difference of means (raw)
-    gt_mean = np.nanmean(gt_flat, axis=0)
-    pr_mean = np.nanmean(pred_flat, axis=0)
-    valid = np.isfinite(gt_mean) & np.isfinite(pr_mean)
-    mean_diff = float(np.mean(np.abs(gt_mean[valid] - pr_mean[valid]))) if np.any(valid) else 0.0
-    mean_diff_score = 1.0 / (1.0 + mean_diff * 0.1)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        gt_path = tmpdir_path / "gt.csv"
+        pr_path = tmpdir_path / "pred.csv"
 
-    # KL similarity per region
-    kl_vals = []
-    for idx in range(gt_flat.shape[1]):
-        g = gt_flat[:, idx]
-        p = pred_flat[:, idx]
-        g = g[np.isfinite(g)]
-        p = p[np.isfinite(p)]
-        if g.size < 10 or p.size < 10:
-            continue
-        lo = min(g.min(), p.min())
-        hi = max(g.max(), p.max())
-        if not np.isfinite(lo) or not np.isfinite(hi) or lo == hi:
-            continue
-        edges = np.linspace(lo, hi, 60)
-        Pg, _ = np.histogram(g, bins=edges, density=True)
-        Pp, _ = np.histogram(p, bins=edges, density=True)
-        eps = 1e-12
-        Pg = (Pg + eps) / (Pg + eps).sum()
-        Pp = (Pp + eps) / (Pp + eps).sum()
-        kl = 0.5 * (stats.entropy(Pg, Pp) + stats.entropy(Pp, Pg))
-        kl_vals.append(kl)
-    kl_score = 1.0 / (1.0 + float(np.mean(kl_vals))) if kl_vals else 1.0
+        seq_ids = np.repeat(np.arange(n_seq), n_time)
+        item_pos = np.tile(np.arange(n_time), n_seq)
+        gt_df = pd.DataFrame(gt.reshape(-1, n_reg), columns=region_names)
+        gt_df.insert(0, "itemPosition", item_pos)
+        gt_df.insert(0, "sequenceId", seq_ids)
+        gt_df.to_csv(gt_path, index=False)
 
-    # Correlation structure similarity (corr-of-corrs)
-    corr_scores = []
-    for seq_idx in range(gt.shape[0]):
-        gt_seq = gt[seq_idx]
-        pr_seq = pred[seq_idx]
-        if np.allclose(np.nanstd(gt_seq, axis=0), 0) or np.allclose(np.nanstd(pr_seq, axis=0), 0):
-            continue
-        Cg = np.corrcoef(gt_seq, rowvar=False)
-        Cp = np.corrcoef(pr_seq, rowvar=False)
-        iu = np.triu_indices_from(Cg, k=1)
-        valid = np.isfinite(Cg[iu]) & np.isfinite(Cp[iu])
-        if np.sum(valid) < 3:
-            continue
-        r = np.corrcoef(Cg[iu][valid], Cp[iu][valid])[0, 1]
-        corr_scores.append(r)
-    corr_score = ((float(np.nanmean(corr_scores)) + 1.0) / 2.0) if corr_scores else 0.5
+        pr_df = pd.DataFrame(pred.reshape(-1, n_reg), columns=region_names)
+        pr_df.index = seq_ids
+        pr_df.to_csv(pr_path)
 
-    # Dimensionality via PCA spectra Wasserstein
-    def spectrum(X: np.ndarray, n: int = 20) -> np.ndarray:
-        idx = rng.choice(X.shape[0], size=min(X.shape[0], 20000), replace=False)
-        Xs = X[idx] - X[idx].mean(axis=0)
-        U, S, _ = np.linalg.svd(Xs, full_matrices=False)
-        eig = (S ** 2) / max(1, len(Xs) - 1)
-        spec = eig / (eig.sum() + 1e-12)
-        return spec[:n]
-
-    spec_gt = spectrum(gt_flat)
-    spec_pr = spectrum(pred_flat)
-    spec_dist = float(stats.wasserstein_distance(spec_gt, spec_pr))
-    dim_score = 1.0 - min(spec_dist / 0.5, 1.0)
-
-    # Graph overlap (correlation threshold)
-    thresh = 0.5
-    adj_gt = (np.abs(np.corrcoef(gt_flat, rowvar=False)) > thresh).astype(int)
-    adj_pr = (np.abs(np.corrcoef(pred_flat, rowvar=False)) > thresh).astype(int)
-    np.fill_diagonal(adj_gt, 0)
-    np.fill_diagonal(adj_pr, 0)
-    overlap = np.logical_and(adj_gt, adj_pr).sum()
-    union = np.logical_or(adj_gt, adj_pr).sum()
-    graph_score = float(overlap / union) if union else 1.0
-
-    # Autocorrelation similarity
-    def mean_autocorr(arr: np.ndarray, max_lag: int = 60) -> np.ndarray:
-        curves = []
-        for region_idx in range(arr.shape[-1]):
-            series = arr[:, :, region_idx].reshape(-1)
-            if np.allclose(series.std(), 0):
-                continue
-            series = (series - series.mean()) / (series.std() + 1e-9)
-            corr = np.correlate(series, series, mode="full") / len(series)
-            mid = len(corr) // 2
-            curves.append(corr[mid: mid + max_lag])
-        return np.mean(curves, axis=0) if curves else np.zeros(max_lag)
-
-    ac_gt = mean_autocorr(gt)
-    ac_pr = mean_autocorr(pred)
-    ac_score = (float(np.corrcoef(ac_gt, ac_pr)[0, 1]) + 1.0) / 2.0 if ac_gt.size and ac_pr.size else 0.5
-
-    # Welch PSD similarity
-    def welch_similarity(gt_arr: np.ndarray, pr_arr: np.ndarray, fs: float = 1.0) -> float:
-        sims = []
-        for region_idx in range(gt_arr.shape[-1]):
-            gt_vals = gt_arr[:, :, region_idx].reshape(-1)
-            pr_vals = pr_arr[:, :, region_idx].reshape(-1)
-            mask = np.isfinite(gt_vals) & np.isfinite(pr_vals)
-            gt_vals = gt_vals[mask]
-            pr_vals = pr_vals[mask]
-            if gt_vals.size == 0 or pr_vals.size == 0:
-                continue
-            nperseg = min(256, gt_vals.size, pr_vals.size)
-            freqs, Pxx_gt = signal.welch(gt_vals, fs=fs, nperseg=nperseg)
-            _, Pxx_pr = signal.welch(pr_vals, fs=fs, nperseg=nperseg)
-            denom = np.linalg.norm(Pxx_gt) * np.linalg.norm(Pxx_pr) + 1e-12
-            cos_sim = float(np.dot(Pxx_gt, Pxx_pr) / denom)
-            sims.append(np.clip(cos_sim, 0.0, 1.0))
-        return float(np.nanmean(sims)) if sims else 0.5
-
-    psd_similarity_score = welch_similarity(gt, pred)
-
-    scores = {
-        "mean_diff_score": mean_diff_score,
-        "kl_score": kl_score,
-        "correlation_score": corr_score,
-        "dimensionality_score": dim_score,
-        "graph_score": graph_score,
-        "autocorr_score": ac_score,
-        "psd_similarity_score": psd_similarity_score,
-    }
-
-    composite = 1.0
-    for value in scores.values():
-        composite *= max(0.0, min(1.0, float(value)))
-    scores["composite_score"] = float(composite)
-    return scores
+        return _compute_neuro_scores_from_notebook(pr_path, gt_path, ddconfig_path=ddconfig_path)
 
 
 def compute_neuro_scores(
@@ -224,38 +229,27 @@ def compute_neuro_scores(
     *,
     per_sequence_stats: bool = False,
     neuro_cols: Optional[list[str]] = None,
+    ddconfig_path: Optional[Path] = None,
 ) -> Dict[str, object]:
     """
-    Compute condensed neural plausibility scores (NeuroBench-style).
+    Compute neural plausibility scores using the bundled benchmark notebook logic.
     """
-    gt, pred, _ = _load_and_align(Path(predictions_csv), Path(ground_truth_csv), neuro_cols=neuro_cols)
-    pooled_scores = _compute_scores_from_arrays(gt, pred)
+    if per_sequence_stats:
+        raise ValueError("per_sequence_stats is not supported for notebook-based core scores.")
 
-    if not per_sequence_stats:
-        return pooled_scores
-
-    per_seq_scores = []
-    for seq_idx in range(gt.shape[0]):
-        seq_scores = _compute_scores_from_arrays(
-            gt[seq_idx : seq_idx + 1],
-            pred[seq_idx : seq_idx + 1],
+    if neuro_cols:
+        gt, pred, overlap = _load_and_align(
+            Path(predictions_csv),
+            Path(ground_truth_csv),
+            neuro_cols=neuro_cols,
         )
-        per_seq_scores.append({"sequence_index": int(seq_idx), **seq_scores})
+        return _compute_scores_from_arrays(gt, pred, region_names=overlap, ddconfig_path=ddconfig_path)
 
-    metric_names = pooled_scores.keys()
-    mean_scores = {}
-    std_scores = {}
-    for name in metric_names:
-        vals = np.array([seq[name] for seq in per_seq_scores], dtype=float)
-        mean_scores[name] = float(np.nanmean(vals))
-        std_scores[name] = float(np.nanstd(vals))
-
-    return {
-        "pooled_scores": pooled_scores,
-        "per_sequence_mean": mean_scores,
-        "per_sequence_std": std_scores,
-        "per_sequence_scores": per_seq_scores,
-    }
+    return _compute_neuro_scores_from_notebook(
+        Path(predictions_csv),
+        Path(ground_truth_csv),
+        ddconfig_path=ddconfig_path,
+    )
 
 
 def _timestamped_outdir(base: Optional[Path] = None, stem: Optional[str] = None) -> Path:
@@ -279,26 +273,63 @@ def run_neuro_full_analysis(
     """
     Execute the bundled NeuroBench full analysis (notebook-derived script) and save figures.
     """
+    from nbconvert.preprocessors import ExecutePreprocessor
+    import nbformat
+
+    nb_path = Path(__file__).parent / "notebooks" / "final_implementation_benchmark.ipynb"
+    if not nb_path.is_file():
+        raise FileNotFoundError(f"Neuro notebook missing at {nb_path}")
+
     preds_path = Path(predictions_csv)
     outdir = _timestamped_outdir(output_root, stem=preds_path.stem)
 
-    # Monkey-patch plt.show to save and close instead of displaying.
-    plot_counter = {"n": 0}
-    orig_show = plt.show
+    nb = nbformat.read(nb_path, as_version=4)
 
-    def saving_show(*args, **kwargs):
-        figs = [plt.figure(num) for num in plt.get_fignums()]
-        for fig in figs:
-            plot_counter["n"] += 1
-            fig.savefig(outdir / f"figure_{plot_counter['n']:03d}.png", dpi=200, bbox_inches="tight")
-        plt.close("all")
+    # Patch notebook cell(s) that hardcode file paths.
+    pred_str = str(predictions_csv)
+    gt_str = str(ground_truth_csv)
+    dd_str = str(ddconfig_path)
+    for cell in nb.cells:
+        if cell.get("cell_type") != "code":
+            continue
+        lines = cell.source.splitlines()
+        changed = False
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith("preds_fname ="):
+                lines[i] = f'preds_fname = r"{pred_str}"'
+                changed = True
+            elif stripped.startswith("gt_fname ="):
+                lines[i] = f'gt_fname = r"{gt_str}"'
+                changed = True
+            elif stripped.startswith("ddconfig_path ="):
+                lines[i] = f'ddconfig_path = r"{dd_str}"'
+                changed = True
+        if changed:
+            cell.source = "\n".join(lines)
 
-    plt.show = saving_show
+    patch = f"""
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from pathlib import Path
+outdir = Path(r\"{outdir}\")
+plot_counter = {{'n': 0}}
+orig_show = plt.show
+def saving_show(*args, **kwargs):
+    figs = [plt.figure(num) for num in plt.get_fignums()]
+    for fig in figs:
+        plot_counter['n'] += 1
+        fig.savefig(outdir / f\"figure_{{plot_counter['n']:03d}}.png\", dpi=200, bbox_inches=\"tight\")
+    plt.close('all')
+plt.show = saving_show
+"""
+    nb.cells.insert(0, nbformat.v4.new_code_cell(patch))
 
-    from .analysis.final_implementation_benchmark import neurobench_analysis
+    ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
+    ep.preprocess(nb, {"metadata": {"path": nb_path.parent}})
+    executed_path = outdir / "executed_neurobench.ipynb"
+    with executed_path.open("w", encoding="utf-8") as f:
+        nbformat.write(nb, f)
 
-    neurobench_analysis(str(predictions_csv), str(ground_truth_csv), str(ddconfig_path))
-
-    # Restore show (best effort)
-    plt.show = orig_show
     return {"output_dir": outdir}
