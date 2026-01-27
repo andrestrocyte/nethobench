@@ -2,6 +2,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
+import runpy
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -162,32 +163,359 @@ def _flatten_scores(metrics: dict, buckets: dict, composite: float) -> Dict[str,
     return scores
 
 
-def _compute_neuro_scores_from_notebook(
+def _run_neurobench_script(
     predictions_csv: Path,
     ground_truth_csv: Path,
     *,
     ddconfig_path: Optional[Path] = None,
-) -> Dict[str, float]:
-    nb_path = Path(__file__).parent / "notebooks" / "final_implementation_benchmark.ipynb"
-    if not nb_path.is_file():
-        raise FileNotFoundError(f"Neuro notebook missing at {nb_path}")
+    mode: str = "full",
+    skip_crosscorr: bool = True,
+    skip_cca: bool = True,
+    enable_plots: bool = False,
+) -> dict:
+    script_path = Path(__file__).parent / "analysis" / "neurobench_core_script.py"
+    if not script_path.is_file():
+        raise FileNotFoundError(f"Neuro script missing at {script_path}")
     dd_path, cleanup_path = _ensure_ddconfig(ddconfig_path)
-
-    env = _exec_notebook_metrics(
-        nb_path,
-        Path(predictions_csv),
-        Path(ground_truth_csv),
-        dd_path,
-        skip_heavy_diagnostics=True,
-    )
-    metrics = env.get("METRICS")
-    buckets = env.get("BUCKETS")
-    composite = env.get("FINAL_COMPOSITE_SCORE", env.get("FINAL_NEURO_COMPOSITE_SCORE"))
-    if metrics is None or buckets is None or composite is None:
-        raise RuntimeError("Notebook execution did not produce METRICS/BUCKETS/FINAL_COMPOSITE_SCORE.")
+    init_globals = {
+        "preds_fname": str(predictions_csv),
+        "gt_fname": str(ground_truth_csv),
+        "ddconfig_path": str(dd_path) if dd_path else None,
+        "MODE": mode,
+        "SKIP_CROSSCORR": skip_crosscorr,
+        "SKIP_CCA": skip_cca,
+        "ENABLE_PLOTS": enable_plots,
+    }
+    env = runpy.run_path(str(script_path), init_globals=init_globals)
     if cleanup_path and cleanup_path.exists():
         cleanup_path.unlink(missing_ok=True)
-    return _flatten_scores(metrics, buckets, composite)
+    return env
+
+
+def _avg_mean_strict(mean_val: float, strict_val: float) -> float:
+    mean_val = float(mean_val) if np.isfinite(mean_val) else np.nan
+    strict_val = float(strict_val) if np.isfinite(strict_val) else np.nan
+    if np.isfinite(mean_val) and np.isfinite(strict_val):
+        return 0.5 * (mean_val + strict_val)
+    if np.isfinite(mean_val):
+        return mean_val
+    if np.isfinite(strict_val):
+        return strict_val
+    return np.nan
+
+
+def _clip01(x: float, eps: float = 1e-6) -> float:
+    return float(np.clip(x, eps, 1.0 - eps))
+
+
+def _gmean(values) -> float:
+    v = np.asarray(values, dtype=np.float64)
+    v = v[np.isfinite(v)]
+    if v.size == 0:
+        return np.nan
+    v = np.clip(v, 1e-6, 1.0 - 1e-6)
+    return float(np.exp(np.mean(np.log(v))))
+
+
+def _weighted_gmean(buckets: dict, weights: dict) -> float:
+    keys = [k for k, v in buckets.items() if np.isfinite(v)]
+    if not keys:
+        return np.nan
+    wsum = float(np.sum([weights[k] for k in keys]))
+    if wsum <= 0:
+        return np.nan
+    acc = 0.0
+    for k in keys:
+        acc += weights[k] * np.log(_clip01(buckets[k]))
+    return float(np.exp(acc / wsum))
+
+
+def _get(d, path, default=np.nan):
+    cur = d
+    for k in path:
+        if isinstance(cur, dict) and k in cur:
+            cur = cur[k]
+        else:
+            return default
+    return cur
+
+
+def _build_full_metrics_from_env(env: dict, *, skip_crosscorr: bool, skip_cca: bool) -> tuple[dict, dict, float]:
+    dist_out = env.get("dist_out", {})
+    mean_results = env.get("mean_results", {})
+    results_mi = env.get("results_mi", {})
+    err_out = env.get("err_out", {})
+    results_qnt = env.get("results_qnt", {})
+    pca_realism_v1 = env.get("pca_realism_v1", {})
+    fc_realism_summary = env.get("fc_realism_summary", {})
+    autocorr_realism_summary = env.get("autocorr_realism_summary", {})
+    crosscorr_realism_summary = env.get("crosscorr_realism_summary", {})
+    moments_realism_summary = env.get("moments_realism_summary", {})
+    graph_results = env.get("graph_results", {})
+    cca_realism_summary = env.get("cca_realism_summary", {})
+    mani_out = env.get("mani_out", {})
+    bandpower_global_realism = env.get("bandpower_global_realism", {})
+
+    _jsd_mean = _get(dist_out, ["summary", "JSD_worstq", "score01_mean"])
+    _jsd_q10 = _get(dist_out, ["summary", "JSD_worstq", "score01_q10_strict"])
+    JSD_score01 = _avg_mean_strict(_jsd_mean, _jsd_q10)
+
+    _kl_mean = _get(dist_out, ["summary", "KL_geo", "mean"])
+    _kl_q10 = _get(dist_out, ["summary", "KL_geo", "q10_strict"])
+    KL_score01 = _avg_mean_strict(_kl_mean, _kl_q10)
+
+    _w1_mean = _get(dist_out, ["summary", "W1_mean", "score01_mean"])
+    _w1_q10 = _get(dist_out, ["summary", "W1_mean", "score01_q10_strict"])
+    W1n_score01 = _avg_mean_strict(_w1_mean, _w1_q10)
+
+    MeanShiftZ_mean = mean_results.get("final_scalar", np.nan)
+
+    _qnt_scores = results_qnt.get("scores_for_composite", {})
+    _qnt_tail_mean = _qnt_scores.get("QNT_tail_topq_z_score01_mean", np.nan)
+    _qnt_tail_q10 = _qnt_scores.get("QNT_tail_topq_z_score01_q10", np.nan)
+    QNT_tail_score01 = _avg_mean_strict(_qnt_tail_mean, _qnt_tail_q10)
+
+    _qnt_full_mean = _qnt_scores.get("QNT_full_topq_z_score01_mean", np.nan)
+    _qnt_full_q10 = _qnt_scores.get("QNT_full_topq_z_score01_q10", np.nan)
+    QNT_full_score01 = _avg_mean_strict(_qnt_full_mean, _qnt_full_q10)
+
+    _mi_scores = results_mi.get("scores_for_composite", {})
+    _mi_mean = _mi_scores.get("MI_mean_z_score01_mean", np.nan)
+    _mi_q10 = _mi_scores.get("MI_mean_z_score01_q10", np.nan)
+    MI_score01 = _avg_mean_strict(_mi_mean, _mi_q10)
+
+    _err_scores = err_out.get("scores_for_composite", {})
+    _nrmse_mean = _err_scores.get("ERR_nRMSE_topq_z_score01_mean", np.nan)
+    _nrmse_q10 = _err_scores.get("ERR_nRMSE_topq_z_score01_q10", np.nan)
+    ERR_nRMSE_score01 = _avg_mean_strict(_nrmse_mean, _nrmse_q10)
+
+    _nmae_mean = _err_scores.get("ERR_nMAE_topq_z_score01_mean", np.nan)
+    _nmae_q10 = _err_scores.get("ERR_nMAE_topq_z_score01_q10", np.nan)
+    ERR_nMAE_score01 = _avg_mean_strict(_nmae_mean, _nmae_q10)
+
+    _pca_scores = pca_realism_v1.get("scores_for_composite", {})
+    _pca_mean = _pca_scores.get("PCA_comp_z_score01_mean", np.nan)
+    _pca_q10 = _pca_scores.get("PCA_comp_z_score01_q10", np.nan)
+    PCA_score01 = _avg_mean_strict(_pca_mean, _pca_q10)
+
+    _fc_scores = fc_realism_summary.get("scores_for_composite", {})
+    _fc_mean = _fc_scores.get("FC_core_score01_mean", np.nan)
+    _fc_q10 = _fc_scores.get("FC_core_score01_q10", np.nan)
+    FC_score01 = _avg_mean_strict(_fc_mean, _fc_q10)
+
+    _auto_scalars = autocorr_realism_summary.get("scalars", {})
+    _auto_mean = _auto_scalars.get("AUTO_core_score01_mean", np.nan)
+    _auto_q10 = _auto_scalars.get("AUTO_core_score01_q10", np.nan)
+    AUTO_score01 = _avg_mean_strict(_auto_mean, _auto_q10)
+
+    _cc_scalars = crosscorr_realism_summary.get("scalars", {})
+    _cc_mean = _cc_scalars.get("CC_core_score01_mean", np.nan)
+    _cc_q10 = _cc_scalars.get("CC_core_score01_q10", np.nan)
+    CC_score01 = _avg_mean_strict(_cc_mean, _cc_q10) if not skip_crosscorr else np.nan
+
+    _mom_scalars = moments_realism_summary.get("scalars", {})
+    _mom_mean = _mom_scalars.get("MOM_core_score01_mean", np.nan)
+    _mom_q10 = _mom_scalars.get("MOM_core_score01_q10", np.nan)
+    MOM_score01 = _avg_mean_strict(_mom_mean, _mom_q10)
+
+    _graph_scalars = graph_results.get("scalars", {})
+    _graph_mean = _graph_scalars.get("GRAPH_core_score01_mean", np.nan)
+    _graph_q10 = _graph_scalars.get("GRAPH_core_score01_q10", np.nan)
+    GRAPH_score01 = _avg_mean_strict(_graph_mean, _graph_q10)
+
+    _cca_scalars = cca_realism_summary.get("scalars", {})
+    _cca_mean = _cca_scalars.get("CCA_core_score01_mean", np.nan)
+    _cca_q10 = _cca_scalars.get("CCA_core_score01_q10", np.nan)
+    CCA_score01 = _avg_mean_strict(_cca_mean, _cca_q10) if not skip_cca else np.nan
+
+    _mani_scalars = mani_out.get("scalars", {})
+    _mani_mean = _mani_scalars.get("MANI_core_score01_mean", np.nan)
+    _mani_q10 = _mani_scalars.get("MANI_core_score01_q10", np.nan)
+    MANI_score01 = _avg_mean_strict(_mani_mean, _mani_q10)
+
+    _mani_df = mani_out.get("df", None)
+
+    def _mani_component_avg(df, col):
+        if df is None or col not in df:
+            return np.nan
+        vals = df[col].to_numpy(dtype=float)
+        vals = vals[np.isfinite(vals)]
+        if vals.size == 0:
+            return np.nan
+        mean = float(np.mean(vals))
+        q10 = float(np.quantile(vals, 0.10))
+        return _avg_mean_strict(mean, q10)
+
+    MANI_s_knn = _mani_component_avg(_mani_df, "s_knn")
+    MANI_s_spec = _mani_component_avg(_mani_df, "s_spec")
+    MANI_s_proc = _mani_component_avg(_mani_df, "s_proc")
+    MANI_s_geo = _mani_component_avg(_mani_df, "s_geo")
+
+    _bp_seq = bandpower_global_realism.get("per_seq_diag", {}).get("score01_seq", None)
+    if _bp_seq is not None:
+        _bp_seq = np.asarray(_bp_seq, dtype=np.float64)
+        _bp_seq = _bp_seq[np.isfinite(_bp_seq)]
+        _bp_mean = float(np.mean(_bp_seq)) if _bp_seq.size else np.nan
+        _bp_q10 = float(np.quantile(_bp_seq, 0.10)) if _bp_seq.size else np.nan
+    else:
+        _bp_mean = np.nan
+        _bp_q10 = np.nan
+    Bandpower_score01 = _avg_mean_strict(_bp_mean, _bp_q10)
+
+    metrics = {
+        "JSD_worstq_score01_avg": float(JSD_score01),
+        "KL_geo_score01_avg": float(KL_score01),
+        "W1n_mean_score01_avg": float(W1n_score01),
+        "MeanShiftZ_mean": float(MeanShiftZ_mean),
+        "QNT_tail_score01_avg": float(QNT_tail_score01),
+        "QNT_full_score01_avg": float(QNT_full_score01),
+        "MI_mean_score01_avg": float(MI_score01),
+        "ERR_nRMSE_score01_avg": float(ERR_nRMSE_score01),
+        "ERR_nMAE_score01_avg": float(ERR_nMAE_score01),
+        "AUTO_core_score01_avg": float(AUTO_score01),
+        "CC_core_score01_avg": float(CC_score01),
+        "Bandpower_score01_avg": float(Bandpower_score01),
+        "FC_core_score01_avg": float(FC_score01),
+        "GRAPH_core_score01_avg": float(GRAPH_score01),
+        "PCA_comp_score01_avg": float(PCA_score01),
+        "CCA_core_score01_avg": float(CCA_score01),
+        "MANI_core_score01_avg": float(MANI_score01),
+        "MOM_core_score01_avg": float(MOM_score01),
+        "MANI_s_knn_score01_avg": float(MANI_s_knn),
+        "MANI_s_spec_score01_avg": float(MANI_s_spec),
+        "MANI_s_proc_score01_avg": float(MANI_s_proc),
+        "MANI_s_geo_score01_avg": float(MANI_s_geo),
+    }
+
+    if skip_crosscorr:
+        metrics.pop("CC_core_score01_avg", None)
+    if skip_cca:
+        metrics.pop("CCA_core_score01_avg", None)
+
+    buckets = {
+        "distribution": _gmean([
+            JSD_score01,
+            KL_score01,
+            W1n_score01,
+            MeanShiftZ_mean,
+            QNT_tail_score01,
+            QNT_full_score01,
+        ]),
+        "dependence": _gmean([
+            MI_score01,
+        ]),
+        "point_error": _gmean([
+            ERR_nRMSE_score01,
+            ERR_nMAE_score01,
+        ]),
+        "temporal_dynamics": _gmean([
+            AUTO_score01,
+            CC_score01,
+            Bandpower_score01,
+            MANI_score01,
+            CCA_score01,
+        ]),
+        "inter_region_structure": _gmean([
+            FC_score01,
+            GRAPH_score01,
+            PCA_score01,
+        ]),
+        "higher_order": _gmean([
+            MOM_score01,
+        ]),
+        "manifold_components": _gmean([
+            MANI_s_knn,
+            MANI_s_spec,
+            MANI_s_proc,
+            MANI_s_geo,
+        ]),
+    }
+
+    weights = {
+        "distribution": 0.22,
+        "dependence": 0.10,
+        "point_error": 0.10,
+        "temporal_dynamics": 0.22,
+        "inter_region_structure": 0.22,
+        "higher_order": 0.07,
+        "manifold_components": 0.07,
+    }
+
+    composite = _weighted_gmean(buckets, weights)
+    return metrics, buckets, composite
+
+
+def _build_instant_metrics_from_env(env: dict) -> tuple[dict, float]:
+    mean_results = env.get("mean_results", {})
+    err_out = env.get("err_out", {})
+    results_qnt = env.get("results_qnt", {})
+    pca_realism_v1 = env.get("pca_realism_v1", {})
+    fc_realism_summary = env.get("fc_realism_summary", {})
+    graph_results = env.get("graph_results", {})
+    bandpower_global_realism = env.get("bandpower_global_realism", {})
+
+    MeanShiftZ_mean = mean_results.get("final_scalar", np.nan)
+
+    _err_scores = err_out.get("scores_for_composite", {})
+    _nrmse_mean = _err_scores.get("ERR_nRMSE_topq_z_score01_mean", np.nan)
+    _nrmse_q10 = _err_scores.get("ERR_nRMSE_topq_z_score01_q10", np.nan)
+    ERR_nRMSE_score01 = _avg_mean_strict(_nrmse_mean, _nrmse_q10)
+
+    _nmae_mean = _err_scores.get("ERR_nMAE_topq_z_score01_mean", np.nan)
+    _nmae_q10 = _err_scores.get("ERR_nMAE_topq_z_score01_q10", np.nan)
+    ERR_nMAE_score01 = _avg_mean_strict(_nmae_mean, _nmae_q10)
+
+    ERR_score01 = _gmean([ERR_nRMSE_score01, ERR_nMAE_score01])
+
+    _qnt_scores = results_qnt.get("scores_for_composite", {})
+    _qnt_tail_mean = _qnt_scores.get("QNT_tail_topq_z_score01_mean", np.nan)
+    _qnt_tail_q10 = _qnt_scores.get("QNT_tail_topq_z_score01_q10", np.nan)
+    QNT_tail_score01 = _avg_mean_strict(_qnt_tail_mean, _qnt_tail_q10)
+
+    _qnt_full_mean = _qnt_scores.get("QNT_full_topq_z_score01_mean", np.nan)
+    _qnt_full_q10 = _qnt_scores.get("QNT_full_topq_z_score01_q10", np.nan)
+    QNT_full_score01 = _avg_mean_strict(_qnt_full_mean, _qnt_full_q10)
+
+    QNT_score01 = _gmean([QNT_tail_score01, QNT_full_score01])
+
+    _pca_scores = pca_realism_v1.get("scores_for_composite", {})
+    _pca_mean = _pca_scores.get("PCA_comp_z_score01_mean", np.nan)
+    _pca_q10 = _pca_scores.get("PCA_comp_z_score01_q10", np.nan)
+    PCA_score01 = _avg_mean_strict(_pca_mean, _pca_q10)
+
+    _fc_scores = fc_realism_summary.get("scores_for_composite", {})
+    _fc_mean = _fc_scores.get("FC_core_score01_mean", np.nan)
+    _fc_q10 = _fc_scores.get("FC_core_score01_q10", np.nan)
+    FC_score01 = _avg_mean_strict(_fc_mean, _fc_q10)
+
+    _graph_scalars = graph_results.get("scalars", {})
+    _graph_mean = _graph_scalars.get("GRAPH_core_score01_mean", np.nan)
+    _graph_q10 = _graph_scalars.get("GRAPH_core_score01_q10", np.nan)
+    GRAPH_score01 = _avg_mean_strict(_graph_mean, _graph_q10)
+
+    _bp_seq = bandpower_global_realism.get("per_seq_diag", {}).get("score01_seq", None)
+    if _bp_seq is not None:
+        _bp_seq = np.asarray(_bp_seq, dtype=np.float64)
+        _bp_seq = _bp_seq[np.isfinite(_bp_seq)]
+        _bp_mean = float(np.mean(_bp_seq)) if _bp_seq.size else np.nan
+        _bp_q10 = float(np.quantile(_bp_seq, 0.10)) if _bp_seq.size else np.nan
+    else:
+        _bp_mean = np.nan
+        _bp_q10 = np.nan
+    Bandpower_score01 = _avg_mean_strict(_bp_mean, _bp_q10)
+
+    metrics = {
+        "MeanShiftZ_mean": float(MeanShiftZ_mean),
+        "ERR_realism_score01_avg": float(ERR_score01),
+        "QNT_realism_score01_avg": float(QNT_score01),
+        "FC_core_score01_avg": float(FC_score01),
+        "PCA_comp_score01_avg": float(PCA_score01),
+        "GRAPH_core_score01_avg": float(GRAPH_score01),
+        "Bandpower_score01_avg": float(Bandpower_score01),
+    }
+
+    composite = _weighted_gmean(metrics, {k: 1.0 for k in metrics})
+    return metrics, composite
 
 
 def _compute_scores_from_arrays(
@@ -220,7 +548,36 @@ def _compute_scores_from_arrays(
         pr_df.index = seq_ids
         pr_df.to_csv(pr_path)
 
-        return _compute_neuro_scores_from_notebook(pr_path, gt_path, ddconfig_path=ddconfig_path)
+        return _compute_neuro_scores_from_script(pr_path, gt_path, ddconfig_path=ddconfig_path)
+
+
+def _compute_neuro_scores_from_script(
+    predictions_csv: Path,
+    ground_truth_csv: Path,
+    *,
+    ddconfig_path: Optional[Path] = None,
+    mode: str = "full",
+    skip_crosscorr: bool = True,
+    skip_cca: bool = True,
+) -> Dict[str, float]:
+    env = _run_neurobench_script(
+        Path(predictions_csv),
+        Path(ground_truth_csv),
+        ddconfig_path=ddconfig_path,
+        mode=mode,
+        skip_crosscorr=skip_crosscorr,
+        skip_cca=skip_cca,
+        enable_plots=False,
+    )
+    if mode == "instant":
+        metrics, composite = _build_instant_metrics_from_env(env)
+        return _flatten_scores(metrics, {}, composite)
+    metrics, buckets, composite = _build_full_metrics_from_env(
+        env,
+        skip_crosscorr=skip_crosscorr,
+        skip_cca=skip_cca,
+    )
+    return _flatten_scores(metrics, buckets, composite)
 
 
 def compute_neuro_scores(
@@ -245,10 +602,32 @@ def compute_neuro_scores(
         )
         return _compute_scores_from_arrays(gt, pred, region_names=overlap, ddconfig_path=ddconfig_path)
 
-    return _compute_neuro_scores_from_notebook(
+    return _compute_neuro_scores_from_script(
         Path(predictions_csv),
         Path(ground_truth_csv),
         ddconfig_path=ddconfig_path,
+        mode="full",
+        skip_crosscorr=True,
+        skip_cca=True,
+    )
+
+
+def compute_instant_neuro_scores(
+    predictions_csv: Path,
+    ground_truth_csv: Path,
+    *,
+    ddconfig_path: Optional[Path] = None,
+) -> Dict[str, float]:
+    """
+    Compute a fast neuro composite using mean diff, error realism, quantile, FC, PCA, Jaccard, and Power.
+    """
+    return _compute_neuro_scores_from_script(
+        Path(predictions_csv),
+        Path(ground_truth_csv),
+        ddconfig_path=ddconfig_path,
+        mode="instant",
+        skip_crosscorr=True,
+        skip_cca=True,
     )
 
 

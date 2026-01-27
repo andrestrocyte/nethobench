@@ -32,6 +32,9 @@ python -m pip install -e .
 ## CLI
 - Neuro scores (core metrics + neuro composite):
   - `nethobench neuro-scores --gt gt_neural.csv --preds pred_neural.csv`
+- Instant neuro scores (fast composite from core neuro submetrics):
+  - `nethobench instant-neuro-scores --gt gt_neural.csv --preds pred_neural.csv`
+  - Composite uses: MeanShiftZ, error realism (nRMSE+nMAE), quantile realism (tail+full), FC core, PCA, GRAPH core, Bandpower.
 - Neuro full analysis (runs the bundled notebook headlessly; saves plots + executed notebook):
   - `nethobench neuro-analysis --gt gt_neural.csv --preds pred_neural.csv --ddconfig configs/data-clean-all.json`
 - Behavior-only:
@@ -60,12 +63,13 @@ Core metric families:
 - Distribution / marginals: tail-binned JSD (worst-q), symmetric KL (geo mean of `1/(1+KL)`), normalized W1 (`W1/IQR`), mean-shift realism (MeanShiftZ), and quantile-shape realism (tail + full).
 - Dependence: kNN mutual information realism (mismatch-corrected).
 - Point error: nRMSE and nMAE realism (IQR-normalized, mismatch-corrected).
-- Temporal dynamics: autocorr realism, crosscorr realism, bandpower realism, CV-CCA realism.
+- Temporal dynamics: autocorr realism, bandpower realism, CV-CCA realism.
 - Inter-region structure: FC core realism, correlation-graph realism, PCA realism.
 - Higher-order: skew/kurtosis realism.
 - Manifold: kNN overlap, spectral similarity, Procrustes alignment, geodesic W1.
 
 See `nethobench/notebooks/final_implementation_benchmark.ipynb` for exact definitions, parameters, and the final composite formula.
+Note: the `neuro-scores` command runs the extracted notebook logic and **excludes CCA + cross-correlation** from the CLI composite.
 - **Behavior** (from EthoBench): position KL, quadrant KL, stationary fraction, velocity/acceleration KL, direction alignment (velocity vs body axis), syllable (k-means) distribution similarity, trajectory-shape similarity, multiplicative composite.
 - **Cross-modal** (new):  
   - `cca_alignment_score`: gap between GT vs Pred **neural–behavior canonical correlations** (0–1).  
@@ -87,6 +91,7 @@ See `nethobench/notebooks/final_implementation_benchmark.ipynb` for exact defini
 ```python
 from nethobench import (
     compute_neuro_scores,
+    compute_instant_neuro_scores,
     compute_etho_scores,
     compute_cross_scores,
     run_ethobench_notebook,   # optional behavior notebook capture
@@ -94,7 +99,8 @@ from nethobench import (
 ```
 
 ## Outputs
-- CLI prints scores and saves JSON when `--json-out` is passed.
+- CLI prints scores (with colored arrow bars) and saves JSON when `--json-out` is passed.
+- Intermediate notebook/metric logs are suppressed by default for all CLI commands.
 - `neuro-analysis`, `etho-scores --run-notebook`, and `cross-analysis` save figures + executed notebook under `./outputs/.../`.
 - `cross-scores` reports per-axis composites and the final multimodal composite.
 
@@ -111,12 +117,10 @@ Neuro scores:
   ERR_nRMSE_score01_avg         : 0.xxx
   ERR_nMAE_score01_avg          : 0.xxx
   AUTO_core_score01_avg         : 0.xxx
-  CC_core_score01_avg           : 0.xxx
   Bandpower_score01_avg         : 0.xxx
   FC_core_score01_avg           : 0.xxx
   GRAPH_core_score01_avg        : 0.xxx
   PCA_comp_score01_avg          : 0.xxx
-  CCA_core_score01_avg          : 0.xxx
   MOM_core_score01_avg          : 0.xxx
   MANI_core_score01_avg         : 0.xxx
   MANI_s_knn_score01_avg        : 0.xxx

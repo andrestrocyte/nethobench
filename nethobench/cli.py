@@ -1,11 +1,14 @@
 from __future__ import annotations
 import argparse
+import contextlib
+import io
 import json
 from pathlib import Path
 from typing import Iterable, Optional
 
 from nethobench import (
     compute_neuro_scores,
+    compute_instant_neuro_scores,
     run_neuro_full_analysis,
     compute_etho_scores,
     compute_cross_scores,
@@ -96,13 +99,14 @@ def _score_to_color(value: float) -> str:
         v = float(value)
     except Exception:
         return ""
-    v = max(0.0, min(1.0, v))
-    red = int(round((1.0 - v) * 255))
-    green = int(round(v * 255))
-    return f"\033[38;2;{red};{green};0m"
+    if v >= 0.75:
+        return "\033[32m"
+    if v >= 0.5:
+        return "\033[33m"
+    return "\033[31m"
 
 
-def _render_score_bar(value: float, width: int = 24) -> str:
+def _render_score_bar(value: float, width: int = 16) -> str:
     try:
         v = float(value)
     except Exception:
@@ -116,10 +120,10 @@ def _render_score_bar(value: float, width: int = 24) -> str:
         elif idx == arrow_idx:
             chars.append(">")
         else:
-            chars.append(".")
+            chars.append("-")
     color = _score_to_color(v)
     reset = "\033[0m"
-    return f"{color}0 |{''.join(chars)}| 1{reset}"
+    return f"{color}0 {''.join(chars)}1{reset}"
 
 
 def _print_scores(label: str, scores: dict[str, float]) -> None:
@@ -130,6 +134,20 @@ def _print_scores(label: str, scores: dict[str, float]) -> None:
             print(f"  {k:24s}: {v:.3f} {bar}")
         else:
             print(f"  {k:24s}: NaN")
+
+
+def _print_composite(label: str, value: float) -> None:
+    if value == value:
+        bar = _render_score_bar(value)
+        print(f"{label:18s}: {value:.3f} {bar}")
+    else:
+        print(f"{label:18s}: NaN")
+
+
+def _quiet_call(func, *args, **kwargs):
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+        return func(*args, **kwargs)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -145,6 +163,15 @@ def _build_parser() -> argparse.ArgumentParser:
     neuro.add_argument("--per-seq-std", action="store_true", dest="per_seq_std", help="Include per-sequence stats.")
     neuro.add_argument("--json-out", help="Optional JSON output path.")
     neuro.set_defaults(func=_run_neuro)
+
+    instant = subparsers.add_parser(
+        "instant-neuro-scores",
+        help="Compute a fast neuro composite (mean diff, error, quantile, FC, PCA, Jaccard, power).",
+    )
+    instant.add_argument("--gt", help="Ground-truth neural CSV (auto-detected if omitted).")
+    instant.add_argument("--preds", help="Predicted neural CSV (auto-detected if omitted).")
+    instant.add_argument("--json-out", help="Optional JSON output path.")
+    instant.set_defaults(func=_run_instant_neuro)
 
     neuro_full = subparsers.add_parser(
         "neuro-analysis",
@@ -190,7 +217,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def _run_neuro(args: argparse.Namespace) -> None:
     gt = _prompt_for_file("ground-truth", "gt_", args.gt)
     preds = _prompt_for_file("inference", "inference_", args.preds)
-    scores = compute_neuro_scores(preds, gt, per_sequence_stats=args.per_seq_std)
+    scores = _quiet_call(compute_neuro_scores, preds, gt, per_sequence_stats=args.per_seq_std)
     _print_scores("Neuro scores", scores if not args.per_seq_std else scores["pooled_scores"])
     payload = scores if args.per_seq_std else {"pooled_scores": scores}
     if args.json_out:
@@ -203,12 +230,28 @@ def _run_neuro(args: argparse.Namespace) -> None:
 def _run_neuro_full(args: argparse.Namespace) -> None:
     gt = _prompt_for_file("ground-truth", "gt_", args.gt)
     preds = _prompt_for_file("inference", "inference_", args.preds)
-    out = run_neuro_full_analysis(preds, gt, Path(args.ddconfig), output_root=args.output_root)
+    out = _quiet_call(run_neuro_full_analysis, preds, gt, Path(args.ddconfig), output_root=args.output_root)
     print(f"Neuro full analysis complete. Outputs under {out['output_dir']}")
 
 
+def _run_instant_neuro(args: argparse.Namespace) -> None:
+    gt = _prompt_for_file("ground-truth", "gt_", args.gt)
+    preds = _prompt_for_file("inference", "inference_", args.preds)
+    scores = _quiet_call(compute_instant_neuro_scores, preds, gt)
+    _print_scores("Instant neuro scores", scores)
+    if args.json_out:
+        out = Path(args.json_out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps({"scores": scores}, indent=2))
+        print(f"Saved scores to {out}")
+
+
 def _run_etho(args: argparse.Namespace) -> None:
-    scores, seq_scores, seq_means, seq_stds = compute_etho_scores(Path(args.gt_dir), Path(args.inf_dir))
+    scores, seq_scores, seq_means, seq_stds = _quiet_call(
+        compute_etho_scores,
+        Path(args.gt_dir),
+        Path(args.inf_dir),
+    )
     _print_scores("Behavior scores", scores)
     if args.json_out:
         out = Path(args.json_out)
@@ -230,14 +273,15 @@ def _run_cross(args: argparse.Namespace) -> None:
     gt = _prompt_for_file("ground-truth", "gt_", args.gt)
     preds = _prompt_for_file("inference", "inference_", args.preds)
     cfg_path = _prompt_for_config(args.config)
-    scores = compute_cross_scores(preds, gt, cfg_path)
+    scores = _quiet_call(compute_cross_scores, preds, gt, cfg_path)
     _print_scores("Neuro scores", scores["neuro_scores"])
     _print_scores("Behavior scores", scores["behavior_scores"])
     _print_scores("Cross-modal scores", scores["cross_scores"])
-    print(f"\nComposite neuro:  {scores['neuro_composite']:.3f}")
-    print(f"Composite etho:   {scores['etho_composite']:.3f}")
-    print(f"Composite cross:  {scores['cross_composite']:.3f}")
-    print(f"Final composite:  {scores['composite']:.3f}")
+    print("")
+    _print_composite("Composite neuro", scores.get("neuro_composite", float("nan")))
+    _print_composite("Composite etho", scores.get("etho_composite", float("nan")))
+    _print_composite("Composite cross", scores.get("cross_composite", float("nan")))
+    _print_composite("Final composite", scores.get("composite", float("nan")))
     if args.json_out:
         out = Path(args.json_out)
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -249,7 +293,7 @@ def _run_cross_full(args: argparse.Namespace) -> None:
     gt = _prompt_for_file("ground-truth", "gt_", args.gt)
     preds = _prompt_for_file("inference", "inference_", args.preds)
     cfg_path = _prompt_for_config(args.config)
-    outdir = run_cross_full_analysis(preds, gt, cfg_path, output_root=args.output_root)
+    outdir = _quiet_call(run_cross_full_analysis, preds, gt, cfg_path, output_root=args.output_root)
     print(f"Cross-modal full analysis executed. Outputs under {outdir}")
 
 
