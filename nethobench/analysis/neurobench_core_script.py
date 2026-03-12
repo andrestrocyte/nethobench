@@ -8,6 +8,11 @@ MODE = globals().get('MODE', 'full')
 SKIP_CROSSCORR = bool(globals().get('SKIP_CROSSCORR', False))
 SKIP_CCA = bool(globals().get('SKIP_CCA', False))
 ENABLE_PLOTS = bool(globals().get('ENABLE_PLOTS', False))
+DISABLE_RUNTIME_LIMITS = bool(globals().get('DISABLE_RUNTIME_LIMITS', True))
+
+
+def _runtime_cap(value):
+    return None if DISABLE_RUNTIME_LIMITS else value
 
 # Disable interactive display by default
 try:
@@ -31,6 +36,9 @@ except NameError:
 import pandas as pd
 import numpy as np
 import json
+
+if not hasattr(np, "trapezoid"):
+    np.trapezoid = np.trapz
 
 preds_fname = globals().get('preds_fname')
 gt_fname = globals().get('gt_fname')
@@ -1054,7 +1062,7 @@ def compute_mi_realism_benchmark(
     n_neighbors=5,
     # data / stability controls
     min_samples=80,
-    max_time=1200,          # cap timepoints per (seq,region) for MI
+    max_time=_runtime_cap(1200),  # cap timepoints per (seq,region); None disables cap
     standardize=True,        # robust z-score each x,y before MI
     # mismatch baseline controls
     mismatch_M=10,
@@ -1104,7 +1112,7 @@ def compute_mi_realism_benchmark(
             x = x[m]; y = y[m]
 
             # time cap
-            if x.size > max_time:
+            if max_time is not None and x.size > max_time:
                 idx = rng.choice(x.size, size=max_time, replace=False)
                 x = x[idx]; y = y[idx]
 
@@ -1183,7 +1191,7 @@ def compute_mi_realism_benchmark(
                     continue
                 x = x[mm]; y = y[mm]
 
-                if x.size > max_time:
+                if max_time is not None and x.size > max_time:
                     idx = rng.choice(x.size, size=max_time, replace=False)
                     x = x[idx]; y = y[idx]
 
@@ -1337,7 +1345,7 @@ if MODE == 'full':
         # sensible defaults; tweak if too slow
         n_neighbors=5,
         min_samples=80,
-        max_time=1200,
+        max_time=_runtime_cap(1200),
         mismatch_M=10,
         mismatch_regions_max=10,
         worst_q_regions=0.10,
@@ -1880,7 +1888,7 @@ def compute_quantile_realism_benchmark_v1(
     tail_hi=0.90,
     # validity / runtime guards
     min_samples=80,      # per (seq,region) after finite masking (for quantiles)
-    max_time=1200,       # subsample points used to estimate quantiles
+    max_time=_runtime_cap(1200),  # subsample points used to estimate quantiles (None disables)
     rng_seed=0,
     # scaling (benchmark-safe)
     scale_mode="gt_iqr", # "gt_iqr" (default) or "gt_mad"
@@ -1942,7 +1950,7 @@ def compute_quantile_realism_benchmark_v1(
         v = v[np.isfinite(v)]
         if v.size < min_samples:
             return np.full(quantiles.shape, np.nan, dtype=np.float64)
-        if v.size > max_time:
+        if max_time is not None and v.size > max_time:
             idx = rng.choice(v.size, size=max_time, replace=False)
             v = v[idx]
         # np.quantile is fine; we avoid interpolation args for broad compatibility
@@ -2156,7 +2164,7 @@ if MODE in ('full', 'instant'):
         use_resampled=True,
         # sensible defaults (non-saturating)
         min_samples=80,
-        max_time=1200,
+        max_time=_runtime_cap(1200),
         top_q_regions=0.25,
         min_regions_for_reduce=4,
         mismatch_M=10,
@@ -2675,7 +2683,7 @@ def compute_pca_realism_benchmark_v1(
     use_resampled=True,
     # validity / runtime
     min_samples=80,
-    max_time=1200,
+    max_time=_runtime_cap(1200),
     rng_seed=0,
     # PCA config (GT-anchored)
     var_target=0.90,
@@ -2732,7 +2740,7 @@ def compute_pca_realism_benchmark_v1(
             continue
 
         # time cap (subsample matched rows)
-        if Xg.shape[0] > max_time:
+        if max_time is not None and Xg.shape[0] > max_time:
             idx = rng.choice(Xg.shape[0], size=max_time, replace=False)
             Xg = Xg[idx]
             Xp = Xp[idx]
@@ -2806,7 +2814,7 @@ def compute_pca_realism_benchmark_v1(
             if Xg.shape[0] < min_samples:
                 continue
 
-            if Xg.shape[0] > max_time:
+            if max_time is not None and Xg.shape[0] > max_time:
                 idx = rng.choice(Xg.shape[0], size=max_time, replace=False)
                 Xg = Xg[idx]
                 Xp = Xp[idx]
@@ -2943,7 +2951,7 @@ if MODE in ('full', 'instant'):
         use_resampled=True,
         # defaults chosen to match your other v1 cells
         min_samples=80,
-        max_time=1200,
+        max_time=_runtime_cap(1200),
         rng_seed=0,
         var_target=0.90,
         k_min=5,
@@ -3021,7 +3029,7 @@ def run_autocorr_realism_benchmark_v1(
     use_resampled=True,
     # validity + truncation
     min_seg_len=80,
-    max_time=1200,
+    max_time=_runtime_cap(1200),
     min_lag=1,
     # lags
     max_lag_short=60,
@@ -3175,7 +3183,10 @@ def run_autocorr_realism_benchmark_v1(
     n_seq, T, n_reg = gt.shape
 
     # choose effective time used (ensure long lag possible when available, but don't exceed max_time)
-    max_time_eff = int(min(T, int(max_time)))
+    if max_time is None:
+        max_time_eff = int(T)
+    else:
+        max_time_eff = int(min(T, int(max_time)))
     gt = gt[:, :max_time_eff, :]
     pr = pr[:, :max_time_eff, :]
 
@@ -3631,7 +3642,7 @@ if MODE == 'full':
         use_resampled=True,
         # tune these if needed
         min_seg_len=80,
-        max_time=1200,
+        max_time=_runtime_cap(1200),
         min_lag=1,
         max_lag_short=60,
         max_lag_long=600,
@@ -4756,7 +4767,7 @@ def run_graph_realism_benchmark_v1(
 
     # validity
     min_seg_len=80,         # min joint-finite timepoints for corr computation
-    max_time=1200,          # cap timepoints for speed/stability (0/None to disable)
+    max_time=_runtime_cap(1200),  # cap timepoints for speed/stability (None disables)
 
     # top-k edge selection
     topk_mode="k",          # "k" or "frac"
@@ -5300,7 +5311,7 @@ if MODE in ('full', 'instant'):
         pred_region_names=globals().get("pred_region_names", None),
 
         min_seg_len=80,
-        max_time=1200,
+        max_time=_runtime_cap(1200),
 
         topk_mode="k",
         topk_k=30,
@@ -5359,7 +5370,7 @@ def run_cca_realism_benchmark_v1(
     region_names=None,
     # validity / truncation
     min_seg_len=80,
-    max_time=601,
+    max_time=_runtime_cap(601),
     # CV-CCA
     n_comp=5,
     folds=5,
@@ -5398,7 +5409,10 @@ def run_cca_realism_benchmark_v1(
         raise ValueError(f"Expected aligned gt/pred [n_seq,T,R]. Got {gt.shape} vs {pr.shape}")
 
     n_seq, T, R = gt.shape
-    Tuse = int(min(int(max_time), int(T)))
+    if max_time is None:
+        Tuse = int(T)
+    else:
+        Tuse = int(min(int(max_time), int(T)))
     gt = gt[:, :Tuse, :]
     pr = pr[:, :Tuse, :]
     T = Tuse
@@ -5824,7 +5838,7 @@ if MODE == 'full' and not SKIP_CCA:
         data_predicted=data_predicted,
         region_names=gt_regions if "gt_regions" in globals() else None,
         min_seg_len=80,
-        max_time=601,
+        max_time=_runtime_cap(601),
         n_comp=5,
         folds=5,
         mismatch_M=25,
@@ -5945,7 +5959,7 @@ if MODE == 'full':
         Xs, Ys = Xs[m], Ys[m]
         if Xs.shape[0] < min_pts:
             return None, None, 0
-        if Xs.shape[0] > max_pts:
+        if max_pts is not None and Xs.shape[0] > max_pts:
             idx = rng.choice(Xs.shape[0], size=max_pts, replace=False)
             Xs, Ys = Xs[idx], Ys[idx]
         Xs = _v1_zscore_cols(Xs)
@@ -6070,9 +6084,9 @@ if MODE == 'full':
     # -----------------------------
     params_mani = dict(
         min_seg_len=80,
-        max_time=601,
+        max_time=_runtime_cap(601),
         time_step=10,
-        max_pts_per_seq=220,
+        max_pts_per_seq=_runtime_cap(220),
         min_pts_per_seq=30,        # additional hard minimum post-filtering
         k_nn=10,
         top_eigs=12,
