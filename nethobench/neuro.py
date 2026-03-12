@@ -192,22 +192,6 @@ def _run_active_neuro_instant_notebook(
             for key, value in exact.items():
                 if np.isfinite(value):
                     scores[key] = float(value)
-
-        compatibility_aliases = {
-            "KL_geo_score01_avg": scores.get("KL_score01", np.nan),
-            "MeanShiftZ_mean": scores.get("Mean_score01", np.nan),
-            "MI_mean_score01_avg": scores.get("MI_score01", np.nan),
-            "ERR_realism_score01_avg": scores.get("Error_score01", np.nan),
-            "QNT_realism_score01_avg": scores.get("QNT_score01", np.nan),
-            "FC_core_score01_avg": scores.get("FC_score01", np.nan),
-            "PCA_comp_score01_avg": scores.get("PCA_score01", np.nan),
-            "MOM_core_score01_avg": scores.get("MOM_score01", np.nan),
-            "GRAPH_core_score01_avg": scores.get("GRAPH_score01", np.nan),
-            "Bandpower_score01_avg": scores.get("BP_score01", np.nan),
-        }
-        for key, value in compatibility_aliases.items():
-            if np.isfinite(value):
-                scores[key] = float(value)
         return scores
     finally:
         if cleanup_path and cleanup_path.exists():
