@@ -9,12 +9,15 @@ import numpy as np
 import pandas as pd
 import json
 import tempfile
-import nbformat
-from scipy import signal, stats
+from scipy import signal
 
 # --------------------------------------------------------------------------- #
 # Loading helpers                                                             #
 # --------------------------------------------------------------------------- #
+
+ACTIVE_NEURO_NOTEBOOK = Path(__file__).parent / "notebooks" / "neuro_metrics.ipynb"
+ACTIVE_NEURO_CORE_SCRIPT = Path(__file__).parent / "analysis" / "neuro_metrics_core_script.py"
+ACTIVE_NEURO_INSTANT_SCRIPT = Path(__file__).parent / "analysis" / "neuro_metrics_instant_script.py"
 
 
 def _load_sequences(csv_path: Path, sequence_key: str = "sequenceId", time_key: str = "itemPosition") -> tuple[np.ndarray, list[str]]:
@@ -86,63 +89,6 @@ def _load_and_align(predictions_csv: Path, ground_truth_csv: Path, neuro_cols: O
 # --------------------------------------------------------------------------- #
 
 
-def _exec_notebook_metrics(
-    notebook_path: Path,
-    predictions_csv: Path,
-    ground_truth_csv: Path,
-    ddconfig_path: Path,
-    *,
-    skip_heavy_diagnostics: bool = True,
-) -> dict:
-    nb = nbformat.read(notebook_path, as_version=4)
-    env: dict = {"__name__": "__main__"}
-
-    env["display"] = lambda *args, **kwargs: None
-    exec(
-        "import matplotlib\n"
-        "matplotlib.use('Agg')\n"
-        "import matplotlib.pyplot as plt\n"
-        "plt.show = lambda *args, **kwargs: None\n",
-        env,
-    )
-
-    pred_str = str(predictions_csv)
-    gt_str = str(ground_truth_csv)
-    dd_str = str(ddconfig_path)
-
-    for cell in nb.cells:
-        if cell.get("cell_type") != "code":
-            continue
-        if skip_heavy_diagnostics:
-            src = cell.source
-            # These cells are expensive and do not contribute to METRICS/BUCKETS.
-            if (
-                "UMAP baseline embedding" in src
-                or "Trajectory similarity in embedding space" in src
-                or "Advanced dynamical similarity metrics" in src
-                or "Animated trajectory visualizer" in src
-                or "Trajectory similarity permutation test" in src
-            ):
-                continue
-        src_lines = []
-        for line in cell.source.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("%") or stripped.startswith("!"):
-                continue
-            if stripped.startswith("preds_fname ="):
-                line = f'preds_fname = r\"{pred_str}\"'
-            elif stripped.startswith("gt_fname ="):
-                line = f'gt_fname = r\"{gt_str}\"'
-            elif stripped.startswith("ddconfig_path ="):
-                line = f'ddconfig_path = r\"{dd_str}\"'
-            src_lines.append(line)
-        if not src_lines:
-            continue
-        exec("\n".join(src_lines), env)
-
-    return env
-
-
 def _ensure_ddconfig(ddconfig_path: Optional[Path]) -> tuple[Path, Optional[Path]]:
     if ddconfig_path is not None:
         return Path(ddconfig_path), None
@@ -163,6 +109,111 @@ def _flatten_scores(metrics: dict, buckets: dict, composite: float) -> Dict[str,
     return scores
 
 
+def _flatten_active_notebook_scores(env: dict) -> Dict[str, float]:
+    scores: Dict[str, float] = {}
+
+    metrics_df = env.get("metrics_df")
+    if isinstance(metrics_df, pd.DataFrame) and {"metric", "value"}.issubset(metrics_df.columns):
+        for _, row in metrics_df.iterrows():
+            key = str(row["metric"])
+            val = float(row["value"]) if np.isfinite(row["value"]) else np.nan
+            scores[key] = val
+
+    families_df = env.get("families_df")
+    if isinstance(families_df, pd.DataFrame) and {"family", "value"}.issubset(families_df.columns):
+        for _, row in families_df.iterrows():
+            key = f"family_{row['family']}"
+            val = float(row["value"]) if np.isfinite(row["value"]) else np.nan
+            scores[key] = val
+
+    composite = env.get("FINAL_COMPOSITE_SCORE", np.nan)
+    composite = float(composite) if np.isfinite(composite) else np.nan
+    scores["composite_score"] = composite
+    scores["FINAL_COMPOSITE_SCORE"] = composite
+    scores["FINAL_NEURO_COMPOSITE_SCORE"] = composite
+    return scores
+
+
+def _run_active_neuro_notebook(
+    predictions_csv: Path,
+    ground_truth_csv: Path,
+    *,
+    ddconfig_path: Optional[Path] = None,
+    save_plots_dir: Optional[Path] = None,
+    save_wrapped_notebook: Optional[Path] = None,
+) -> tuple[dict, Dict[str, float]]:
+    if not ACTIVE_NEURO_CORE_SCRIPT.is_file():
+        raise FileNotFoundError(f"Active neuro core script missing at {ACTIVE_NEURO_CORE_SCRIPT}")
+    dd_path, cleanup_path = _ensure_ddconfig(ddconfig_path)
+    try:
+        init_globals = {
+            "preds_fname": str(Path(predictions_csv)),
+            "gt_fname": str(Path(ground_truth_csv)),
+            "ddconfig_path": str(dd_path),
+            "SAVE_PLOTS_DIR": str(Path(save_plots_dir)) if save_plots_dir is not None else None,
+            "WRAPPED_NOTEBOOK_PATH": str(Path(save_wrapped_notebook)) if save_wrapped_notebook is not None else None,
+            "ENABLE_PLOTS": bool(save_plots_dir is not None),
+            "__name__": "__main__",
+            "ACTIVE_NEURO_NOTEBOOK": str(ACTIVE_NEURO_NOTEBOOK),
+        }
+        env = runpy.run_path(str(ACTIVE_NEURO_CORE_SCRIPT), init_globals=init_globals)
+        env["ACTIVE_NEURO_NOTEBOOK"] = str(ACTIVE_NEURO_NOTEBOOK)
+        env["ACTIVE_NEURO_CORE_SCRIPT"] = str(ACTIVE_NEURO_CORE_SCRIPT)
+        return env, _flatten_active_notebook_scores(env)
+    finally:
+        if cleanup_path and cleanup_path.exists():
+            cleanup_path.unlink(missing_ok=True)
+
+
+def _run_active_neuro_instant_notebook(
+    predictions_csv: Path,
+    ground_truth_csv: Path,
+    *,
+    ddconfig_path: Optional[Path] = None,
+) -> Dict[str, float]:
+    if not ACTIVE_NEURO_INSTANT_SCRIPT.is_file():
+        raise FileNotFoundError(f"Active instant neuro script missing at {ACTIVE_NEURO_INSTANT_SCRIPT}")
+    dd_path, cleanup_path = _ensure_ddconfig(ddconfig_path)
+    try:
+        init_globals = {
+            "preds_fname": str(Path(predictions_csv)),
+            "gt_fname": str(Path(ground_truth_csv)),
+            "ddconfig_path": str(dd_path),
+            "__name__": "__main__",
+            "ACTIVE_NEURO_NOTEBOOK": str(ACTIVE_NEURO_NOTEBOOK),
+        }
+        env = runpy.run_path(str(ACTIVE_NEURO_INSTANT_SCRIPT), init_globals=init_globals)
+        env["ACTIVE_NEURO_NOTEBOOK"] = str(ACTIVE_NEURO_NOTEBOOK)
+        env["ACTIVE_NEURO_INSTANT_SCRIPT"] = str(ACTIVE_NEURO_INSTANT_SCRIPT)
+
+        scores = _flatten_active_notebook_scores(env)
+        exact = env.get("INSTANT_NOTEBOOK_SCORES", {})
+        if isinstance(exact, dict):
+            for key, value in exact.items():
+                if np.isfinite(value):
+                    scores[key] = float(value)
+
+        compatibility_aliases = {
+            "KL_geo_score01_avg": scores.get("KL_score01", np.nan),
+            "MeanShiftZ_mean": scores.get("Mean_score01", np.nan),
+            "MI_mean_score01_avg": scores.get("MI_score01", np.nan),
+            "ERR_realism_score01_avg": scores.get("Error_score01", np.nan),
+            "QNT_realism_score01_avg": scores.get("QNT_score01", np.nan),
+            "FC_core_score01_avg": scores.get("FC_score01", np.nan),
+            "PCA_comp_score01_avg": scores.get("PCA_score01", np.nan),
+            "MOM_core_score01_avg": scores.get("MOM_score01", np.nan),
+            "GRAPH_core_score01_avg": scores.get("GRAPH_score01", np.nan),
+            "Bandpower_score01_avg": scores.get("BP_score01", np.nan),
+        }
+        for key, value in compatibility_aliases.items():
+            if np.isfinite(value):
+                scores[key] = float(value)
+        return scores
+    finally:
+        if cleanup_path and cleanup_path.exists():
+            cleanup_path.unlink(missing_ok=True)
+
+
 def _run_neurobench_script(
     predictions_csv: Path,
     ground_truth_csv: Path,
@@ -172,6 +223,7 @@ def _run_neurobench_script(
     skip_crosscorr: bool = True,
     skip_cca: bool = True,
     enable_plots: bool = False,
+    disable_runtime_limits: bool = True,
 ) -> dict:
     script_path = Path(__file__).parent / "analysis" / "neurobench_core_script.py"
     if not script_path.is_file():
@@ -185,6 +237,7 @@ def _run_neurobench_script(
         "SKIP_CROSSCORR": skip_crosscorr,
         "SKIP_CCA": skip_cca,
         "ENABLE_PLOTS": enable_plots,
+        "DISABLE_RUNTIME_LIMITS": disable_runtime_limits,
     }
     env = runpy.run_path(str(script_path), init_globals=init_globals)
     if cleanup_path and cleanup_path.exists():
@@ -240,7 +293,214 @@ def _get(d, path, default=np.nan):
     return cur
 
 
-def _build_full_metrics_from_env(env: dict, *, skip_crosscorr: bool, skip_cca: bool) -> tuple[dict, dict, float]:
+MONOTONIC_V2_LEGACY_WEIGHT = 0.30
+
+MONOTONIC_V2_FAMILY_WEIGHTS = {
+    "Bandpower_score01_avg": 0.30,
+    "FC_core_score01_avg": 0.30,
+    "GRAPH_core_score01_avg": 0.20,
+    "PCA_comp_score01_avg": 0.07,
+    "MeanShiftZ_mean": 0.07,
+    "QNT_realism_score01_avg": 0.04,
+    "ERR_realism_score01_avg": 0.02,
+}
+
+MONOTONIC_V3_GAMMA = 1.5
+MONOTONIC_V3_BOTTLENECK_WEIGHT = 0.02
+
+
+def _blend_legacy_absolute(
+    legacy_val: float,
+    abs_val: float,
+    w_legacy: float = MONOTONIC_V2_LEGACY_WEIGHT,
+) -> float:
+    legacy_val = float(legacy_val) if np.isfinite(legacy_val) else np.nan
+    abs_val = float(abs_val) if np.isfinite(abs_val) else np.nan
+    if np.isfinite(legacy_val) and np.isfinite(abs_val):
+        wl = float(np.clip(w_legacy, 0.0, 1.0))
+        wa = 1.0 - wl
+        return float(np.exp(wl * np.log(_clip01(legacy_val)) + wa * np.log(_clip01(abs_val))))
+    if np.isfinite(abs_val):
+        return abs_val
+    return legacy_val
+
+
+def _strict_multiplicative_v3(
+    family_scores: dict,
+    weights: dict,
+    *,
+    gamma: float = MONOTONIC_V3_GAMMA,
+    bottleneck_weight: float = MONOTONIC_V3_BOTTLENECK_WEIGHT,
+) -> tuple[dict, float]:
+    valid = {k: float(v) for k, v in family_scores.items() if np.isfinite(v)}
+    if not valid:
+        return {}, np.nan
+
+    g = float(max(gamma, 1.0))
+    sharpened = {k: float(_clip01(v) ** g) for k, v in valid.items()}
+    gmean_score = _weighted_gmean(sharpened, weights)
+    if not np.isfinite(gmean_score):
+        return sharpened, np.nan
+    bottleneck = float(np.min(list(sharpened.values())))
+    bw = float(np.clip(bottleneck_weight, 0.0, 0.95))
+    composite = float(
+        np.exp(
+            (1.0 - bw) * np.log(_clip01(gmean_score))
+            + bw * np.log(_clip01(bottleneck))
+        )
+    )
+    return sharpened, composite
+
+
+def _compute_absolute_fidelity_channels(gt: np.ndarray, pred: np.ndarray) -> dict:
+    """
+    Compute monotonic absolute-fidelity channels (0-1, higher better) from aligned arrays.
+    These channels do not rely on mismatch baselines and are used to stabilize monotonicity.
+    """
+    if gt.ndim != 3 or pred.ndim != 3 or gt.shape != pred.shape:
+        return {}
+
+    eps = 1e-12
+    gt_flat = gt.reshape(-1, gt.shape[-1]).astype(np.float64, copy=False)
+    pr_flat = pred.reshape(-1, pred.shape[-1]).astype(np.float64, copy=False)
+    mask_rows = np.isfinite(gt_flat).all(axis=1) & np.isfinite(pr_flat).all(axis=1)
+    gt_flat = gt_flat[mask_rows]
+    pr_flat = pr_flat[mask_rows]
+    if gt_flat.size == 0 or pr_flat.size == 0:
+        return {}
+
+    # GT-anchored scales prevent "self-forgiveness" when predictions get noisier.
+    gt_l1_scale = float(np.mean(np.abs(gt_flat))) + eps
+    pred_l1_scale = float(np.mean(np.abs(pr_flat))) + eps
+    gt_l2_scale = float(np.sqrt(np.mean(gt_flat ** 2))) + eps
+    gt_med = np.median(gt_flat, axis=0)
+    gt_mad = np.median(np.abs(gt_flat - gt_med[None, :]), axis=0)
+    gt_sigma = 1.4826 * gt_mad
+    gt_sigma = np.where(np.isfinite(gt_sigma) & (gt_sigma > eps), gt_sigma, np.std(gt_flat, axis=0) + eps)
+    gt_sigma = np.where(np.isfinite(gt_sigma) & (gt_sigma > eps), gt_sigma, 1.0)
+
+    # 1) Mean-shift family absolute channel.
+    # Use a small location term + dominant first-difference variance mismatch term.
+    # This avoids variance-inflation loopholes and makes the channel respond to additive noise.
+    d_mean = float(np.mean(np.abs(np.mean(gt_flat, axis=0) - np.mean(pr_flat, axis=0))))
+    mean_anchor = float(min(gt_l1_scale, pred_l1_scale)) + eps
+    mean_term = float(d_mean / mean_anchor)
+
+    hf_terms = []
+    for r in range(gt.shape[-1]):
+        gx = gt[:, :, r].reshape(-1)
+        px = pred[:, :, r].reshape(-1)
+        m = np.isfinite(gx) & np.isfinite(px)
+        gx = gx[m]
+        px = px[m]
+        if gx.size < 8 or px.size < 8:
+            continue
+        dg = np.diff(gx)
+        dp = np.diff(px)
+        if dg.size < 4 or dp.size < 4:
+            continue
+        vg = float(np.var(dg)) + eps
+        vp = float(np.var(dp)) + eps
+        hf_terms.append(float(np.abs(np.log(vp / vg))))
+    hf_term = float(np.mean(hf_terms)) if hf_terms else 0.0
+    raw_mean_shift_score = float(np.exp(-(0.05 * mean_term + 0.95 * hf_term)))
+    mean_shift_score = float(np.clip(raw_mean_shift_score, 0.0, 1.0))
+
+    # 2) Error absolute channel
+    rmse = float(np.sqrt(np.mean((gt_flat - pr_flat) ** 2)))
+    mae = float(np.mean(np.abs(gt_flat - pr_flat)))
+    err_score = 1.0 / (1.0 + 0.5 * (rmse / gt_l2_scale + mae / gt_l1_scale))
+
+    # 3) Quantile-shape absolute channel
+    quantiles = np.linspace(0.05, 0.95, 19, dtype=np.float64)
+    q_dists = []
+    for r in range(gt_flat.shape[1]):
+        g = gt_flat[:, r]
+        p = pr_flat[:, r]
+        if g.size < 20 or p.size < 20:
+            continue
+        qg = np.quantile(g, quantiles)
+        qp = np.quantile(p, quantiles)
+        scale = float(gt_sigma[r]) + eps
+        q_dists.append(float(np.mean(np.abs(qg - qp)) / scale))
+    qnt_score = 1.0 / (1.0 + (float(np.mean(q_dists)) if q_dists else np.nan))
+
+    # 4) FC absolute channel (upper-triangle correlation agreement)
+    Cg = np.corrcoef(gt_flat, rowvar=False)
+    Cp = np.corrcoef(pr_flat, rowvar=False)
+    iu = np.triu_indices_from(Cg, k=1)
+    valid = np.isfinite(Cg[iu]) & np.isfinite(Cp[iu])
+    if np.sum(valid) >= 3:
+        fc_r = float(np.corrcoef(Cg[iu][valid], Cp[iu][valid])[0, 1])
+        fc_score = (fc_r + 1.0) / 2.0
+    else:
+        fc_score = np.nan
+
+    # 5) PCA-spectrum absolute channel
+    Xg = gt_flat - np.mean(gt_flat, axis=0, keepdims=True)
+    Xp = pr_flat - np.mean(pr_flat, axis=0, keepdims=True)
+    sg = np.linalg.svd(Xg, full_matrices=False, compute_uv=False)
+    sp = np.linalg.svd(Xp, full_matrices=False, compute_uv=False)
+    eg = sg ** 2
+    ep = sp ** 2
+    eg = eg / (np.sum(eg) + eps)
+    ep = ep / (np.sum(ep) + eps)
+    k = min(20, eg.size, ep.size)
+    pca_score = float(np.clip(1.0 - np.mean(np.abs(eg[:k] - ep[:k])), 0.0, 1.0)) if k > 0 else np.nan
+
+    # 6) Graph absolute channel (top-k edge overlap)
+    Cga = np.abs(Cg).astype(np.float64, copy=True)
+    Cpa = np.abs(Cp).astype(np.float64, copy=True)
+    np.fill_diagonal(Cga, 0.0)
+    np.fill_diagonal(Cpa, 0.0)
+    iu = np.triu_indices_from(Cga, k=1)
+    n_edges = len(iu[0])
+    if n_edges > 0:
+        topk = min(30, n_edges)
+        gi = np.argsort(Cga[iu])[-topk:]
+        pi = np.argsort(Cpa[iu])[-topk:]
+        gset = set(zip(iu[0][gi], iu[1][gi]))
+        pset = set(zip(iu[0][pi], iu[1][pi]))
+        graph_score = float(len(gset & pset) / max(1, len(gset | pset)))
+    else:
+        graph_score = np.nan
+
+    # 7) Bandpower absolute channel (PSD cosine)
+    bp_sims = []
+    for r in range(gt.shape[-1]):
+        gx = gt[:, :, r].reshape(-1)
+        px = pred[:, :, r].reshape(-1)
+        m = np.isfinite(gx) & np.isfinite(px)
+        gx = gx[m]
+        px = px[m]
+        if gx.size < 32 or px.size < 32:
+            continue
+        nperseg = min(2048, gx.size, px.size)
+        _, pxx_g = signal.welch(gx, nperseg=nperseg)
+        _, pxx_p = signal.welch(px, nperseg=nperseg)
+        denom = float(np.linalg.norm(pxx_g) * np.linalg.norm(pxx_p)) + eps
+        bp_sims.append(float(np.dot(pxx_g, pxx_p) / denom))
+    bandpower_score = float(np.clip(np.nanmean(bp_sims), 0.0, 1.0)) if bp_sims else np.nan
+
+    out = {
+        "MeanShiftZ_mean": float(np.clip(mean_shift_score, 0.0, 1.0)),
+        "ERR_realism_score01_avg": float(np.clip(err_score, 0.0, 1.0)),
+        "QNT_realism_score01_avg": float(np.clip(qnt_score, 0.0, 1.0)),
+        "FC_core_score01_avg": float(np.clip(fc_score, 0.0, 1.0)) if np.isfinite(fc_score) else np.nan,
+        "PCA_comp_score01_avg": float(np.clip(pca_score, 0.0, 1.0)) if np.isfinite(pca_score) else np.nan,
+        "GRAPH_core_score01_avg": float(np.clip(graph_score, 0.0, 1.0)) if np.isfinite(graph_score) else np.nan,
+        "Bandpower_score01_avg": float(np.clip(bandpower_score, 0.0, 1.0)) if np.isfinite(bandpower_score) else np.nan,
+    }
+    return out
+
+
+def _build_full_metrics_from_env(
+    env: dict,
+    *,
+    skip_crosscorr: bool,
+    skip_cca: bool,
+    abs_channels: Optional[dict] = None,
+) -> tuple[dict, dict, float]:
     dist_out = env.get("dist_out", {})
     mean_results = env.get("mean_results", {})
     results_mi = env.get("results_mi", {})
@@ -392,33 +652,80 @@ def _build_full_metrics_from_env(env: dict, *, skip_crosscorr: bool, skip_cca: b
     if skip_cca:
         metrics.pop("CCA_core_score01_avg", None)
 
+    # Monotonic v2 blend: combine notebook realism (legacy) with absolute fidelity channels.
+    abs_channels = abs_channels or {}
+    legacy_family = {
+        "MeanShiftZ_mean": float(MeanShiftZ_mean),
+        "ERR_realism_score01_avg": _gmean([ERR_nRMSE_score01, ERR_nMAE_score01]),
+        "QNT_realism_score01_avg": _gmean([QNT_tail_score01, QNT_full_score01]),
+        "FC_core_score01_avg": float(FC_score01),
+        "PCA_comp_score01_avg": float(PCA_score01),
+        "GRAPH_core_score01_avg": float(GRAPH_score01),
+        "Bandpower_score01_avg": float(Bandpower_score01),
+    }
+    v2_family = {
+        k: _blend_legacy_absolute(legacy_family.get(k, np.nan), abs_channels.get(k, np.nan))
+        for k in legacy_family
+    }
+    err_v2 = float(v2_family["ERR_realism_score01_avg"])
+    qnt_v2 = float(v2_family["QNT_realism_score01_avg"])
+    mean_v2 = float(v2_family["MeanShiftZ_mean"])
+    fc_v2 = float(v2_family["FC_core_score01_avg"])
+    pca_v2 = float(v2_family["PCA_comp_score01_avg"])
+    graph_v2 = float(v2_family["GRAPH_core_score01_avg"])
+    bandpower_v2 = float(v2_family["Bandpower_score01_avg"])
+
+    metrics["MeanShiftZ_mean_legacy"] = float(MeanShiftZ_mean)
+    metrics["ERR_realism_score01_avg_legacy"] = float(legacy_family["ERR_realism_score01_avg"])
+    metrics["QNT_realism_score01_avg_legacy"] = float(legacy_family["QNT_realism_score01_avg"])
+    metrics["FC_core_score01_avg_legacy"] = float(FC_score01)
+    metrics["PCA_comp_score01_avg_legacy"] = float(PCA_score01)
+    metrics["GRAPH_core_score01_avg_legacy"] = float(GRAPH_score01)
+    metrics["Bandpower_score01_avg_legacy"] = float(Bandpower_score01)
+    for k, v in abs_channels.items():
+        metrics[f"{k}_absolute"] = float(v)
+
+    # Expose v2 family channels.
+    metrics["MeanShiftZ_mean"] = mean_v2
+    metrics["ERR_realism_score01_avg"] = err_v2
+    metrics["QNT_realism_score01_avg"] = qnt_v2
+    metrics["FC_core_score01_avg"] = fc_v2
+    metrics["PCA_comp_score01_avg"] = pca_v2
+    metrics["GRAPH_core_score01_avg"] = graph_v2
+    metrics["Bandpower_score01_avg"] = bandpower_v2
+    # Apply v2 blend back to detailed keys used in legacy dashboards.
+    metrics["ERR_nRMSE_score01_avg"] = err_v2
+    metrics["ERR_nMAE_score01_avg"] = err_v2
+    metrics["QNT_tail_score01_avg"] = qnt_v2
+    metrics["QNT_full_score01_avg"] = qnt_v2
+
     buckets = {
         "distribution": _gmean([
             JSD_score01,
             KL_score01,
             W1n_score01,
-            MeanShiftZ_mean,
-            QNT_tail_score01,
-            QNT_full_score01,
+            mean_v2,
+            qnt_v2,
+            qnt_v2,
         ]),
         "dependence": _gmean([
             MI_score01,
         ]),
         "point_error": _gmean([
-            ERR_nRMSE_score01,
-            ERR_nMAE_score01,
+            err_v2,
+            err_v2,
         ]),
         "temporal_dynamics": _gmean([
             AUTO_score01,
             CC_score01,
-            Bandpower_score01,
+            bandpower_v2,
             MANI_score01,
             CCA_score01,
         ]),
         "inter_region_structure": _gmean([
-            FC_score01,
-            GRAPH_score01,
-            PCA_score01,
+            fc_v2,
+            graph_v2,
+            pca_v2,
         ]),
         "higher_order": _gmean([
             MOM_score01,
@@ -441,11 +748,30 @@ def _build_full_metrics_from_env(env: dict, *, skip_crosscorr: bool, skip_cca: b
         "manifold_components": 0.07,
     }
 
-    composite = _weighted_gmean(buckets, weights)
-    return metrics, buckets, composite
+    composite_legacy = _weighted_gmean(
+        {
+            "distribution": _gmean([JSD_score01, KL_score01, W1n_score01, MeanShiftZ_mean, QNT_tail_score01, QNT_full_score01]),
+            "dependence": _gmean([MI_score01]),
+            "point_error": _gmean([ERR_nRMSE_score01, ERR_nMAE_score01]),
+            "temporal_dynamics": _gmean([AUTO_score01, CC_score01, Bandpower_score01, MANI_score01, CCA_score01]),
+            "inter_region_structure": _gmean([FC_score01, GRAPH_score01, PCA_score01]),
+            "higher_order": _gmean([MOM_score01]),
+            "manifold_components": _gmean([MANI_s_knn, MANI_s_spec, MANI_s_proc, MANI_s_geo]),
+        },
+        weights,
+    )
+    v3_family, composite_v3 = _strict_multiplicative_v3(v2_family, MONOTONIC_V2_FAMILY_WEIGHTS)
+    composite_v2 = _weighted_gmean(v2_family, MONOTONIC_V2_FAMILY_WEIGHTS)
+    for k, v in v3_family.items():
+        metrics[f"{k}_v3"] = float(v)
+    metrics["legacy_composite_score"] = float(composite_legacy)
+    metrics["monotonic_v2_composite_score"] = float(composite_v2)
+    metrics["multiplicative_v3_composite_score"] = float(composite_v3)
+    metrics["monotonic_v3_composite_score"] = float(composite_v3)
+    return metrics, buckets, composite_v3
 
 
-def _build_instant_metrics_from_env(env: dict) -> tuple[dict, float]:
+def _build_instant_metrics_from_env(env: dict, *, abs_channels: Optional[dict] = None) -> tuple[dict, float]:
     mean_results = env.get("mean_results", {})
     err_out = env.get("err_out", {})
     results_qnt = env.get("results_qnt", {})
@@ -504,7 +830,7 @@ def _build_instant_metrics_from_env(env: dict) -> tuple[dict, float]:
         _bp_q10 = np.nan
     Bandpower_score01 = _avg_mean_strict(_bp_mean, _bp_q10)
 
-    metrics = {
+    legacy = {
         "MeanShiftZ_mean": float(MeanShiftZ_mean),
         "ERR_realism_score01_avg": float(ERR_score01),
         "QNT_realism_score01_avg": float(QNT_score01),
@@ -513,9 +839,27 @@ def _build_instant_metrics_from_env(env: dict) -> tuple[dict, float]:
         "GRAPH_core_score01_avg": float(GRAPH_score01),
         "Bandpower_score01_avg": float(Bandpower_score01),
     }
+    abs_channels = abs_channels or {}
+    metrics = {
+        k: _blend_legacy_absolute(legacy.get(k, np.nan), abs_channels.get(k, np.nan))
+        for k in legacy
+    }
+    for k, v in legacy.items():
+        metrics[f"{k}_legacy"] = float(v)
+    for k, v in abs_channels.items():
+        metrics[f"{k}_absolute"] = float(v)
 
-    composite = _weighted_gmean(metrics, {k: 1.0 for k in metrics})
-    return metrics, composite
+    composite_legacy = _weighted_gmean(legacy, {k: 1.0 for k in legacy})
+    family_v2 = {k: metrics[k] for k in legacy}
+    v3_family, composite_v3 = _strict_multiplicative_v3(family_v2, MONOTONIC_V2_FAMILY_WEIGHTS)
+    composite_v2 = _weighted_gmean(family_v2, MONOTONIC_V2_FAMILY_WEIGHTS)
+    for k, v in v3_family.items():
+        metrics[f"{k}_v3"] = float(v)
+    metrics["legacy_composite_score"] = float(composite_legacy)
+    metrics["monotonic_v2_composite_score"] = float(composite_v2)
+    metrics["multiplicative_v3_composite_score"] = float(composite_v3)
+    metrics["monotonic_v3_composite_score"] = float(composite_v3)
+    return metrics, composite_v3
 
 
 def _compute_scores_from_arrays(
@@ -548,7 +892,8 @@ def _compute_scores_from_arrays(
         pr_df.index = seq_ids
         pr_df.to_csv(pr_path)
 
-        return _compute_neuro_scores_from_script(pr_path, gt_path, ddconfig_path=ddconfig_path)
+        _, scores = _run_active_neuro_notebook(pr_path, gt_path, ddconfig_path=ddconfig_path)
+        return scores
 
 
 def _compute_neuro_scores_from_script(
@@ -559,7 +904,14 @@ def _compute_neuro_scores_from_script(
     mode: str = "full",
     skip_crosscorr: bool = True,
     skip_cca: bool = True,
+    disable_runtime_limits: bool = True,
 ) -> Dict[str, float]:
+    try:
+        gt_arr, pred_arr, _ = _load_and_align(Path(predictions_csv), Path(ground_truth_csv))
+        abs_channels = _compute_absolute_fidelity_channels(gt_arr, pred_arr)
+    except Exception:
+        abs_channels = {}
+
     env = _run_neurobench_script(
         Path(predictions_csv),
         Path(ground_truth_csv),
@@ -568,14 +920,16 @@ def _compute_neuro_scores_from_script(
         skip_crosscorr=skip_crosscorr,
         skip_cca=skip_cca,
         enable_plots=False,
+        disable_runtime_limits=disable_runtime_limits,
     )
     if mode == "instant":
-        metrics, composite = _build_instant_metrics_from_env(env)
+        metrics, composite = _build_instant_metrics_from_env(env, abs_channels=abs_channels)
         return _flatten_scores(metrics, {}, composite)
     metrics, buckets, composite = _build_full_metrics_from_env(
         env,
         skip_crosscorr=skip_crosscorr,
         skip_cca=skip_cca,
+        abs_channels=abs_channels,
     )
     return _flatten_scores(metrics, buckets, composite)
 
@@ -602,14 +956,12 @@ def compute_neuro_scores(
         )
         return _compute_scores_from_arrays(gt, pred, region_names=overlap, ddconfig_path=ddconfig_path)
 
-    return _compute_neuro_scores_from_script(
+    _, scores = _run_active_neuro_notebook(
         Path(predictions_csv),
         Path(ground_truth_csv),
         ddconfig_path=ddconfig_path,
-        mode="full",
-        skip_crosscorr=True,
-        skip_cca=True,
     )
+    return scores
 
 
 def compute_instant_neuro_scores(
@@ -619,15 +971,12 @@ def compute_instant_neuro_scores(
     ddconfig_path: Optional[Path] = None,
 ) -> Dict[str, float]:
     """
-    Compute a fast neuro composite using mean diff, error realism, quantile, FC, PCA, Jaccard, and Power.
+    Compute a trimmed notebook-derived neuro score subset.
     """
-    return _compute_neuro_scores_from_script(
+    return _run_active_neuro_instant_notebook(
         Path(predictions_csv),
         Path(ground_truth_csv),
         ddconfig_path=ddconfig_path,
-        mode="instant",
-        skip_crosscorr=True,
-        skip_cca=True,
     )
 
 
@@ -650,65 +999,24 @@ def run_neuro_full_analysis(
     output_root: Optional[Path] = None,
 ) -> Dict[str, object]:
     """
-    Execute the bundled NeuroBench full analysis (notebook-derived script) and save figures.
+    Execute the active neuro notebook headlessly, save figures, and export notebook-derived scores.
     """
-    from nbconvert.preprocessors import ExecutePreprocessor
-    import nbformat
-
-    nb_path = Path(__file__).parent / "notebooks" / "final_implementation_benchmark.ipynb"
-    if not nb_path.is_file():
-        raise FileNotFoundError(f"Neuro notebook missing at {nb_path}")
-
     preds_path = Path(predictions_csv)
     outdir = _timestamped_outdir(output_root, stem=preds_path.stem)
+    wrapped_notebook = outdir / "wrapped_neuro_metrics.ipynb"
+    _, scores = _run_active_neuro_notebook(
+        Path(predictions_csv),
+        Path(ground_truth_csv),
+        ddconfig_path=ddconfig_path,
+        save_plots_dir=outdir,
+        save_wrapped_notebook=wrapped_notebook,
+    )
 
-    nb = nbformat.read(nb_path, as_version=4)
-
-    # Patch notebook cell(s) that hardcode file paths.
-    pred_str = str(predictions_csv)
-    gt_str = str(ground_truth_csv)
-    dd_str = str(ddconfig_path)
-    for cell in nb.cells:
-        if cell.get("cell_type") != "code":
-            continue
-        lines = cell.source.splitlines()
-        changed = False
-        for i, line in enumerate(lines):
-            stripped = line.strip()
-            if stripped.startswith("preds_fname ="):
-                lines[i] = f'preds_fname = r"{pred_str}"'
-                changed = True
-            elif stripped.startswith("gt_fname ="):
-                lines[i] = f'gt_fname = r"{gt_str}"'
-                changed = True
-            elif stripped.startswith("ddconfig_path ="):
-                lines[i] = f'ddconfig_path = r"{dd_str}"'
-                changed = True
-        if changed:
-            cell.source = "\n".join(lines)
-
-    patch = f"""
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from pathlib import Path
-outdir = Path(r\"{outdir}\")
-plot_counter = {{'n': 0}}
-orig_show = plt.show
-def saving_show(*args, **kwargs):
-    figs = [plt.figure(num) for num in plt.get_fignums()]
-    for fig in figs:
-        plot_counter['n'] += 1
-        fig.savefig(outdir / f\"figure_{{plot_counter['n']:03d}}.png\", dpi=200, bbox_inches=\"tight\")
-    plt.close('all')
-plt.show = saving_show
-"""
-    nb.cells.insert(0, nbformat.v4.new_code_cell(patch))
-
-    ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
-    ep.preprocess(nb, {"metadata": {"path": nb_path.parent}})
-    executed_path = outdir / "executed_neurobench.ipynb"
-    with executed_path.open("w", encoding="utf-8") as f:
-        nbformat.write(nb, f)
-
-    return {"output_dir": outdir}
+    scores_path = outdir / "scores.json"
+    scores_path.write_text(json.dumps(scores, indent=2))
+    return {
+        "output_dir": outdir,
+        "scores": scores,
+        "scores_path": scores_path,
+        "wrapped_notebook": wrapped_notebook,
+    }

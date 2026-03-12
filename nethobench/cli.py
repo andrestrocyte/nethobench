@@ -1,6 +1,7 @@
 from __future__ import annotations
 import argparse
 import contextlib
+from datetime import datetime
 import io
 import json
 from pathlib import Path
@@ -99,9 +100,9 @@ def _score_to_color(value: float) -> str:
         v = float(value)
     except Exception:
         return ""
-    if v >= 0.75:
+    if v >= 0.8:
         return "\033[32m"
-    if v >= 0.5:
+    if v >= 0.4:
         return "\033[33m"
     return "\033[31m"
 
@@ -113,17 +114,18 @@ def _render_score_bar(value: float, width: int = 16) -> str:
         return ""
     v = max(0.0, min(1.0, v))
     arrow_idx = min(width - 1, max(0, int(round(v * (width - 1)))))
+    icon = "↗" if v >= 0.8 else ("→" if v >= 0.4 else "↘")
     chars = []
     for idx in range(width):
         if idx < arrow_idx:
-            chars.append("=")
+            chars.append("━")
         elif idx == arrow_idx:
-            chars.append(">")
+            chars.append("▶")
         else:
-            chars.append("-")
+            chars.append("─")
     color = _score_to_color(v)
     reset = "\033[0m"
-    return f"{color}0 {''.join(chars)}1{reset}"
+    return f"{color}{icon} 0 {''.join(chars)} 1{reset}"
 
 
 def _print_scores(label: str, scores: dict[str, float]) -> None:
@@ -150,6 +152,20 @@ def _quiet_call(func, *args, **kwargs):
         return func(*args, **kwargs)
 
 
+def _default_json_output(command: str, preds: Path) -> Path:
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    outdir = Path.cwd() / "outputs" / f"{preds.stem}-{command}-{ts}"
+    outdir.mkdir(parents=True, exist_ok=True)
+    return outdir / "scores.json"
+
+
+def _save_json_payload(payload: dict, *, requested: Optional[str], command: str, preds: Path) -> Path:
+    out = Path(requested) if requested else _default_json_output(command, preds)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(payload, indent=2))
+    return out
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nethobench",
@@ -166,7 +182,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     instant = subparsers.add_parser(
         "instant-neuro-scores",
-        help="Compute a fast neuro composite (mean diff, error, quantile, FC, PCA, Jaccard, power).",
+        help="Compute a trimmed notebook-derived neuro score subset.",
     )
     instant.add_argument("--gt", help="Ground-truth neural CSV (auto-detected if omitted).")
     instant.add_argument("--preds", help="Predicted neural CSV (auto-detected if omitted).")
@@ -220,18 +236,18 @@ def _run_neuro(args: argparse.Namespace) -> None:
     scores = _quiet_call(compute_neuro_scores, preds, gt, per_sequence_stats=args.per_seq_std)
     _print_scores("Neuro scores", scores if not args.per_seq_std else scores["pooled_scores"])
     payload = scores if args.per_seq_std else {"pooled_scores": scores}
-    if args.json_out:
-        out = Path(args.json_out)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps(payload, indent=2))
-        print(f"Saved scores to {out}")
+    out = _save_json_payload(payload, requested=args.json_out, command="neuro-scores", preds=preds)
+    print(f"Saved scores to {out}")
 
 
 def _run_neuro_full(args: argparse.Namespace) -> None:
     gt = _prompt_for_file("ground-truth", "gt_", args.gt)
     preds = _prompt_for_file("inference", "inference_", args.preds)
     out = _quiet_call(run_neuro_full_analysis, preds, gt, Path(args.ddconfig), output_root=args.output_root)
-    print(f"Neuro full analysis complete. Outputs under {out['output_dir']}")
+    _print_scores("Neuro analysis scores", out["scores"])
+    print(f"\nSaved scores to {out['scores_path']}")
+    print(f"Wrapped notebook saved to {out['wrapped_notebook']}")
+    print(f"Plots and outputs under {out['output_dir']}")
 
 
 def _run_instant_neuro(args: argparse.Namespace) -> None:
@@ -239,11 +255,8 @@ def _run_instant_neuro(args: argparse.Namespace) -> None:
     preds = _prompt_for_file("inference", "inference_", args.preds)
     scores = _quiet_call(compute_instant_neuro_scores, preds, gt)
     _print_scores("Instant neuro scores", scores)
-    if args.json_out:
-        out = Path(args.json_out)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps({"scores": scores}, indent=2))
-        print(f"Saved scores to {out}")
+    out = _save_json_payload({"scores": scores}, requested=args.json_out, command="instant-neuro-scores", preds=preds)
+    print(f"Saved scores to {out}")
 
 
 def _run_etho(args: argparse.Namespace) -> None:

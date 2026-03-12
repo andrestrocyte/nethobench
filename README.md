@@ -30,12 +30,13 @@ python -m pip install -e .
 - For multimodal runs, GT and prediction CSVs should contain both neural and behavior columns (or provide a config that lists them).
 
 ## CLI
-- Neuro scores (core metrics + neuro composite):
+- Neuro scores (notebook-derived baseline metrics + family composite):
   - `nethobench neuro-scores --gt gt_neural.csv --preds pred_neural.csv`
-- Instant neuro scores (fast composite from core neuro submetrics):
+  - Uses the extracted baseline cells from `nethobench/notebooks/neuro_metrics.ipynb`, not the corruption sweeps.
+- Instant neuro scores (trimmed notebook-derived subset):
   - `nethobench instant-neuro-scores --gt gt_neural.csv --preds pred_neural.csv`
-  - Composite uses: MeanShiftZ, error realism (nRMSE+nMAE), quantile realism (tail+full), FC core, PCA, GRAPH core, Bandpower.
-- Neuro full analysis (runs the bundled notebook headlessly; saves plots + executed notebook):
+  - Uses extracted cells from the same active neuro notebook, but only for a smaller score subset.
+- Neuro full analysis (wraps the active neuro notebook; saves plots + wrapped notebook + scores):
   - `nethobench neuro-analysis --gt gt_neural.csv --preds pred_neural.csv --ddconfig configs/data-clean-all.json`
 - Behavior-only:
   - `nethobench etho-scores --gt-dir /path/to/gt_dir --inf-dir /path/to/inf_dir`
@@ -56,31 +57,59 @@ python -m pip install -e .
 }
 ```
 
-## Neuro scoring (benchmark v1)
-Neuro uses mismatch-corrected realism scores grouped into buckets, then computes a weighted geometric-mean composite.
+## Neuro scoring
+`nethobench neuro-scores` is driven by the active notebook implementation in `nethobench/notebooks/neuro_metrics.ipynb` via the extracted baseline-cell runner in `nethobench/analysis/neuro_metrics_core_script.py`.
 
-Core metric families:
-- Distribution / marginals: tail-binned JSD (worst-q), symmetric KL (geo mean of `1/(1+KL)`), normalized W1 (`W1/IQR`), mean-shift realism (MeanShiftZ), and quantile-shape realism (tail + full).
-- Dependence: kNN mutual information realism (mismatch-corrected).
-- Point error: nRMSE and nMAE realism (IQR-normalized, mismatch-corrected).
-- Temporal dynamics: autocorr realism, bandpower realism, CV-CCA realism.
-- Inter-region structure: FC core realism, correlation-graph realism, PCA realism.
-- Higher-order: skew/kurtosis realism.
-- Manifold: kNN overlap, spectral similarity, Procrustes alignment, geodesic W1.
+`nethobench instant-neuro-scores` now uses the same notebook source via `nethobench/analysis/neuro_metrics_instant_script.py`, but executes only a trimmed subset of cells.
 
-See `nethobench/notebooks/final_implementation_benchmark.ipynb` for exact definitions, parameters, and the final composite formula.
-Note: the `neuro-scores` command runs the extracted notebook logic and **excludes CCA + cross-correlation** from the CLI composite.
-- **Behavior** (from EthoBench): position KL, quadrant KL, stationary fraction, velocity/acceleration KL, direction alignment (velocity vs body axis), syllable (k-means) distribution similarity, trajectory-shape similarity, multiplicative composite.
-- **Cross-modal** (new):  
-  - `cca_alignment_score`: gap between GT vs Pred **neural–behavior canonical correlations** (0–1).  
-  - `neural_to_behavior_r2` / `behavior_to_neural_r2`: linear predictive R² in GT and Pred, with similarity scores.  
-  - `lead_lag_score`: agreement of peak lead/lag between neural PCs and behavior speed.  
-  - `cross_composite`: geometric mean of the above (ignoring NaNs).
-- Bundled notebooks:
-  - `notebooks/final_implementation_benchmark.ipynb` (neuro)
-  - `notebooks/full_comprehensive_behavioral_analysis.ipynb` (etho)
-  - `notebooks/cross_modal_full_analysis.ipynb` (cross)
-  Headless runners save figures + executed notebooks under `./outputs/...`.
+The notebook-derived scalar metrics currently include:
+- `KL_score01`
+- `Mean_score01`
+- `MI_score01`
+- `Error_score01`
+- `QNT_score01`
+- `FC_score01`
+- `PCA_score01`
+- `AUTO_score01`
+- `CC_score01`
+- `MOM_score01`
+- `GRAPH_score01`
+- `CCA_score01`
+- `MANI_score01`
+- `BP_score01`
+- `TRJDIST_score01`
+- `FINAL_COMPOSITE_SCORE`
+
+The instant command currently exposes the notebook-equivalent values for:
+- `KL_score01` / `KL_or_JSD_score01`
+- `Mean_score01`
+- `MI_score01`
+- `Error_score01`
+- `QNT_score01`
+- `FC_score01`
+- `PCA_score01`
+- `MOM_score01`
+- `GRAPH_score01`
+- `BP_score01`
+
+It also keeps compatibility aliases such as `KL_geo_score01_avg`, `MeanShiftZ_mean`, `MI_mean_score01_avg`, `QNT_realism_score01_avg`, `PCA_comp_score01_avg`, `MOM_core_score01_avg`, `GRAPH_core_score01_avg`, and `Bandpower_score01_avg`.
+
+The final composite is a weighted arithmetic mean over available metric families:
+- distribution
+- fidelity
+- temporal_spectral
+- relational
+- geometry
+
+`neuro-scores` runs the baseline metric cells and final composite cell only.
+It does not execute the notebook corruption sweeps or the unified degradation dashboard.
+
+## Behavior and cross-modal scoring
+- **Behavior** (from EthoBench): position KL, quadrant KL, stationary fraction, velocity/acceleration KL, direction alignment, syllable distribution similarity, and trajectory-shape similarity.
+- **Cross-modal**: neural-behavior CCA alignment, bidirectional predictive `R^2`, lead-lag agreement, and a cross-modal composite over available terms.
+- Bundled notebooks live under `nethobench/notebooks/`.
+- The active neural benchmark notebook is `nethobench/notebooks/neuro_metrics.ipynb`.
+- Headless analysis commands save figures, notebook wrappers, and score JSON under `./outputs/...`.
 
 ### Composite logic
 - If only neuro: composite = neuro composite.  
@@ -99,7 +128,7 @@ from nethobench import (
 ```
 
 ## Outputs
-- CLI prints scores (with colored arrow bars) and saves JSON when `--json-out` is passed.
+- `neuro-scores` and `instant-neuro-scores` print scores with colored arrow bars and always save a JSON payload. `--json-out` lets you choose the path.
 - Intermediate notebook/metric logs are suppressed by default for all CLI commands.
 - `neuro-analysis`, `etho-scores --run-notebook`, and `cross-analysis` save figures + executed notebook under `./outputs/.../`.
 - `cross-scores` reports per-axis composites and the final multimodal composite.
@@ -107,34 +136,27 @@ from nethobench import (
 ## Example core-score output (CLI)
 ```
 Neuro scores:
-  JSD_worstq_score01_avg        : 0.xxx
-  KL_geo_score01_avg            : 0.xxx
-  W1n_mean_score01_avg          : 0.xxx
-  MeanShiftZ_mean               : 0.xxx
-  QNT_tail_score01_avg          : 0.xxx
-  QNT_full_score01_avg          : 0.xxx
-  MI_mean_score01_avg           : 0.xxx
-  ERR_nRMSE_score01_avg         : 0.xxx
-  ERR_nMAE_score01_avg          : 0.xxx
-  AUTO_core_score01_avg         : 0.xxx
-  Bandpower_score01_avg         : 0.xxx
-  FC_core_score01_avg           : 0.xxx
-  GRAPH_core_score01_avg        : 0.xxx
-  PCA_comp_score01_avg          : 0.xxx
-  MOM_core_score01_avg          : 0.xxx
-  MANI_core_score01_avg         : 0.xxx
-  MANI_s_knn_score01_avg        : 0.xxx
-  MANI_s_spec_score01_avg       : 0.xxx
-  MANI_s_proc_score01_avg       : 0.xxx
-  MANI_s_geo_score01_avg        : 0.xxx
-  bucket_distribution           : 0.xxx
-  bucket_dependence             : 0.xxx
-  bucket_point_error            : 0.xxx
-  bucket_temporal_dynamics      : 0.xxx
-  bucket_inter_region_structure : 0.xxx
-  bucket_higher_order           : 0.xxx
-  bucket_manifold_components    : 0.xxx
-  FINAL_NEURO_COMPOSITE_SCORE   : 0.xxx
+  KL_or_JSD_score01             : 0.xxx
+  Mean_score01                  : 0.xxx
+  MI_score01                    : 0.xxx
+  Error_score01                 : 0.xxx
+  QNT_score01                   : 0.xxx
+  FC_score01                    : 0.xxx
+  PCA_score01                   : 0.xxx
+  AUTO_score01                  : 0.xxx
+  CC_score01                    : 0.xxx
+  MOM_score01                   : 0.xxx
+  GRAPH_score01                 : 0.xxx
+  CCA_score01                   : 0.xxx
+  MANI_score01                  : 0.xxx
+  BP_score01                    : 0.xxx
+  TRJDIST_score01               : 0.xxx
+  family_distribution           : 0.xxx
+  family_fidelity               : 0.xxx
+  family_temporal_spectral      : 0.xxx
+  family_relational             : 0.xxx
+  family_geometry               : 0.xxx
+  FINAL_COMPOSITE_SCORE         : 0.xxx
 ```
 
 ## Status
