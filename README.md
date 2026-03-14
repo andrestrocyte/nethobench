@@ -1,6 +1,6 @@
 # NethoBench
 
-Unified evaluation of neural realism (NeuroBench-style), behavioral realism (EthoBench-style), and cross-modal coupling.
+NethoBench is a benchmark for multimodal brain-behavior models that evaluates neural realism, behavioral realism, and cross-modal plausibility within a single framework. It combines population-level neural metrics spanning distributional structure, temporal dynamics, inter-regional interactions, and low-dimensional geometry with complementary behavioral metrics on pose trajectories, kinematics, motifs, and trajectory statistics. Crucially, it adds an explicit cross-modal axis through neural-to-behavior decoding, behavior-to-neural encoding, latent alignment, and temporal-consistency measures, exposing failure modes that unimodal metrics or task losses alone can miss.
 
 ![NethoBench Logo](assets/nethobench.png)
 
