@@ -24,6 +24,19 @@ from .etho import (
 )
 
 
+def _clip01(x: float, eps: float = 1e-6) -> float:
+    return float(np.clip(x, eps, 1.0 - eps))
+
+
+def _geometric_mean_scores(values: list[float]) -> float:
+    arr = np.asarray(values, dtype=np.float64)
+    arr = arr[np.isfinite(arr)]
+    if arr.size == 0:
+        return np.nan
+    arr = np.asarray([_clip01(v) for v in arr], dtype=np.float64)
+    return float(np.exp(np.mean(np.log(arr))))
+
+
 def _load_config(config: Union[Path, dict, None], sample_df: pd.DataFrame | None = None) -> dict:
     if isinstance(config, dict):
         cfg = dict(config)
@@ -126,9 +139,42 @@ def _behavior_feature_matrix(aligned: pd.DataFrame, cfg: dict, suffix: str) -> n
     return np.vstack(feats)
 
 
+def _behavior_feature_sequences(aligned: pd.DataFrame, cfg: dict, suffix: str) -> list[np.ndarray]:
+    seq_key = cfg.get("sequence_key", "sequenceId")
+    time_key = cfg.get("time_key", "itemPosition")
+    center = cfg.get("center_part", "CENTER")
+    axis = cfg.get("body_axis", ["NOSE", "TAIL_BASE"])
+    nose, tail = axis if len(axis) == 2 else ("NOSE", "TAIL_BASE")
+
+    out: list[np.ndarray] = []
+    for _, sdf in aligned.sort_values([seq_key, time_key]).groupby(seq_key):
+        cx = sdf[f"{center}_X_{suffix}"].to_numpy()
+        cy = sdf[f"{center}_Y_{suffix}"].to_numpy()
+        coords = np.stack([cx, cy], axis=1)
+        speed = np.concatenate([[0.0], np.linalg.norm(np.diff(coords, axis=0), axis=1)])
+        heading_cos = np.zeros_like(speed)
+        heading_sin = np.zeros_like(speed)
+        nose_x_col = f"{nose}_X_{suffix}"
+        tail_x_col = f"{tail}_X_{suffix}"
+        if nose_x_col in sdf.columns and tail_x_col in sdf.columns:
+            nose_xy = sdf[[f"{nose}_X_{suffix}", f"{nose}_Y_{suffix}"]].to_numpy()
+            tail_xy = sdf[[f"{tail}_X_{suffix}", f"{tail}_Y_{suffix}"]].to_numpy()
+            axis_vec = nose_xy - tail_xy
+            norm = np.linalg.norm(axis_vec, axis=1) + 1e-8
+            heading_cos = axis_vec[:, 0] / norm
+            heading_sin = axis_vec[:, 1] / norm
+        out.append(np.stack([cx, cy, speed, heading_cos, heading_sin], axis=1))
+    return out
+
+
 def _neural_feature_matrix(aligned: pd.DataFrame, neuro_cols: list[str], suffix: str, cfg: dict) -> np.ndarray:
     arr = _arrays_from_aligned(aligned, neuro_cols, suffix, cfg)
     return arr.reshape(-1, arr.shape[-1])
+
+
+def _neural_feature_sequences(aligned: pd.DataFrame, neuro_cols: list[str], suffix: str, cfg: dict) -> list[np.ndarray]:
+    arr = _arrays_from_aligned(aligned, neuro_cols, suffix, cfg)
+    return [arr[i] for i in range(arr.shape[0])]
 
 
 def _cca_mean(X: np.ndarray, Y: np.ndarray, n_components: int = 5) -> float:
@@ -149,60 +195,94 @@ def _cca_mean(X: np.ndarray, Y: np.ndarray, n_components: int = 5) -> float:
     return float(np.mean(corrs)) if corrs else np.nan
 
 
-def _predictive_r2(X: np.ndarray, Y: np.ndarray, test_frac: float = 0.2, seed: int = 0) -> float:
-    rng = np.random.default_rng(seed)
-    n = X.shape[0]
-    if n < 10:
+def _stack_sequences(sequences: list[np.ndarray]) -> np.ndarray:
+    if not sequences:
+        return np.empty((0, 0), dtype=np.float64)
+    return np.vstack(sequences)
+
+
+def _predictive_r2(X_sequences: list[np.ndarray], Y_sequences: list[np.ndarray], test_frac: float = 0.2, seed: int = 0) -> float:
+    n = min(len(X_sequences), len(Y_sequences))
+    if n < 2:
         return np.nan
-    idx = rng.permutation(n)
-    split = max(1, int(n * (1 - test_frac)))
+    pairs = []
+    for X, Y in zip(X_sequences[:n], Y_sequences[:n]):
+        if X.shape[0] == 0 or Y.shape[0] == 0:
+            continue
+        m = min(X.shape[0], Y.shape[0])
+        pairs.append((X[:m], Y[:m]))
+    if len(pairs) < 2:
+        return np.nan
+
+    rng = np.random.default_rng(seed)
+    idx = rng.permutation(len(pairs))
+    split = int(round(len(pairs) * (1 - test_frac)))
+    split = int(np.clip(split, 1, len(pairs) - 1))
     train_idx, test_idx = idx[:split], idx[split:]
+    X_train = _stack_sequences([pairs[i][0] for i in train_idx])
+    Y_train = _stack_sequences([pairs[i][1] for i in train_idx])
+    X_test = _stack_sequences([pairs[i][0] for i in test_idx])
+    Y_test = _stack_sequences([pairs[i][1] for i in test_idx])
+    if X_train.size == 0 or Y_train.size == 0 or X_test.size == 0 or Y_test.size == 0:
+        return np.nan
+
     reg = LinearRegression()
-    reg.fit(X[train_idx], Y[train_idx])
-    y_pred = reg.predict(X[test_idx])
-    ss_res = np.sum((Y[test_idx] - y_pred) ** 2)
-    ss_tot = np.sum((Y[test_idx] - Y[test_idx].mean(axis=0)) ** 2) + 1e-12
+    reg.fit(X_train, Y_train)
+    y_pred = reg.predict(X_test)
+    ss_res = np.sum((Y_test - y_pred) ** 2)
+    ss_tot = np.sum((Y_test - Y_test.mean(axis=0)) ** 2) + 1e-12
     r2 = 1.0 - ss_res / ss_tot
     return float(r2)
 
 
-def _lead_lag_peak(neural_arr: np.ndarray, behavior_arr: np.ndarray, max_lag: int = 30) -> int:
-    # neural_arr: (n_time, n_neuro); behavior_arr: (n_time,) speed
-    if neural_arr.shape[0] != behavior_arr.shape[0] or neural_arr.shape[0] < 5:
-        return 0
-    X = neural_arr - neural_arr.mean(axis=0)
-    U, S, _ = np.linalg.svd(X, full_matrices=False)
-    pc1 = (X @ _.T)[:, 0] if _.shape[0] > 0 else X.mean(axis=1)
-    pc1 = (pc1 - pc1.mean()) / (pc1.std() + 1e-9)
-    b = (behavior_arr - behavior_arr.mean()) / (behavior_arr.std() + 1e-9)
+def _lead_lag_peak(neural_sequences: list[np.ndarray], behavior_sequences: list[np.ndarray], max_lag: int = 30) -> int:
     lags = np.arange(-max_lag, max_lag + 1)
-    cors = []
-    for lag in lags:
-        if lag < 0:
-            cors.append(np.corrcoef(pc1[:lag], b[-lag:])[0, 1])
-        elif lag > 0:
-            cors.append(np.corrcoef(pc1[lag:], b[:-lag])[0, 1])
-        else:
-            cors.append(np.corrcoef(pc1, b)[0, 1])
-    cors = np.array(cors)
+    seq_cors = []
+    for neural_arr, behavior_arr in zip(neural_sequences, behavior_sequences):
+        if neural_arr.shape[0] != behavior_arr.shape[0] or neural_arr.shape[0] < max(5, max_lag + 3):
+            continue
+        X = neural_arr - neural_arr.mean(axis=0, keepdims=True)
+        _, _, Vt = np.linalg.svd(X, full_matrices=False)
+        pc1 = (X @ Vt.T)[:, 0] if Vt.shape[0] > 0 else X.mean(axis=1)
+        pc1 = (pc1 - pc1.mean()) / (pc1.std() + 1e-9)
+        b = (behavior_arr - behavior_arr.mean()) / (behavior_arr.std() + 1e-9)
+        cors = []
+        for lag in lags:
+            if lag < 0:
+                a = pc1[:lag]
+                bb = b[-lag:]
+            elif lag > 0:
+                a = pc1[lag:]
+                bb = b[:-lag]
+            else:
+                a = pc1
+                bb = b
+            if a.size < 5 or bb.size < 5:
+                cors.append(np.nan)
+            else:
+                cors.append(np.corrcoef(a, bb)[0, 1])
+        seq_cors.append(np.asarray(cors, dtype=np.float64))
+    if not seq_cors:
+        return 0
+    cors = np.nanmean(np.vstack(seq_cors), axis=0)
+    if not np.isfinite(cors).any():
+        return 0
     idx = int(np.nanargmax(np.abs(cors)))
     return int(lags[idx])
 
 
-def _speed_from_behavior(aligned: pd.DataFrame, cfg: dict, suffix: str) -> Tuple[np.ndarray, list[int]]:
+def _speed_from_behavior(aligned: pd.DataFrame, cfg: dict, suffix: str) -> Tuple[list[np.ndarray], list[int]]:
     seq_key = cfg.get("sequence_key", "sequenceId")
     time_key = cfg.get("time_key", "itemPosition")
     center = cfg.get("center_part", "CENTER")
-    speeds = []
+    speeds: list[np.ndarray] = []
     lengths = []
     for _, sdf in aligned.sort_values([seq_key, time_key]).groupby(seq_key):
         coords = sdf[[f"{center}_X_{suffix}", f"{center}_Y_{suffix}"]].to_numpy()
         sp = np.concatenate([[0.0], np.linalg.norm(np.diff(coords, axis=0), axis=1)])
         speeds.append(sp)
         lengths.append(len(sp))
-    min_len = min(lengths)
-    speeds = np.stack([s[:min_len] for s in speeds], axis=0)
-    return speeds.reshape(-1), lengths
+    return speeds, lengths
 
 
 def compute_cross_scores(predictions_csv: Path, ground_truth_csv: Path, config: Union[Path, dict, None]) -> Dict[str, object]:
@@ -229,36 +309,34 @@ def compute_cross_scores(predictions_csv: Path, ground_truth_csv: Path, config: 
     beh_scores["direction_score"] = direction_score(aligned, nose_label=cfg.get("body_axis", ["NOSE", "TAIL_BASE"])[0], tail_label=cfg.get("body_axis", ["NOSE", "TAIL_BASE"])[-1])[0]
     beh_scores["syllable_score"] = syllable_score(aligned)[0]
     beh_scores["trajectory_shape_score"] = trajectory_shape_score(aligned)[0]
-    beh_composite = 1.0
-    beh_valid = 0
-    for v in beh_scores.values():
-        if np.isfinite(v):
-            beh_composite *= max(0.0, min(1.0, v))
-            beh_valid += 1
-    beh_scores["composite_score"] = beh_composite if beh_valid else np.nan
+    beh_scores["composite_score"] = _geometric_mean_scores(list(beh_scores.values()))
 
     # --- Cross-modal axis ---
     neuro_gt_flat = _neural_feature_matrix(aligned, neuro_cols, "gt", cfg)
     neuro_pr_flat = _neural_feature_matrix(aligned, neuro_cols, "inf", cfg)
     beh_gt_flat = _behavior_feature_matrix(aligned, cfg, "gt")
     beh_pr_flat = _behavior_feature_matrix(aligned, cfg, "inf")
+    neuro_gt_seq = _neural_feature_sequences(aligned, neuro_cols, "gt", cfg)
+    neuro_pr_seq = _neural_feature_sequences(aligned, neuro_cols, "inf", cfg)
+    beh_gt_seq = _behavior_feature_sequences(aligned, cfg, "gt")
+    beh_pr_seq = _behavior_feature_sequences(aligned, cfg, "inf")
 
     cca_gt = _cca_mean(neuro_gt_flat, beh_gt_flat)
     cca_pr = _cca_mean(neuro_pr_flat, beh_pr_flat)
     cca_alignment_score = float(1.0 - min(1.0, abs(cca_gt - cca_pr))) if np.isfinite(cca_gt) and np.isfinite(cca_pr) else np.nan
 
-    r2_n2b_gt = _predictive_r2(neuro_gt_flat, beh_gt_flat)
-    r2_n2b_pr = _predictive_r2(neuro_pr_flat, beh_pr_flat)
+    r2_n2b_gt = _predictive_r2(neuro_gt_seq, beh_gt_seq)
+    r2_n2b_pr = _predictive_r2(neuro_pr_seq, beh_pr_seq)
     n2b_similarity = float(1.0 / (1.0 + abs(r2_n2b_gt - r2_n2b_pr))) if np.isfinite(r2_n2b_gt) and np.isfinite(r2_n2b_pr) else np.nan
 
-    r2_b2n_gt = _predictive_r2(beh_gt_flat, neuro_gt_flat)
-    r2_b2n_pr = _predictive_r2(beh_pr_flat, neuro_pr_flat)
+    r2_b2n_gt = _predictive_r2(beh_gt_seq, neuro_gt_seq)
+    r2_b2n_pr = _predictive_r2(beh_pr_seq, neuro_pr_seq)
     b2n_similarity = float(1.0 / (1.0 + abs(r2_b2n_gt - r2_b2n_pr))) if np.isfinite(r2_b2n_gt) and np.isfinite(r2_b2n_pr) else np.nan
 
     speed_gt, _ = _speed_from_behavior(aligned, cfg, "gt")
     speed_pr, _ = _speed_from_behavior(aligned, cfg, "inf")
-    lag_gt = _lead_lag_peak(neuro_gt_flat.reshape(-1, len(neuro_cols)), speed_gt)
-    lag_pr = _lead_lag_peak(neuro_pr_flat.reshape(-1, len(neuro_cols)), speed_pr)
+    lag_gt = _lead_lag_peak(neuro_gt_seq, speed_gt)
+    lag_pr = _lead_lag_peak(neuro_pr_seq, speed_pr)
     lead_lag_score = 1.0 - min(1.0, abs(lag_gt - lag_pr) / 30.0) if (lag_gt == lag_gt) and (lag_pr == lag_pr) else np.nan
 
     cross_scores = {
@@ -309,7 +387,7 @@ def run_cross_full_analysis(
     """
     from nbconvert.preprocessors import ExecutePreprocessor
 
-    nb_path = Path(__file__).parent / "notebooks" / "cross_modal_full_analysis.ipynb"
+    nb_path = Path(__file__).parent / "notebooks" / "cross_modal_metrics.ipynb"
     if not nb_path.is_file():
         raise FileNotFoundError(f"Cross-modal notebook missing at {nb_path}")
 

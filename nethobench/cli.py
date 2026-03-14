@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import argparse
 import contextlib
 from datetime import datetime
@@ -8,19 +9,18 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from nethobench import (
-    compute_neuro_scores,
-    compute_instant_neuro_scores,
-    run_neuro_full_analysis,
-    compute_etho_scores,
     compute_cross_scores,
+    compute_etho_scores,
+    compute_neuro_scores,
     run_cross_full_analysis,
     run_ethobench_notebook,
+    run_neuro_full_analysis,
 )
 
 
 def _find_candidates(prefix: str) -> list[Path]:
     cwd = Path.cwd()
-    return sorted(p for p in cwd.glob(f"{prefix}*") if p.is_file())
+    return sorted(path for path in cwd.glob(f"{prefix}*") if path.is_file())
 
 
 def _prompt_for_file(label: str, prefix: str, provided: Optional[str]) -> Path:
@@ -80,18 +80,17 @@ def _prompt_for_config(provided: Optional[str]) -> Optional[Path]:
         print("Detected possible config JSON files:")
         for idx, candidate in enumerate(jsons, start=1):
             print(f"  [{idx}] {candidate.name}")
-        resp = input("Enter config filename (or leave blank to auto-infer): ").strip()
-        if resp.isdigit() and jsons:
-            idx = int(resp) - 1
+        response = input("Enter config filename (or leave blank to auto-infer): ").strip()
+        if response.isdigit():
+            idx = int(response) - 1
             if 0 <= idx < len(jsons):
                 return jsons[idx]
-        elif resp:
-            path = Path(resp)
+        elif response:
+            path = Path(response)
             if not path.is_absolute():
                 path = Path.cwd() / path
             if path.is_file():
                 return path
-    # Allow None to trigger auto-infer
     return None
 
 
@@ -130,25 +129,23 @@ def _render_score_bar(value: float, width: int = 16) -> str:
 
 def _print_scores(label: str, scores: dict[str, float]) -> None:
     print(f"\n{label}:")
-    for k, v in scores.items():
-        if v == v:  # NaN check
-            bar = _render_score_bar(v)
-            print(f"  {k:24s}: {v:.3f} {bar}")
+    for key, value in scores.items():
+        if value == value:
+            print(f"  {key:24s}: {value:.3f} {_render_score_bar(value)}")
         else:
-            print(f"  {k:24s}: NaN")
+            print(f"  {key:24s}: NaN")
 
 
 def _print_composite(label: str, value: float) -> None:
     if value == value:
-        bar = _render_score_bar(value)
-        print(f"{label:18s}: {value:.3f} {bar}")
+        print(f"{label:18s}: {value:.3f} {_render_score_bar(value)}")
     else:
         print(f"{label:18s}: NaN")
 
 
 def _quiet_call(func, *args, **kwargs):
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
         return func(*args, **kwargs)
 
 
@@ -176,26 +173,16 @@ def _build_parser() -> argparse.ArgumentParser:
     neuro = subparsers.add_parser("neuro-scores", help="Compute neural-only scores.")
     neuro.add_argument("--gt", help="Ground-truth neural CSV (auto-detected if omitted).")
     neuro.add_argument("--preds", help="Predicted neural CSV (auto-detected if omitted).")
-    neuro.add_argument("--per-seq-std", action="store_true", dest="per_seq_std", help="Include per-sequence stats.")
     neuro.add_argument("--json-out", help="Optional JSON output path.")
     neuro.set_defaults(func=_run_neuro)
 
-    instant = subparsers.add_parser(
-        "instant-neuro-scores",
-        help="Compute a trimmed notebook-derived neuro score subset.",
-    )
-    instant.add_argument("--gt", help="Ground-truth neural CSV (auto-detected if omitted).")
-    instant.add_argument("--preds", help="Predicted neural CSV (auto-detected if omitted).")
-    instant.add_argument("--json-out", help="Optional JSON output path.")
-    instant.set_defaults(func=_run_instant_neuro)
-
     neuro_full = subparsers.add_parser(
         "neuro-analysis",
-        help="Run full NeuroBench analysis (notebook-derived script) and save figures.",
+        help="Run full NeuroBench analysis and save figures.",
     )
     neuro_full.add_argument("--gt", help="Ground-truth neural CSV (auto-detected if omitted).")
     neuro_full.add_argument("--preds", help="Predicted neural CSV (auto-detected if omitted).")
-    neuro_full.add_argument("--ddconfig", required=True, help="ddconfig JSON used by the original notebook.")
+    neuro_full.add_argument("--ddconfig", required=True, help="ddconfig JSON used by the notebook.")
     neuro_full.add_argument("--output-root", type=Path, help="Output root (default ./outputs/).")
     neuro_full.set_defaults(func=_run_neuro_full)
 
@@ -233,10 +220,9 @@ def _build_parser() -> argparse.ArgumentParser:
 def _run_neuro(args: argparse.Namespace) -> None:
     gt = _prompt_for_file("ground-truth", "gt_", args.gt)
     preds = _prompt_for_file("inference", "inference_", args.preds)
-    scores = _quiet_call(compute_neuro_scores, preds, gt, per_sequence_stats=args.per_seq_std)
-    _print_scores("Neuro scores", scores if not args.per_seq_std else scores["pooled_scores"])
-    payload = scores if args.per_seq_std else {"pooled_scores": scores}
-    out = _save_json_payload(payload, requested=args.json_out, command="neuro-scores", preds=preds)
+    scores = _quiet_call(compute_neuro_scores, preds, gt)
+    _print_scores("Neuro scores", scores)
+    out = _save_json_payload({"scores": scores}, requested=args.json_out, command="neuro-scores", preds=preds)
     print(f"Saved scores to {out}")
 
 
@@ -250,21 +236,8 @@ def _run_neuro_full(args: argparse.Namespace) -> None:
     print(f"Plots and outputs under {out['output_dir']}")
 
 
-def _run_instant_neuro(args: argparse.Namespace) -> None:
-    gt = _prompt_for_file("ground-truth", "gt_", args.gt)
-    preds = _prompt_for_file("inference", "inference_", args.preds)
-    scores = _quiet_call(compute_instant_neuro_scores, preds, gt)
-    _print_scores("Instant neuro scores", scores)
-    out = _save_json_payload({"scores": scores}, requested=args.json_out, command="instant-neuro-scores", preds=preds)
-    print(f"Saved scores to {out}")
-
-
 def _run_etho(args: argparse.Namespace) -> None:
-    scores, seq_scores, seq_means, seq_stds = _quiet_call(
-        compute_etho_scores,
-        Path(args.gt_dir),
-        Path(args.inf_dir),
-    )
+    scores, seq_scores, seq_means, seq_stds = _quiet_call(compute_etho_scores, Path(args.gt_dir), Path(args.inf_dir))
     _print_scores("Behavior scores", scores)
     if args.json_out:
         out = Path(args.json_out)

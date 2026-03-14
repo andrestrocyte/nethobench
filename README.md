@@ -30,13 +30,10 @@ python -m pip install -e .
 - For multimodal runs, GT and prediction CSVs should contain both neural and behavior columns (or provide a config that lists them).
 
 ## CLI
-- Neuro scores (notebook-derived baseline metrics + family composite):
+- Neuro scores (single active neural benchmark):
   - `nethobench neuro-scores --gt gt_neural.csv --preds pred_neural.csv`
-  - Uses the extracted baseline cells from `nethobench/notebooks/neuro_metrics.ipynb`, not the corruption sweeps.
-- Instant neuro scores (trimmed notebook-derived subset):
-  - `nethobench instant-neuro-scores --gt gt_neural.csv --preds pred_neural.csv`
-  - Uses extracted cells from the same active neuro notebook, but only for a smaller score subset.
-- Neuro full analysis (wraps the active neuro notebook; saves plots + wrapped notebook + scores):
+  - Uses the baseline score cells from `nethobench/notebooks/neuro_metrics.ipynb`.
+- Neuro full analysis (executes the full active notebook; saves plots + executed notebook + scores):
   - `nethobench neuro-analysis --gt gt_neural.csv --preds pred_neural.csv --ddconfig configs/data-clean-all.json`
 - Behavior-only:
   - `nethobench etho-scores --gt-dir /path/to/gt_dir --inf-dir /path/to/inf_dir`
@@ -60,7 +57,12 @@ python -m pip install -e .
 ## Neuro scoring
 `nethobench neuro-scores` is driven by the active notebook implementation in `nethobench/notebooks/neuro_metrics.ipynb` via the extracted baseline-cell runner in `nethobench/analysis/neuro_metrics_core_script.py`.
 
-`nethobench instant-neuro-scores` now uses the same notebook source via `nethobench/analysis/neuro_metrics_instant_script.py`, but executes only a trimmed subset of cells.
+`nethobench neuro-analysis` executes that same notebook end to end and exports the full figure set, including the degradation ladders and the final polar summary dashboard.
+
+The active notebook keeps the established v2 neuro metrics, with three finalized substitutions wired through `nethobench/analysis/refined_neuro_metric_replacements.py`:
+- `CC_score01`: lagged cross-correlation matrix agreement stabilized by strong-edge cross-correlation profiles
+- `MANI_score01`: persistent-homology lifetime agreement stabilized by local neighborhood geometry
+- `TRJDIST_score01`: occupancy and velocity trajectory agreement stabilized by path-feature agreement
 
 The notebook-derived scalar metrics currently include:
 - `KL_score01`
@@ -80,20 +82,6 @@ The notebook-derived scalar metrics currently include:
 - `TRJDIST_score01`
 - `FINAL_COMPOSITE_SCORE`
 
-The instant command currently exposes the notebook-equivalent values for:
-- `KL_score01` / `KL_or_JSD_score01`
-- `Mean_score01`
-- `MI_score01`
-- `Error_score01`
-- `QNT_score01`
-- `FC_score01`
-- `PCA_score01`
-- `MOM_score01`
-- `GRAPH_score01`
-- `BP_score01`
-
-It also keeps compatibility aliases such as `KL_geo_score01_avg`, `MeanShiftZ_mean`, `MI_mean_score01_avg`, `QNT_realism_score01_avg`, `PCA_comp_score01_avg`, `MOM_core_score01_avg`, `GRAPH_core_score01_avg`, and `Bandpower_score01_avg`.
-
 The final composite is a weighted arithmetic mean over available metric families:
 - distribution
 - fidelity
@@ -103,6 +91,7 @@ The final composite is a weighted arithmetic mean over available metric families
 
 `neuro-scores` runs the baseline metric cells and final composite cell only.
 It does not execute the notebook corruption sweeps or the unified degradation dashboard.
+Use `neuro-analysis` when you want the full notebook outputs.
 
 ## Behavior and cross-modal scoring
 - **Behavior** (from EthoBench): position KL, quadrant KL, stationary fraction, velocity/acceleration KL, direction alignment, syllable distribution similarity, and trajectory-shape similarity.
@@ -120,15 +109,16 @@ It does not execute the notebook corruption sweeps or the unified degradation da
 ```python
 from nethobench import (
     compute_neuro_scores,
-    compute_instant_neuro_scores,
+    run_neuro_full_analysis,
     compute_etho_scores,
     compute_cross_scores,
     run_ethobench_notebook,   # optional behavior notebook capture
+    run_cross_full_analysis,  # optional cross-modal notebook capture
 )
 ```
 
 ## Outputs
-- `neuro-scores` and `instant-neuro-scores` print scores with colored arrow bars and always save a JSON payload. `--json-out` lets you choose the path.
+- `neuro-scores` prints scores with colored arrow bars and always saves a JSON payload. `--json-out` lets you choose the path.
 - Intermediate notebook/metric logs are suppressed by default for all CLI commands.
 - `neuro-analysis`, `etho-scores --run-notebook`, and `cross-analysis` save figures + executed notebook under `./outputs/.../`.
 - `cross-scores` reports per-axis composites and the final multimodal composite.
@@ -162,3 +152,6 @@ Neuro scores:
 ## Status
 - Focused on reproducible metrics; exploratory notebooks (ethology) can still be run via `ethobench`-style capture if you place the notebook under `nethobench/notebooks/`.  
 - Cross-modal metrics are light-weight and interpretable; extend with your own in `nethobench/cross.py`.
+
+## License
+This project is released under the MIT License. See `LICENSE`.

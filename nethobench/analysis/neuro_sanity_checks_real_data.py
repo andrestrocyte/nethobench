@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from nethobench.neuro import compute_instant_neuro_scores, compute_neuro_scores
+from nethobench.neuro import compute_neuro_scores
 
 
 NOISE_RE = re.compile(r"\.noise_(\d+(?:\.\d+)?)\.csv$")
@@ -113,7 +113,6 @@ def _score_pair(
     gt_csv: Path,
     pred_csv: Path,
     ddconfig: Path,
-    run_full: bool,
 ) -> Dict[str, float]:
     # Silence notebook-derived prints while preserving returned metrics.
     buf = io.StringIO()
@@ -125,10 +124,7 @@ def _score_pair(
                 import contextlib
 
                 with contextlib.redirect_stdout(_out), contextlib.redirect_stderr(_err):
-                    if run_full:
-                        scores = compute_neuro_scores(pred_csv, gt_csv, ddconfig_path=ddconfig)
-                    else:
-                        scores = compute_instant_neuro_scores(pred_csv, gt_csv, ddconfig_path=ddconfig)
+                    scores = compute_neuro_scores(pred_csv, gt_csv, ddconfig_path=ddconfig)
                 buf.write(_out.getvalue())
                 buf.write(_err.getvalue())
     elapsed = time.time() - start
@@ -170,16 +166,12 @@ def _build_report_tables(results: pd.DataFrame) -> Dict[str, Dict[str, Dict[str,
         "multiplicative_v3_composite_score",
         "MeanShiftZ_mean",
         "Bandpower_score01_avg",
-        # full-mode names
         "QNT_tail_score01_avg",
         "ERR_nRMSE_score01_avg",
         "MI_mean_score01_avg",
         "FC_core_score01_avg",
         "PCA_comp_score01_avg",
         "GRAPH_core_score01_avg",
-        # instant-mode names
-        "QNT_realism_score01_avg",
-        "ERR_realism_score01_avg",
     ]
     for tag in ["provided_gt_noise", "synthetic_gt_noise", "synthetic_pred_noise"]:
         chunk = results[results["scenario_group"] == tag]
@@ -206,8 +198,6 @@ def _build_saturation(results: pd.DataFrame) -> Dict[str, Dict[str, float]]:
         "FC_core_score01_avg",
         "PCA_comp_score01_avg",
         "GRAPH_core_score01_avg",
-        "QNT_realism_score01_avg",
-        "ERR_realism_score01_avg",
     ]:
         if metric not in results.columns:
             continue
@@ -302,7 +292,6 @@ def run(
     seq_limit: int,
     synthetic_sigmas: List[float],
     synthetic_sigma_mode: str,
-    run_full: bool,
 ) -> Path:
     data_dir = Path(data_dir)
     output_dir = Path(output_dir)
@@ -411,7 +400,6 @@ def run(
             gt_csv=sc["gt_csv"],
             pred_csv=sc["pred_csv"],
             ddconfig=ddconfig,
-            run_full=run_full,
         )
         row = dict(sc)
         row.update(scores)
@@ -433,7 +421,6 @@ def run(
     diagnostics = {
         "monotonicity": monotonic,
         "saturation": saturation,
-        "run_mode": "full" if run_full else "instant",
         "seq_limit": seq_limit,
         "pred_time_horizon": pred_time,
         "n_scenarios": int(len(results)),
@@ -445,7 +432,7 @@ def run(
         "",
         f"- Date: {datetime.now().isoformat(timespec='seconds')}",
         f"- Data dir: `{data_dir}`",
-        f"- Mode: `{diagnostics['run_mode']}` (notebook-derived metrics via `compute_neuro_scores` / `compute_instant_neuro_scores`)",
+        "- Mode: `full` (notebook-derived metrics via `compute_neuro_scores`)",
         f"- Sequence subset: first `{seq_limit}` sequences",
         f"- Time horizon used: `{pred_time}` steps",
         f"- Scenarios: `{len(results)}`",
@@ -507,11 +494,6 @@ def _parse_args() -> argparse.Namespace:
         default="relative_std",
         help="Interpret synthetic sigma as a fraction of each feature std (`relative_std`) or raw-value units (`absolute`).",
     )
-    parser.add_argument(
-        "--instant",
-        action="store_true",
-        help="Use instant-mode metrics instead of full-mode metrics.",
-    )
     return parser.parse_args()
 
 
@@ -525,7 +507,6 @@ def main() -> None:
         seq_limit=args.seq_limit,
         synthetic_sigmas=list(args.sigmas),
         synthetic_sigma_mode=args.sigma_mode,
-        run_full=not args.instant,
     )
     print(f"Saved sanity-check outputs to: {final}")
 

@@ -9,6 +9,19 @@ import pandas as pd
 from sklearn.cluster import KMeans
 
 
+def _clip01(x: float, eps: float = 1e-6) -> float:
+    return float(np.clip(x, eps, 1.0 - eps))
+
+
+def _geometric_mean_scores(values: list[float]) -> float:
+    arr = np.asarray(values, dtype=np.float64)
+    arr = arr[np.isfinite(arr)]
+    if arr.size == 0:
+        return np.nan
+    arr = np.asarray([_clip01(v) for v in arr], dtype=np.float64)
+    return float(np.exp(np.mean(np.log(arr))))
+
+
 def collect_files(directory: Path) -> List[Path]:
     directory = Path(directory)
     files = list(directory.glob("*.parquet")) + list(directory.glob("*.csv"))
@@ -511,13 +524,7 @@ def compute_etho_scores(gt_dir: Path, inf_dir: Path) -> Tuple[Dict[str, float], 
         "trajectory_shape_score": float(traj_res[0]) if np.isfinite(traj_res[0]) else np.nan,
     }
 
-    composite = 1.0
-    valid = 0
-    for v in scores.values():
-        if np.isfinite(v):
-            composite *= max(0.0, min(1.0, v))
-            valid += 1
-    scores["composite_score"] = composite if valid else np.nan
+    scores["composite_score"] = _geometric_mean_scores(list(scores.values()))
 
     all_seq_dicts = {
         "position_kl_score": pos_res[1],
@@ -588,7 +595,7 @@ def run_ethobench_notebook(gt_dir: Path, inf_dir: Path, *, output_root: Path | N
     """
     import nbformat
     from nbconvert.preprocessors import ExecutePreprocessor
-    nb_path = Path(__file__).parent / "notebooks" / "full_comprehensive_behavioral_analysis.ipynb"
+    nb_path = Path(__file__).parent / "notebooks" / "behavior_metrics.ipynb"
     if not nb_path.is_file():
         raise FileNotFoundError(
             f"Bundled ethobench notebook not found at {nb_path}. "

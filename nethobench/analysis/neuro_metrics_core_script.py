@@ -5,7 +5,12 @@ from pathlib import Path
 import nbformat
 
 
-NOTEBOOK_PATH = Path(__file__).resolve().parents[1] / "notebooks" / "neuro_metrics.ipynb"
+NOTEBOOK_PATH = Path(
+    globals().get(
+        "ACTIVE_NEURO_NOTEBOOK",
+        Path(__file__).resolve().parents[1] / "notebooks" / "neuro_metrics.ipynb",
+    )
+)
 
 # Execute only the notebook cells needed for baseline metrics + final composite.
 # Metric cells that also contain corruption sweeps are sliced before the sweep block.
@@ -69,6 +74,7 @@ mean_top10_df = pd.DataFrame([{
     },
     {
         "marker": "# === MANIFOLD realism (simple geometry, strict, benchmark-friendly) ===",
+        "stop_before": "# 1) Region permutation corruption sweep",
     },
     {
         "marker": "# === TRAJECTORY DISTRIBUTION realism (FIXED: global GT-PCA basis, pooled across sequences) ===",
@@ -76,6 +82,7 @@ mean_top10_df = pd.DataFrame([{
     },
     {
         "marker": "# === BANDPOWER realism (simple, strict, benchmark-friendly) ===",
+        "stop_before": "# 1) Temporal shuffle corruption sweep",
     },
     {
         "marker": "# === FINAL COMPOSITE (family-based, using exact upstream notebook result names) ===",
