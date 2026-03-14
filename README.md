@@ -59,10 +59,10 @@ python -m pip install -e .
 
 `nethobench neuro-analysis` executes that same notebook end to end and exports the full figure set, including the degradation ladders and the final polar summary dashboard.
 
-The active notebook keeps the established v2 neuro metrics, with three finalized substitutions wired through `nethobench/analysis/refined_neuro_metric_replacements.py`:
-- `CC_score01`: lagged cross-correlation matrix agreement stabilized by strong-edge cross-correlation profiles
-- `MANI_score01`: persistent-homology lifetime agreement stabilized by local neighborhood geometry
-- `TRJDIST_score01`: occupancy and velocity trajectory agreement stabilized by path-feature agreement
+The active notebook reports a set of scalar neuro metrics. Most entries are direct notebook metrics, and three are composite replacements defined in `nethobench/analysis/refined_neuro_metric_replacements.py`:
+- `CC_score01`: agreement of lagged cross-correlation structure, with extra emphasis on the strongest cross-correlation edges
+- `MANI_score01`: agreement of low-dimensional data geometry, combining persistent-topology lifetimes with local neighborhood structure
+- `TRJDIST_score01`: agreement of trajectory behavior, combining occupancy and velocity patterns with path-shape features
 
 The notebook-derived scalar metrics currently include:
 - `KL_score01`
@@ -82,7 +82,7 @@ The notebook-derived scalar metrics currently include:
 - `TRJDIST_score01`
 - `FINAL_COMPOSITE_SCORE`
 
-The final composite is a weighted arithmetic mean over available metric families:
+`FINAL_COMPOSITE_SCORE` is the overall neuro score. It is a weighted arithmetic mean over the available metric families:
 - distribution
 - fidelity
 - temporal_spectral
