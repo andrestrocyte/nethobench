@@ -5,8 +5,15 @@ from typing import Callable
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy import stats
+from scipy.stats import kurtosis, skew, spearmanr
 
 from .sensitive_metric_candidates import (
+    EPS,
+    _align_arrays,
+    _finite_rows,
+    _safe_corrcoef,
+    _score_from_distance,
     autocorr_weighted_rmse_power_v6,
     bandpower_band_fraction_v2,
     corruption_region_permute_blend,
@@ -58,6 +65,8 @@ def _distance_from_score(score: float) -> float:
 
 def _metric_display_name(metric_key: str) -> str:
     names = {
+        "MOM_score01": "Moments",
+        "GRAPH_score01": "Graph",
         "PCA_score01": "PCA",
         "AUTO_score01": "Autocorr",
         "CC_score01": "CrossCorr",
@@ -66,6 +75,344 @@ def _metric_display_name(metric_key: str) -> str:
         "TRJDIST_score01": "Trajectory",
     }
     return names.get(metric_key, metric_key)
+
+
+def _align_common_arrays(gt_arr: np.ndarray, pred_arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    gt = np.asarray(gt_arr, dtype=np.float64)
+    pred = np.asarray(pred_arr, dtype=np.float64)
+    if gt.ndim != 3 or pred.ndim != 3:
+        raise ValueError(f"Expected 3D arrays [n_seq, T, n_reg], got {gt.shape} and {pred.shape}")
+    if gt.shape[0] != pred.shape[0] or gt.shape[2] != pred.shape[2]:
+        raise ValueError(f"GT/pred sequence-region mismatch: {gt.shape} vs {pred.shape}")
+    gt_len = gt.shape[1]
+    pred_len = pred.shape[1]
+    if pred_len != gt_len and pred_len % gt_len == 0:
+        factor = pred_len // gt_len
+        pred = pred.reshape(pred.shape[0], gt_len, factor, pred.shape[2]).mean(axis=2)
+    elif gt_len != pred_len:
+        keep = min(gt_len, pred_len)
+        gt = gt[:, :keep, :]
+        pred = pred[:, :keep, :]
+    return gt, pred
+
+
+def _safe_spearman01(x: np.ndarray, y: np.ndarray) -> float:
+    x = np.asarray(x, dtype=np.float64).ravel()
+    y = np.asarray(y, dtype=np.float64).ravel()
+    mask = np.isfinite(x) & np.isfinite(y)
+    if mask.sum() < 3:
+        return np.nan
+    xx = x[mask]
+    yy = y[mask]
+    if np.nanstd(xx) < 1e-12 or np.nanstd(yy) < 1e-12:
+        return np.nan
+    corr = spearmanr(xx, yy).correlation
+    if corr is None or not np.isfinite(corr):
+        return np.nan
+    return float(np.clip(0.5 * (corr + 1.0), 0.0, 1.0))
+
+
+def _robust_scale(values: np.ndarray) -> float:
+    values = np.asarray(values, dtype=np.float64)
+    values = values[np.isfinite(values)]
+    if values.size < 2:
+        return np.nan
+    q25, q75 = np.quantile(values, [0.25, 0.75])
+    scale = float(q75 - q25)
+    if not np.isfinite(scale) or scale < 1e-9:
+        scale = float(np.nanstd(values))
+    if not np.isfinite(scale) or scale < 1e-9:
+        scale = float(np.nanmean(np.abs(values)))
+    if not np.isfinite(scale) or scale < 1e-9:
+        return 1.0
+    return scale
+
+
+def _rmse_similarity(gt_values: np.ndarray, pred_values: np.ndarray) -> float:
+    gt_values = np.asarray(gt_values, dtype=np.float64).ravel()
+    pred_values = np.asarray(pred_values, dtype=np.float64).ravel()
+    mask = np.isfinite(gt_values) & np.isfinite(pred_values)
+    if mask.sum() < 3:
+        return np.nan
+    err = float(np.sqrt(np.mean((gt_values[mask] - pred_values[mask]) ** 2)))
+    scale = _robust_scale(gt_values[mask])
+    return float(1.0 / (1.0 + err / max(scale, 1e-6)))
+
+
+def _score_from_components(
+    components: dict[str, tuple[float, float]],
+    stat_weights: dict[str, float],
+) -> tuple[float, dict[str, float]]:
+    scores: dict[str, float] = {}
+    for name, (corr_score, rmse_score) in components.items():
+        scores[name] = _weighted_mean_available(
+            {"corr": corr_score, "rmse": rmse_score},
+            {"corr": 0.5, "rmse": 0.5},
+        )
+    final_score = _weighted_mean_available(scores, stat_weights)
+    return final_score, scores
+
+
+def _moment_feature_arrays(arr: np.ndarray) -> dict[str, np.ndarray]:
+    return {
+        "var": np.nanvar(arr, axis=1, ddof=1),
+        "skew": skew(arr, axis=1, bias=False, nan_policy="omit"),
+        "kurt": kurtosis(arr, axis=1, fisher=True, bias=False, nan_policy="omit"),
+    }
+
+
+def _one_sided_spikes_corruption(data: np.ndarray, level: float, seed: int) -> np.ndarray:
+    level = float(level)
+    out = np.asarray(data, dtype=np.float64).copy()
+    if level <= 0:
+        return out
+    rng = np.random.default_rng(seed)
+    flat = out.reshape(-1, out.shape[-1])
+    for region_idx in range(flat.shape[1]):
+        values = flat[:, region_idx]
+        valid_idx = np.flatnonzero(np.isfinite(values))
+        if valid_idx.size < 8:
+            continue
+        valid_values = values[valid_idx]
+        q25, q75 = np.quantile(valid_values, [0.25, 0.75])
+        iqr = max(float(q75 - q25), 1e-6)
+        tail_threshold = float(np.quantile(valid_values, 0.9))
+        candidate_idx = valid_idx[values[valid_idx] >= tail_threshold]
+        if candidate_idx.size == 0:
+            candidate_idx = valid_idx
+        n_spikes = max(1, int(np.ceil(level * 0.20 * candidate_idx.size)))
+        chosen = rng.choice(candidate_idx, size=n_spikes, replace=n_spikes > candidate_idx.size)
+        spike_mag = (0.75 + 0.75 * rng.random(n_spikes)) * level * iqr
+        values[chosen] = values[chosen] + spike_mag
+        flat[:, region_idx] = values
+    return out
+
+
+def corruption_gain_scaling_blend(data: np.ndarray, level: float, seed: int) -> np.ndarray:
+    data = np.asarray(data, dtype=np.float64)
+    if level <= 0:
+        return data.copy()
+    rng = np.random.default_rng(seed)
+    region_gain = rng.lognormal(mean=0.0, sigma=0.55, size=(1, 1, data.shape[-1]))
+    scaled = data * region_gain
+    return ((1.0 - level) * data) + (level * scaled)
+
+
+def _corrcoef_from_flat(data: np.ndarray) -> np.ndarray | None:
+    flat = np.asarray(data, dtype=np.float64).reshape(-1, data.shape[-1])
+    finite_rows = np.isfinite(flat).all(axis=1)
+    flat = flat[finite_rows]
+    if flat.shape[0] < 5 or flat.shape[1] < 2:
+        return None
+    keep_cols = np.nanstd(flat, axis=0) > 1e-9
+    flat = flat[:, keep_cols]
+    if flat.shape[1] < 2:
+        return None
+    corr = np.corrcoef(flat, rowvar=False)
+    corr = np.asarray(corr, dtype=np.float64)
+    corr[~np.isfinite(corr)] = 0.0
+    np.fill_diagonal(corr, 0.0)
+    return corr
+
+
+def _top_edge_index(abs_weights: np.ndarray, frac: float = 0.2) -> np.ndarray:
+    n_edges = abs_weights.size
+    if n_edges == 0:
+        return np.asarray([], dtype=int)
+    k = max(1, int(np.ceil(frac * n_edges)))
+    order = np.argsort(abs_weights)
+    return order[-k:]
+
+
+def _local_clustering_from_adj(adj: np.ndarray) -> np.ndarray:
+    if adj.size == 0:
+        return np.asarray([], dtype=np.float64)
+    A = np.asarray(adj, dtype=np.float64)
+    A = ((A > 0).astype(np.float64) + (A.T > 0).astype(np.float64)) > 0
+    A = A.astype(np.float64)
+    np.fill_diagonal(A, 0.0)
+    degree = A.sum(axis=1)
+    tri = np.diag(A @ A @ A)
+    out = np.full(A.shape[0], np.nan, dtype=np.float64)
+    valid = degree >= 2
+    out[valid] = tri[valid] / np.maximum(degree[valid] * (degree[valid] - 1.0), 1e-9)
+    out[(degree < 2) & np.isfinite(degree)] = 0.0
+    return out
+
+
+def _binary_topology_from_corr(C: np.ndarray, frac: float = 0.15) -> np.ndarray:
+    C = np.abs(np.asarray(C, dtype=np.float64))
+    np.fill_diagonal(C, 0.0)
+    iu = np.triu_indices_from(C, k=1)
+    n_edges = len(iu[0])
+    topk = max(3, int(np.ceil(frac * n_edges)))
+    topk = min(topk, n_edges)
+    idx = np.argsort(C[iu])[-topk:]
+    A = np.zeros_like(C, dtype=np.int64)
+    A[iu[0][idx], iu[1][idx]] = 1
+    A = A + A.T
+    return A
+
+
+def _binary_clustering(adj: np.ndarray) -> np.ndarray:
+    adj = np.asarray(adj, dtype=np.int64)
+    n = adj.shape[0]
+    out = np.zeros(n, dtype=np.float64)
+    for i in range(n):
+        nbr = np.flatnonzero(adj[i])
+        k = nbr.size
+        if k < 2:
+            continue
+        sub = adj[np.ix_(nbr, nbr)]
+        edges = float(np.sum(sub) / 2.0)
+        out[i] = (2.0 * edges) / (k * (k - 1))
+    return out
+
+
+def _final_moment_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
+    gt, pred = _align_common_arrays(gt_arr, pred_arr)
+    gt_feats = _moment_feature_arrays(gt)
+    pred_feats = _moment_feature_arrays(pred)
+    components = {}
+    for name in ["var", "skew", "kurt"]:
+        gt_values = gt_feats[name].ravel()
+        pred_values = pred_feats[name].ravel()
+        components[name] = (_safe_spearman01(gt_values, pred_values), _rmse_similarity(gt_values, pred_values))
+    score, per_stat = _score_from_components(
+        components,
+        {"var": 0.40, "skew": 0.30, "kurt": 0.30},
+    )
+    return {
+        "score": score,
+        "var_score": per_stat.get("var", np.nan),
+        "skew_score": per_stat.get("skew", np.nan),
+        "kurt_score": per_stat.get("kurt", np.nan),
+    }
+
+
+def _perfected_moment_score_legacy(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
+    gt, pred = _align_arrays(gt_arr, pred_arr)
+    scores = []
+    for region in range(gt.shape[-1]):
+        g = gt[:, :, region].reshape(-1)
+        p = pred[:, :, region].reshape(-1)
+        mask = np.isfinite(g) & np.isfinite(p)
+        g = g[mask]
+        p = p[mask]
+        if g.size < 24:
+            continue
+        var_g = float(np.var(g)) + EPS
+        var_p = float(np.var(p)) + EPS
+        skew_g = float(stats.skew(g, bias=False))
+        skew_p = float(stats.skew(p, bias=False))
+        kurt_g = float(stats.kurtosis(g, fisher=True, bias=False))
+        kurt_p = float(stats.kurtosis(p, fisher=True, bias=False))
+        dist = abs(np.log(var_p / var_g)) + 0.50 * abs(skew_p - skew_g) + 0.25 * abs(kurt_p - kurt_g)
+        scores.append(_score_from_distance(dist))
+    arr = np.asarray(scores, dtype=np.float64)
+    arr = arr[np.isfinite(arr)]
+    return {"score": float(np.mean(arr)) if arr.size else np.nan}
+
+
+def _final_graph_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
+    gt, pred = _align_common_arrays(gt_arr, pred_arr)
+    corr_gt = _corrcoef_from_flat(gt)
+    corr_pred = _corrcoef_from_flat(pred)
+    if corr_gt is None or corr_pred is None or corr_gt.shape != corr_pred.shape:
+        return {
+            "score": np.nan,
+            "jaccard": np.nan,
+            "weight_score": np.nan,
+            "degree_score": np.nan,
+            "cluster_score": np.nan,
+        }
+    tri = np.triu_indices(corr_gt.shape[0], k=1)
+    gt_edges = corr_gt[tri]
+    pred_edges = corr_pred[tri]
+    abs_gt = np.abs(gt_edges)
+    abs_pred = np.abs(pred_edges)
+    idx_gt = _top_edge_index(abs_gt, frac=0.20)
+    idx_pred = _top_edge_index(abs_pred, frac=0.20)
+    set_gt = set(idx_gt.tolist())
+    set_pred = set(idx_pred.tolist())
+    union_idx = np.asarray(sorted(set_gt | set_pred), dtype=int)
+    inter_size = len(set_gt & set_pred)
+    union_size = len(set_gt | set_pred)
+    jaccard = float(inter_size / union_size) if union_size else 1.0
+    if union_idx.size:
+        weight_score = _safe_spearman01(gt_edges[union_idx], pred_edges[union_idx])
+    else:
+        weight_score = np.nan
+    degree_score = _safe_spearman01(np.sum(np.abs(corr_gt), axis=1), np.sum(np.abs(corr_pred), axis=1))
+    adj_gt = np.zeros_like(corr_gt, dtype=np.float64)
+    adj_pred = np.zeros_like(corr_pred, dtype=np.float64)
+    if idx_gt.size:
+        adj_gt[tri[0][idx_gt], tri[1][idx_gt]] = 1.0
+    if idx_pred.size:
+        adj_pred[tri[0][idx_pred], tri[1][idx_pred]] = 1.0
+    adj_gt = adj_gt + adj_gt.T
+    adj_pred = adj_pred + adj_pred.T
+    cluster_score = _rmse_similarity(_local_clustering_from_adj(adj_gt), _local_clustering_from_adj(adj_pred))
+    score = _weighted_mean_available(
+        {
+            "jaccard": jaccard,
+            "weight": weight_score,
+            "degree": degree_score,
+            "cluster": cluster_score,
+        },
+        {
+            "jaccard": 0.35,
+            "weight": 0.30,
+            "degree": 0.20,
+            "cluster": 0.15,
+        },
+    )
+    return {
+        "score": score,
+        "jaccard": jaccard,
+        "weight_score": weight_score,
+        "degree_score": degree_score,
+        "cluster_score": cluster_score,
+    }
+
+
+def _perfected_graph_score_legacy(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
+    gt, pred = _align_arrays(gt_arr, pred_arr)
+    Xg = gt.reshape(-1, gt.shape[-1])
+    Xp = pred.reshape(-1, pred.shape[-1])
+    Xg, Xp = _finite_rows(Xg, Xp)
+    Cg = _safe_corrcoef(Xg)
+    Cp = _safe_corrcoef(Xp)
+    if Cg is None or Cp is None:
+        return {
+            "score": np.nan,
+            "jaccard": np.nan,
+            "degree_score": np.nan,
+            "clustering_score": np.nan,
+        }
+    Ag = _binary_topology_from_corr(Cg)
+    Ap = _binary_topology_from_corr(Cp)
+    edges_g = set(zip(*np.where(np.triu(Ag, k=1) > 0)))
+    edges_p = set(zip(*np.where(np.triu(Ap, k=1) > 0)))
+    union = edges_g | edges_p
+    jaccard = float(len(edges_g & edges_p) / max(len(union), 1))
+    deg_g = np.sum(np.abs(Cg), axis=0)
+    deg_p = np.sum(np.abs(Cp), axis=0)
+    degree_score = _score_from_distance(float(np.mean(np.abs(deg_p - deg_g)) / (np.mean(np.abs(deg_g)) + EPS)))
+    clust_g = _binary_clustering(Ag)
+    clust_p = _binary_clustering(Ap)
+    clustering_score = _finite_float(1.0 - float(np.mean(np.abs(clust_p - clust_g))))
+    pieces = [value for value in [jaccard, degree_score, clustering_score] if np.isfinite(value)]
+    if not pieces:
+        score = np.nan
+    else:
+        score = _finite_float(float(np.exp(np.mean(np.log(np.clip(pieces, 1e-6, 1.0))))))
+    return {
+        "score": score,
+        "jaccard": jaccard,
+        "degree_score": degree_score,
+        "clustering_score": clustering_score,
+    }
 
 
 def _build_corruption_df(
@@ -230,6 +577,89 @@ def compute_pca_replacement(
         enable_plots=enable_plots,
     )
     return pca_simple, pca_corr_df
+
+
+def compute_moment_replacement(
+    gt_arr: np.ndarray,
+    pred_arr: np.ndarray,
+    *,
+    enable_plots: bool = True,
+) -> tuple[dict, pd.DataFrame]:
+    description = "Variance, skewness, and kurtosis agreement."
+    result = _perfected_moment_score_legacy(gt_arr, pred_arr)
+    score = _extract_score(result)
+    mom_simple = _wrap_population_metric(
+        score_key="MOM_score01",
+        mean_key="MOM_mean",
+        score=score,
+        description=description,
+        candidate_name="perfected_moment_score",
+    )
+    mom_corr_df = _build_corruption_df(
+        gt_arr,
+        _perfected_moment_score_legacy,
+        corruption_gain_scaling_blend,
+        score_key="MOM_score01",
+        family_label="gain_scaling_blend",
+    )
+    _display_summary(
+        label="Moments",
+        score_key="MOM_score01",
+        score=score,
+        description=description,
+        corruption_df=mom_corr_df,
+    )
+    _plot_corruption_df(
+        mom_corr_df,
+        score_key="MOM_score01",
+        title="Moments replacement degradation",
+        enable_plots=enable_plots,
+    )
+    return mom_simple, mom_corr_df
+
+
+def compute_graph_replacement(
+    gt_arr: np.ndarray,
+    pred_arr: np.ndarray,
+    *,
+    enable_plots: bool = True,
+) -> tuple[dict, pd.DataFrame]:
+    description = "Top-edge topology, weighted degree, and clustering agreement."
+    result = _perfected_graph_score_legacy(gt_arr, pred_arr)
+    score = _extract_score(result)
+    graph_simple = _wrap_population_metric(
+        score_key="GRAPH_score01",
+        mean_key="GRAPH_mean",
+        score=score,
+        description=description,
+        candidate_name="perfected_graph_score",
+        extra_scores={
+            "GRAPH_jacc_mean": result.get("jaccard", np.nan),
+            "GRAPH_deg_mean": result.get("degree_score", np.nan),
+            "GRAPH_cluster_mean": result.get("clustering_score", np.nan),
+        },
+    )
+    graph_corr_df = _build_corruption_df(
+        gt_arr,
+        _perfected_graph_score_legacy,
+        corruption_region_permute_blend,
+        score_key="GRAPH_score01",
+        family_label="region_permute_blend",
+    )
+    _display_summary(
+        label="Graph",
+        score_key="GRAPH_score01",
+        score=score,
+        description=description,
+        corruption_df=graph_corr_df,
+    )
+    _plot_corruption_df(
+        graph_corr_df,
+        score_key="GRAPH_score01",
+        title="Graph replacement degradation",
+        enable_plots=enable_plots,
+    )
+    return graph_simple, graph_corr_df
 
 
 def compute_autocorr_replacement(
