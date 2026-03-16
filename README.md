@@ -35,6 +35,8 @@ python -m pip install -e .
   - Uses the baseline score cells from `nethobench/notebooks/neuro_metrics.ipynb`.
 - Neuro full analysis (executes the full active notebook; saves plots + executed notebook + scores):
   - `nethobench neuro-analysis --gt gt_neural.csv --preds pred_neural.csv --ddconfig configs/data-clean-all.json`
+- Synthetic validation (known-structure synthetic neural datasets, oracle ceilings, targeted perturbations, family + metric selectivity tables):
+  - `nethobench synthetic-validation --output-root outputs/synthetic_validation`
 - Behavior-only:
   - `nethobench etho-scores --gt-dir /path/to/gt_dir --inf-dir /path/to/inf_dir`
   - add `--run-notebook` to also execute the bundled ethology notebook headlessly
@@ -93,6 +95,16 @@ The notebook-derived scalar metrics currently include:
 It does not execute the notebook corruption sweeps or the unified degradation dashboard.
 Use `neuro-analysis` when you want the full notebook outputs.
 
+## Synthetic validation
+`nethobench synthetic-validation` builds a synthetic neural benchmark with fully known structure and validates the active neuro score against it. The generator uses a low-dimensional latent dynamical system with region loadings, oscillatory forcing, and calcium-like AR(1) observations. The validation then:
+
+- estimates empirical oracle ceilings from independent draws of the same generator
+- applies targeted perturbations in generator parameter space for distribution, fidelity, temporal-spectral, relational, and geometry families
+- writes family-level and metric-level dose-response and selectivity tables
+- exports synthetic CSV datasets with `sequenceId` and `itemPosition`, so the same data can be reused downstream in Sequifier or other pipelines
+
+The main public notebook for this workflow is `nethobench/notebooks/synthetic_validation.ipynb`.
+
 ## Behavior and cross-modal scoring
 - **Behavior** (from EthoBench): position KL, quadrant KL, stationary fraction, velocity/acceleration KL, direction alignment, syllable distribution similarity, and trajectory-shape similarity.
 - **Cross-modal**: neural-behavior CCA alignment, bidirectional predictive `R^2`, lead-lag agreement, and a cross-modal composite over available terms.
@@ -112,6 +124,8 @@ from nethobench import (
     run_neuro_full_analysis,
     compute_etho_scores,
     compute_cross_scores,
+    generate_synthetic_neural_dataset,
+    run_synthetic_neuro_validation,
     run_ethobench_notebook,   # optional behavior notebook capture
     run_cross_full_analysis,  # optional cross-modal notebook capture
 )

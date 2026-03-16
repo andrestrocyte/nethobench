@@ -85,6 +85,9 @@ mean_top10_df = pd.DataFrame([{
         "stop_before": "# 1) Temporal shuffle corruption sweep",
     },
     {
+        "marker": "# === ADDITIONAL STRUCTURAL METRICS (partial corr, spectra, subspaces, lagged dynamics) ===",
+    },
+    {
         "marker": "# === FINAL COMPOSITE (family-based, using exact upstream notebook result names) ===",
     },
 ]
