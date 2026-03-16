@@ -61,35 +61,57 @@ python -m pip install -e .
 
 `nethobench neuro-analysis` executes that same notebook end to end and exports the full figure set, including the degradation ladders and the final polar summary dashboard.
 
-The active notebook reports a set of scalar neuro metrics. Most entries are direct notebook metrics, and three are composite replacements defined in `nethobench/analysis/refined_neuro_metric_replacements.py`:
-- `CC_score01`: agreement of lagged cross-correlation structure, with extra emphasis on the strongest cross-correlation edges
-- `MANI_score01`: agreement of low-dimensional data geometry, combining persistent-topology lifetimes with local neighborhood structure
-- `TRJDIST_score01`: agreement of trajectory behavior, combining occupancy and velocity patterns with path-shape features
+The active notebook reports scalar neuro metrics grouped into interpretable families. Every metric is bounded to `[0, 1]`, where higher means the predicted neural population matches the reference population more closely.
 
-The notebook-derived scalar metrics currently include:
-- `KL_score01`
-- `Mean_score01`
-- `MI_score01`
-- `Error_score01`
-- `QNT_score01`
-- `FC_score01`
-- `PCA_score01`
-- `AUTO_score01`
-- `CC_score01`
-- `MOM_score01`
-- `GRAPH_score01`
-- `CCA_score01`
-- `MANI_score01`
-- `BP_score01`
-- `TRJDIST_score01`
-- `FINAL_COMPOSITE_SCORE`
+Family definitions:
+- `distribution`: whether marginal neural statistics are realistic, including full-value distributions, central tendency, quantiles, and higher moments.
+- `fidelity`: whether aligned ground-truth and predicted traces agree directly at the sequence-region level.
+- `temporal_spectral`: whether each region has realistic autocorrelation, spectrum, and trajectory evolution over time.
+- `relational`: whether inter-regional dependencies, temporal couplings, and network interaction structure are realistic.
+- `geometry`: whether the model recovers the same low-dimensional organization, variance allocation, and manifold structure as the reference data.
 
-`FINAL_COMPOSITE_SCORE` is the overall neuro score. It is a weighted arithmetic mean over the available metric families:
-- distribution
-- fidelity
-- temporal_spectral
-- relational
-- geometry
+Metric list by family:
+
+- `distribution`
+  - `KL_or_JSD_score01`: histogram-based distribution similarity for per-region activity values.
+  - `Mean_score01`: agreement of first-order location statistics across regions and sequences.
+  - `QNT_score01`: agreement of quantile structure and tail behavior.
+  - `MOM_score01`: agreement of variance, skewness, and kurtosis structure.
+
+- `fidelity`
+  - `Error_score01`: normalized trace-reconstruction fidelity for aligned ground-truth and predicted signals.
+  - `MI_score01`: mutual-information agreement between aligned ground-truth and predicted traces.
+
+- `temporal_spectral`
+  - `AUTO_score01`: agreement of per-region autocorrelation structure and characteristic timescales.
+  - `BP_score01`: agreement of canonical bandpower allocation.
+  - `PSDShape_score01`: agreement of the full normalized power-spectral shape.
+  - `TRJDIST_score01`: agreement of temporal trajectory evolution in low-dimensional space, including occupancy, velocity, and path-shape features.
+
+- `relational`
+  - `FC_score01`: agreement of zero-lag functional connectivity.
+  - `CC_score01`: agreement of lagged cross-correlation structure, with extra emphasis on the strongest edges.
+  - `GRAPH_score01`: agreement of graph-level interaction structure derived from inter-regional coupling.
+  - `PartialCorr_score01`: agreement of conditional dependency structure via partial correlations.
+  - `CrossRegionMI_score01`: agreement of region-by-region mutual-information structure within each dataset.
+  - `PrecisionMatrixSpectrum_score01`: agreement of the precision-matrix eigenspectrum.
+  - `LaggedCovariance_score01`: agreement of covariance structure at nonzero temporal lags.
+  - `ImpulseResponse_score01`: agreement of simple directed temporal influence kernels between regions.
+
+- `geometry`
+  - `PCA_score01`: agreement of low-dimensional variance structure under PCA.
+  - `CCA_score01`: agreement of shared canonical latent subspaces between reference and prediction.
+  - `MANI_score01`: agreement of low-dimensional data geometry, combining persistent-topology lifetimes with local neighborhood structure.
+  - `Dimensionality_score01`: agreement of effective dimensionality.
+  - `SubspaceAngle_score01`: agreement of dominant latent subspaces via principal angles.
+  - `EigenspectrumShape_score01`: agreement of normalized covariance eigenspectrum shape.
+
+`FINAL_COMPOSITE_SCORE` is the overall neuro score. It is a weighted arithmetic mean over the available family composites:
+- `family_distribution`: `KL_or_JSD`, `Mean`, `QNT`, `MOM`
+- `family_fidelity`: `Error`, `MI`
+- `family_temporal_spectral`: `AUTO`, `BP`, `PSDShape`, `TRJDIST`
+- `family_relational`: `FC`, `CC`, `GRAPH`, `PartialCorr`, `CrossRegionMI`, `PrecisionMatrixSpectrum`, `LaggedCovariance`, `ImpulseResponse`
+- `family_geometry`: `PCA`, `CCA`, `MANI`, `Dimensionality`, `SubspaceAngle`, `EigenspectrumShape`
 
 `neuro-scores` runs the baseline metric cells and final composite cell only.
 It does not execute the notebook corruption sweeps or the unified degradation dashboard.
@@ -138,29 +160,31 @@ from nethobench import (
 - `cross-scores` reports per-axis composites and the final multimodal composite.
 
 ## Example core-score output (CLI)
+Green bars indicate strong agreement, yellow indicates intermediate agreement, and red indicates weak agreement. The CLI prints ANSI-colored arrow bars in the terminal; the example below mirrors that format with representative values.
+
 ```
 Neuro scores:
-  KL_or_JSD_score01             : 0.xxx
-  Mean_score01                  : 0.xxx
-  MI_score01                    : 0.xxx
-  Error_score01                 : 0.xxx
-  QNT_score01                   : 0.xxx
-  FC_score01                    : 0.xxx
-  PCA_score01                   : 0.xxx
-  AUTO_score01                  : 0.xxx
-  CC_score01                    : 0.xxx
-  MOM_score01                   : 0.xxx
-  GRAPH_score01                 : 0.xxx
-  CCA_score01                   : 0.xxx
-  MANI_score01                  : 0.xxx
-  BP_score01                    : 0.xxx
-  TRJDIST_score01               : 0.xxx
-  family_distribution           : 0.xxx
-  family_fidelity               : 0.xxx
-  family_temporal_spectral      : 0.xxx
-  family_relational             : 0.xxx
-  family_geometry               : 0.xxx
-  FINAL_COMPOSITE_SCORE         : 0.xxx
+  KL_or_JSD_score01             : 0.742 \033[33m→ 0 ━━━━━━━━━━━▶──── 1\033[0m
+  Mean_score01                  : 0.781 \033[33m→ 0 ━━━━━━━━━━━━▶─── 1\033[0m
+  MI_score01                    : 0.027 \033[31m↘ 0 ▶─────────────── 1\033[0m
+  Error_score01                 : 0.475 \033[33m→ 0 ━━━━━━━▶──────── 1\033[0m
+  QNT_score01                   : 0.766 \033[33m→ 0 ━━━━━━━━━━━▶──── 1\033[0m
+  FC_score01                    : 0.937 \033[32m↗ 0 ━━━━━━━━━━━━━━▶─ 1\033[0m
+  PCA_score01                   : 0.986 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
+  AUTO_score01                  : 0.984 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
+  CC_score01                    : 0.985 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
+  MOM_score01                   : 0.963 \033[32m↗ 0 ━━━━━━━━━━━━━━▶─ 1\033[0m
+  GRAPH_score01                 : 0.996 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
+  CCA_score01                   : 0.563 \033[33m→ 0 ━━━━━━━━▶─────── 1\033[0m
+  MANI_score01                  : 0.818 \033[32m↗ 0 ━━━━━━━━━━━━▶─── 1\033[0m
+  BP_score01                    : 0.997 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
+  TRJDIST_score01               : 0.989 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
+  family_distribution           : 0.811 \033[32m↗ 0 ━━━━━━━━━━━━▶─── 1\033[0m
+  family_fidelity               : 0.318 \033[31m↘ 0 ━━━━▶─────────── 1\033[0m
+  family_temporal_spectral      : 0.991 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
+  family_relational             : 0.967 \033[32m↗ 0 ━━━━━━━━━━━━━━▶─ 1\033[0m
+  family_geometry               : 0.879 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
+  FINAL_COMPOSITE_SCORE         : 0.852 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
 ```
 
 ## Status
