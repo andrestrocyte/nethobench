@@ -1,14 +1,15 @@
 # NethoBench
 
-NethoBench is a benchmark for multimodal brain-behavior models that evaluates neural realism, behavioral realism, and cross-modal plausibility within a single framework. It combines population-level neural metrics spanning distributional structure, temporal dynamics, inter-regional interactions, and low-dimensional geometry with complementary behavioral metrics on pose trajectories, kinematics, motifs, and trajectory statistics. Crucially, it adds an explicit cross-modal axis through neural-to-behavior decoding, behavior-to-neural encoding, latent alignment, and temporal-consistency measures, exposing failure modes that unimodal metrics or task losses alone can miss.
+NethoBench is a benchmark for multimodal brain-behavior models that evaluates neural realism, behavioral realism, and cross-modal plausibility within a single framework. It combines population-level neural metrics spanning distributional structure, temporal dynamics, inter-regional interactions, low-dimensional geometry, and latent state dynamics with complementary behavioral metrics on pose trajectories, kinematics, motifs, and trajectory statistics. Crucially, it adds an explicit cross-modal axis through neural-to-behavior decoding, behavior-to-neural encoding, latent alignment, and temporal-consistency measures, exposing failure modes that unimodal metrics or task losses alone can miss.
 
 ![NethoBench Logo](assets/nethobench.png)
 
 NethoBench outputs:
-1) Neuro scores (neural realism)
-2) Behavior scores (pose / kinematics realism)
-3) Cross-modal scores (neural <-> behavior coupling)
-4) A final composite (average over available axes)
+1. Neuro score (default neural realism benchmark)
+2. Fidelity score (separate direct trace-alignment family)
+3. Behavior scores (pose / kinematics realism)
+4. Cross-modal scores (neural <-> behavior coupling)
+5. A final multimodal composite (average over available neuro / behavior / cross axes)
 
 ## Install
 ```bash
@@ -26,23 +27,30 @@ python -m pip install -e .
 ## Data expectations
 - Files must include `sequenceId` and `itemPosition` for alignment.
 - Neural: region columns (one column per region).
-- Behavior: keypoint columns with `_X/_Y` pairs (e.g., `CENTER_X`, `CENTER_Y`).
-- For multimodal runs, GT and prediction CSVs should contain both neural and behavior columns (or provide a config that lists them).
+- Behavior: keypoint columns with `_X/_Y` pairs (e.g. `CENTER_X`, `CENTER_Y`).
+- For multimodal runs, GT and prediction CSVs should contain both neural and behavior columns, or you should provide a config that lists them.
 
 ## CLI
-- Neuro scores (single active neural benchmark):
+- Neuro score:
   - `nethobench neuro-scores --gt gt_neural.csv --preds pred_neural.csv`
-  - Uses the baseline score cells from `nethobench/notebooks/neuro_metrics.ipynb`.
-- Neuro full analysis (executes the full active notebook; saves plots + executed notebook + scores):
+  - Uses the active score cells from `nethobench/notebooks/neuro_metrics.ipynb`.
+- Fidelity score:
+  - `nethobench fidelity-scores --gt gt_neural.csv --preds pred_neural.csv`
+  - Reports the separate direct-fidelity family only.
+- Neuro full analysis:
   - `nethobench neuro-analysis --gt gt_neural.csv --preds pred_neural.csv --ddconfig configs/data-clean-all.json`
-- Synthetic validation (known-structure synthetic neural datasets, oracle ceilings, targeted perturbations, family + metric selectivity tables):
+  - Executes the full active notebook and saves plots + executed notebook + scores.
+- Synthetic validation:
   - `nethobench synthetic-validation --output-root outputs/synthetic_validation`
+- Harder biophysical synthetic validation:
+  - `nethobench synthetic-validation-biophysical --output-root outputs/biophysical_validation`
 - Behavior-only:
   - `nethobench etho-scores --gt-dir /path/to/gt_dir --inf-dir /path/to/inf_dir`
-  - add `--run-notebook` to also execute the bundled ethology notebook headlessly
-- Multimodal scores (neuro + behavior + coupling):
+  - Add `--run-notebook` to also execute the bundled ethology notebook headlessly.
+- Multimodal scores:
   - `nethobench cross-scores --gt gt_multimodal.csv --preds pred_multimodal.csv --config config.json`
-- Cross full analysis (headless notebook):
+  - Uses the default neuro score internally.
+- Cross full analysis:
   - `nethobench cross-analysis --gt gt_multimodal.csv --preds pred_multimodal.csv --config config.json`
 
 ### Config schema (JSON)
@@ -52,80 +60,126 @@ python -m pip install -e .
   "time_key": "itemPosition",
   "neuro_cols": ["region1", "region2", "region3"],
   "behavior_parts": ["CENTER", "NOSE", "TAIL_BASE"],
-  "body_axis": ["NOSE", "TAIL_BASE"]  // optional override for direction metric
+  "body_axis": ["NOSE", "TAIL_BASE"]
 }
 ```
 
 ## Neuro scoring
 `nethobench neuro-scores` is driven by the active notebook implementation in `nethobench/notebooks/neuro_metrics.ipynb` via the extracted baseline-cell runner in `nethobench/analysis/neuro_metrics_core_script.py`.
 
-`nethobench neuro-analysis` executes that same notebook end to end and exports the full figure set, including the degradation ladders and the final polar summary dashboard.
+`nethobench neuro-analysis` executes that same notebook end to end and exports the full figure set, including corruption ladders, family polar summaries, and the unified dashboard.
 
-The active notebook reports scalar neuro metrics grouped into interpretable families. Every metric is bounded to `[0, 1]`, where higher means the predicted neural population matches the reference population more closely.
+The default neuro score is a curated structural neural realism benchmark. Every metric is bounded to `[0, 1]`, where higher means the predicted neural population matches the reference population more closely.
 
-Family definitions:
-- `distribution`: whether marginal neural statistics are realistic, including full-value distributions, central tendency, quantiles, and higher moments.
-- `fidelity`: whether aligned ground-truth and predicted traces agree directly at the sequence-region level.
-- `temporal_spectral`: whether each region has realistic autocorrelation, spectrum, and trajectory evolution over time.
-- `relational`: whether inter-regional dependencies, temporal couplings, and network interaction structure are realistic.
-- `geometry`: whether the model recovers the same low-dimensional organization, variance allocation, and manifold structure as the reference data.
+The active neuro families are:
+- `distribution`: whether marginal activity statistics, tails, and moments are realistic.
+- `temporal_spectral`: whether neural trajectories evolve through time like the reference data.
+- `relational`: whether inter-regional interactions and lagged dependencies are realistic.
+- `geometry`: whether the dominant latent organization and manifold geometry are realistic.
+- `state_dynamics`: whether the model occupies and transitions between GT-defined latent states correctly.
 
-Metric list by family:
+### Active metric list
 
 - `distribution`
-  - `KL_or_JSD_score01`: histogram-based distribution similarity for per-region activity values.
-  - `Mean_score01`: agreement of first-order location statistics across regions and sequences.
+  - `KL_or_JSD_score01`: histogram-based similarity of per-region activity-value distributions.
   - `QNT_score01`: agreement of quantile structure and tail behavior.
   - `MOM_score01`: agreement of variance, skewness, and kurtosis structure.
-
-- `fidelity`
-  - `Error_score01`: normalized trace-reconstruction fidelity for aligned ground-truth and predicted signals.
-  - `MI_score01`: mutual-information agreement between aligned ground-truth and predicted traces.
+  - `Mean_score01`: agreement of first-order location statistics.
 
 - `temporal_spectral`
-  - `AUTO_score01`: agreement of per-region autocorrelation structure and characteristic timescales.
-  - `BP_score01`: agreement of canonical bandpower allocation.
-  - `PSDShape_score01`: agreement of the full normalized power-spectral shape.
-  - `TRJDIST_score01`: agreement of temporal trajectory evolution in low-dimensional space, including occupancy, velocity, and path-shape features.
+  - `TRJDIST_score01`: low-dimensional trajectory realism, combining occupancy, speed, turning, and path-shape features in a shared GT latent space.
 
 - `relational`
-  - `FC_score01`: agreement of zero-lag functional connectivity.
-  - `CC_score01`: agreement of lagged cross-correlation structure, with extra emphasis on the strongest edges.
   - `GRAPH_score01`: agreement of graph-level interaction structure derived from inter-regional coupling.
-  - `PartialCorr_score01`: agreement of conditional dependency structure via partial correlations.
   - `CrossRegionMI_score01`: agreement of region-by-region mutual-information structure within each dataset.
-  - `PrecisionMatrixSpectrum_score01`: agreement of the precision-matrix eigenspectrum.
   - `LaggedCovariance_score01`: agreement of covariance structure at nonzero temporal lags.
   - `ImpulseResponse_score01`: agreement of simple directed temporal influence kernels between regions.
 
 - `geometry`
-  - `PCA_score01`: agreement of low-dimensional variance structure under PCA.
-  - `CCA_score01`: agreement of shared canonical latent subspaces between reference and prediction.
-  - `MANI_score01`: agreement of low-dimensional data geometry, combining persistent-topology lifetimes with local neighborhood structure.
-  - `Dimensionality_score01`: agreement of effective dimensionality.
+  - `MANI_score01`: agreement of low-dimensional geometry, combining persistent-topology lifetimes with local-neighborhood structure.
   - `SubspaceAngle_score01`: agreement of dominant latent subspaces via principal angles.
-  - `EigenspectrumShape_score01`: agreement of normalized covariance eigenspectrum shape.
 
-`FINAL_COMPOSITE_SCORE` is the overall neuro score. It is a weighted arithmetic mean over the available family composites:
-- `family_distribution`: `KL_or_JSD`, `Mean`, `QNT`, `MOM`
-- `family_fidelity`: `Error`, `MI`
-- `family_temporal_spectral`: `AUTO`, `BP`, `PSDShape`, `TRJDIST`
-- `family_relational`: `FC`, `CC`, `GRAPH`, `PartialCorr`, `CrossRegionMI`, `PrecisionMatrixSpectrum`, `LaggedCovariance`, `ImpulseResponse`
-- `family_geometry`: `PCA`, `CCA`, `MANI`, `Dimensionality`, `SubspaceAngle`, `EigenspectrumShape`
+- `state_dynamics`
+  - `LatentStateOccupancyK11_score01`: agreement of GT-derived latent-state occupancy using an 11-state partition.
+  - `LatentStateOccupancyK12_score01`: same occupancy test with a 12-state partition.
+  - `LatentStateTransitionLag1K11_score01`: agreement of one-step transition structure between GT-derived latent states.
+  - `LatentStateTransitionLag2K11_score01`: agreement of two-step transition structure between GT-derived latent states.
+  - `LatentStateTransitionLag3K11_score01`: agreement of three-step transition structure between GT-derived latent states.
 
-`neuro-scores` runs the baseline metric cells and final composite cell only.
-It does not execute the notebook corruption sweeps or the unified degradation dashboard.
-Use `neuro-analysis` when you want the full notebook outputs.
+### Family and composite definition
+The default neuro score is a weighted arithmetic mean over family composites:
+
+\[
+D = \frac{s_{KL} + s_{QNT} + s_{MOM} + s_{Mean}}{4}
+\]
+
+\[
+T = s_{TRJDIST}
+\]
+
+\[
+R = \frac{s_{GRAPH} + s_{CrossRegionMI} + s_{LaggedCovariance} + s_{ImpulseResponse}}{4}
+\]
+
+\[
+G = \frac{s_{MANI} + s_{SubspaceAngle}}{2}
+\]
+
+\[
+S = \frac{s_{Occ11} + s_{Occ12} + s_{Trans1} + s_{Trans2} + s_{Trans3}}{5}
+\]
+
+\[
+\text{FINAL\_COMPOSITE\_SCORE}
+= 0.22D + 0.18T + 0.24R + 0.18G + 0.18S
+\]
+
+The CLI reports these as:
+- `family_distribution`
+- `family_temporal_spectral`
+- `family_relational`
+- `family_geometry`
+- `family_state_dynamics`
+- `FINAL_COMPOSITE_SCORE`
+
+### Separate fidelity score
+The direct trace-alignment family is now reported separately:
+
+- `Error_score01`
+- `MI_score01`
+- `family_fidelity`
+- `FIDELITY_SCORE`
+
+with:
+
+\[
+S_{fidelity} = 0.65 \, s_{Error} + 0.35 \, s_{MI}
+\]
+
+Run it with:
+```bash
+nethobench fidelity-scores --gt gt_neural.csv --preds pred_neural.csv
+```
+
+### Legacy metrics
+The previous broader metric inventory is preserved under:
+- `nethobench/legacy/legacy_metrics.py`
+- `nethobench/legacy/legacy_neuro_core_script.py`
+- `nethobench/legacy/notebooks/neuro_metrics_legacy.ipynb`
+
+The public CLI now defaults to the curated neuro score above. The legacy folder is retained for historical comparison, ablations, and migration.
 
 ## Synthetic validation
-`nethobench synthetic-validation` builds a synthetic neural benchmark with fully known structure and validates the active neuro score against it. The generator uses a low-dimensional latent dynamical system with region loadings, oscillatory forcing, and calcium-like AR(1) observations. The validation then:
+`nethobench synthetic-validation` builds a synthetic neural benchmark with fully known structure and validates the active neuro score against it. The generator uses low-dimensional latent dynamics with region loadings and calcium-like observations. The validation:
 
 - estimates empirical oracle ceilings from independent draws of the same generator
-- applies targeted perturbations in generator parameter space for distribution, fidelity, temporal-spectral, relational, and geometry families
+- applies targeted perturbations in generator parameter space for the active neuro score families
 - writes family-level and metric-level dose-response and selectivity tables
 - exports synthetic CSV datasets with `sequenceId` and `itemPosition`, so the same data can be reused downstream in Sequifier or other pipelines
 
-The main public notebook for this workflow is `nethobench/notebooks/synthetic_validation.ipynb`.
+`nethobench synthetic-validation-biophysical` repeats the same logic on a harder spike/event-driven calcium world with heterogeneous kinetics and state switches.
+
+These validation commands audit the active neuro score. Fidelity is intentionally separate and can be computed independently with `fidelity-scores` if needed.
 
 ## Behavior and cross-modal scoring
 - **Behavior** (from EthoBench): position KL, quadrant KL, stationary fraction, velocity/acceleration KL, direction alignment, syllable distribution similarity, and trajectory-shape similarity.
@@ -135,61 +189,77 @@ The main public notebook for this workflow is `nethobench/notebooks/synthetic_va
 - Headless analysis commands save figures, notebook wrappers, and score JSON under `./outputs/...`.
 
 ### Composite logic
-- If only neuro: composite = neuro composite.  
-- If only behavior: composite = behavior composite.  
-- If multimodal: composite = average(neuro composite, behavior composite, cross composite) over available (finite) axes.
+- If only neuro: composite = neuro composite.
+- If only behavior: composite = behavior composite.
+- If multimodal: composite = average(neuro composite, behavior composite, cross composite) over available finite axes.
 
 ## Python API
 ```python
 from nethobench import (
     compute_neuro_scores,
+    compute_fidelity_scores,
     run_neuro_full_analysis,
     compute_etho_scores,
     compute_cross_scores,
     generate_synthetic_neural_dataset,
     run_synthetic_neuro_validation,
-    run_ethobench_notebook,   # optional behavior notebook capture
-    run_cross_full_analysis,  # optional cross-modal notebook capture
+    run_biophysical_synthetic_neuro_validation,
+    run_ethobench_notebook,
+    run_cross_full_analysis,
 )
 ```
 
 ## Outputs
-- `neuro-scores` prints scores with colored arrow bars and always saves a JSON payload. `--json-out` lets you choose the path.
-- Intermediate notebook/metric logs are suppressed by default for all CLI commands.
+- `neuro-scores` prints the active neuro score metrics with colored arrow bars and always saves a JSON payload. `--json-out` lets you choose the path.
+- `fidelity-scores` does the same for the separate fidelity family.
 - `neuro-analysis`, `etho-scores --run-notebook`, and `cross-analysis` save figures + executed notebook under `./outputs/.../`.
 - `cross-scores` reports per-axis composites and the final multimodal composite.
 
-## Example core-score output (CLI)
+## Example neuro-score output (CLI)
 Green bars indicate strong agreement, yellow indicates intermediate agreement, and red indicates weak agreement. The CLI prints ANSI-colored arrow bars in the terminal; the example below mirrors that format with representative values.
 
-```
+```text
 Neuro scores:
-  KL_or_JSD_score01             : 0.742 \033[33m→ 0 ━━━━━━━━━━━▶──── 1\033[0m
-  Mean_score01                  : 0.781 \033[33m→ 0 ━━━━━━━━━━━━▶─── 1\033[0m
-  MI_score01                    : 0.027 \033[31m↘ 0 ▶─────────────── 1\033[0m
-  Error_score01                 : 0.475 \033[33m→ 0 ━━━━━━━▶──────── 1\033[0m
-  QNT_score01                   : 0.766 \033[33m→ 0 ━━━━━━━━━━━▶──── 1\033[0m
-  FC_score01                    : 0.937 \033[32m↗ 0 ━━━━━━━━━━━━━━▶─ 1\033[0m
-  PCA_score01                   : 0.986 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
-  AUTO_score01                  : 0.984 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
-  CC_score01                    : 0.985 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
-  MOM_score01                   : 0.963 \033[32m↗ 0 ━━━━━━━━━━━━━━▶─ 1\033[0m
-  GRAPH_score01                 : 0.996 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
-  CCA_score01                   : 0.563 \033[33m→ 0 ━━━━━━━━▶─────── 1\033[0m
-  MANI_score01                  : 0.818 \033[32m↗ 0 ━━━━━━━━━━━━▶─── 1\033[0m
-  BP_score01                    : 0.997 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
-  TRJDIST_score01               : 0.989 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
-  family_distribution           : 0.811 \033[32m↗ 0 ━━━━━━━━━━━━▶─── 1\033[0m
-  family_fidelity               : 0.318 \033[31m↘ 0 ━━━━▶─────────── 1\033[0m
-  family_temporal_spectral      : 0.991 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
-  family_relational             : 0.967 \033[32m↗ 0 ━━━━━━━━━━━━━━▶─ 1\033[0m
-  family_geometry               : 0.879 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
-  FINAL_COMPOSITE_SCORE         : 0.852 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
+  KL_or_JSD_score01                  : 0.742 \033[33m→ 0 ━━━━━━━━━━━▶──── 1\033[0m
+  QNT_score01                        : 0.766 \033[33m→ 0 ━━━━━━━━━━━▶──── 1\033[0m
+  MOM_score01                        : 0.641 \033[33m→ 0 ━━━━━━━━━▶────── 1\033[0m
+  Mean_score01                       : 0.781 \033[33m→ 0 ━━━━━━━━━━━━▶─── 1\033[0m
+  TRJDIST_score01                    : 0.989 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
+  GRAPH_score01                      : 0.996 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
+  CrossRegionMI_score01              : 0.911 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
+  LaggedCovariance_score01           : 0.969 \033[32m↗ 0 ━━━━━━━━━━━━━━▶─ 1\033[0m
+  ImpulseResponse_score01            : 0.922 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
+  MANI_score01                       : 0.884 \033[32m↗ 0 ━━━━━━━━━━━━▶─── 1\033[0m
+  SubspaceAngle_score01              : 0.946 \033[32m↗ 0 ━━━━━━━━━━━━━━▶─ 1\033[0m
+  LatentStateOccupancyK11_score01    : 0.910 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
+  LatentStateOccupancyK12_score01    : 0.903 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
+  LatentStateTransitionLag1K11_score01: 0.861 \033[32m↗ 0 ━━━━━━━━━━━━▶── 1\033[0m
+  LatentStateTransitionLag2K11_score01: 0.844 \033[32m↗ 0 ━━━━━━━━━━━━▶── 1\033[0m
+  LatentStateTransitionLag3K11_score01: 0.829 \033[32m↗ 0 ━━━━━━━━━━━▶─── 1\033[0m
+  family_distribution                : 0.733 \033[33m→ 0 ━━━━━━━━━━━▶──── 1\033[0m
+  family_temporal_spectral           : 0.989 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
+  family_relational                  : 0.950 \033[32m↗ 0 ━━━━━━━━━━━━━━▶─ 1\033[0m
+  family_geometry                    : 0.915 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
+  family_state_dynamics              : 0.869 \033[32m↗ 0 ━━━━━━━━━━━━▶── 1\033[0m
+  FINAL_COMPOSITE_SCORE              : 0.891 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
+```
+
+## Reproducibility
+The notebook-backed neuro score, the separate fidelity command, and the downstream synthetic / Sequifier / CalciumGAN workspaces are all aligned to the same active neuro metric inventory.
+
+Full rerun command list:
+- [final_score_rerun_commands.md](/Users/deviandr/nethobench/docs/final_score_rerun_commands.md)
+
+Single orchestration entry point:
+```bash
+cd /Users/deviandr/nethobench
+bash scripts/run_full_project_rerun.sh all
 ```
 
 ## Status
-- Focused on reproducible metrics; exploratory notebooks (ethology) can still be run via `ethobench`-style capture if you place the notebook under `nethobench/notebooks/`.  
-- Cross-modal metrics are light-weight and interpretable; extend with your own in `nethobench/cross.py`.
+- The default neural benchmark is now the curated structural neuro score described above.
+- The previous broad metric inventory remains available under `legacy/`.
+- Cross-modal metrics remain lightweight and interpretable; extend them in `nethobench/cross.py` if needed.
 
 ## License
 This project is released under the MIT License. See `LICENSE`.

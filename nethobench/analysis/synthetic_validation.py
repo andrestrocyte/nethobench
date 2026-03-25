@@ -5,31 +5,25 @@ from dataclasses import asdict, dataclass, replace
 import io
 import json
 from pathlib import Path
+import tempfile
 from typing import Iterable
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from ..fidelity import compute_fidelity_scores
 from ..neuro import _compute_scores_from_arrays
+from .score_definitions import NEURO_FAMILY_WEIGHTS
 
 
-FAMILY_COLUMNS = [
-    "family_distribution",
-    "family_fidelity",
-    "family_temporal_spectral",
-    "family_relational",
-    "family_geometry",
+FAMILY_COLUMNS = [f"family_{name}" for name in NEURO_FAMILY_WEIGHTS] + [
     "FINAL_COMPOSITE_SCORE",
     "ORACLE_VALIDATION_COMPOSITE_SCORE",
 ]
 
-ORACLE_VALIDATION_WEIGHTS = {
-    "family_distribution": 0.22,
-    "family_temporal_spectral": 0.18,
-    "family_relational": 0.28,
-    "family_geometry": 0.22,
-}
+ORACLE_VALIDATION_WEIGHTS = {f"family_{name}": weight for name, weight in NEURO_FAMILY_WEIGHTS.items()}
+FIDELITY_COLUMNS = ["Error_score01", "MI_score01", "family_fidelity", "FIDELITY_SCORE"]
 
 
 @dataclass(frozen=True)
@@ -70,12 +64,6 @@ DEFAULT_PERTURBATIONS = (
         name="distribution_gain_bias",
         target_family="family_distribution",
         description="Change per-region gains and offsets while preserving latent dynamics.",
-        levels=(0.0, 0.25, 0.50, 0.75, 1.0),
-    ),
-    PerturbationSpec(
-        name="fidelity_observation_noise",
-        target_family="family_fidelity",
-        description="Increase observation noise in the calcium readout.",
         levels=(0.0, 0.25, 0.50, 0.75, 1.0),
     ),
     PerturbationSpec(
@@ -226,8 +214,6 @@ def _build_system(spec: SyntheticNeuralSpec) -> dict[str, np.ndarray]:
         pattern = np.linspace(-0.5, 1.0, n_regions)
         gains = gains * (1.0 + 1.2 * level * pattern)
         biases = biases + 0.45 * level * pattern
-    elif perturbation == "fidelity_observation_noise":
-        observation_noise = spec.observation_noise * (1.0 + 5.0 * level)
     elif perturbation in {"temporal_tau_frequency", "temporal_combo"}:
         alphas = np.clip(alphas - 0.25 * level, 0.55, 0.98)
         oscillation_frequency = oscillation_frequency * (1.0 + level * np.linspace(0.7, 1.1, latent_dim))
@@ -384,6 +370,23 @@ def _oracle_validation_composite(score_row: dict[str, object]) -> float:
     return float(np.sum(np.asarray(values) * np.asarray(weights)) / np.sum(weights))
 
 
+def _quiet_fidelity_from_arrays(
+    gt_arr: np.ndarray,
+    pred_arr: np.ndarray,
+    *,
+    region_names: list[str],
+) -> dict[str, float]:
+    sink = io.StringIO()
+    with tempfile.TemporaryDirectory(prefix="nethobench-synth-fidelity-") as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        gt_path = tmpdir_path / "gt.csv"
+        pred_path = tmpdir_path / "pred.csv"
+        dataset_to_sequence_frame(gt_arr, region_names).to_csv(gt_path, index=False)
+        dataset_to_sequence_frame(pred_arr, region_names).to_csv(pred_path, index=False)
+        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+            return compute_fidelity_scores(pred_path, gt_path, neuro_cols=region_names)
+
+
 def _relative_drop(reference: float, value: float) -> float:
     if not np.isfinite(reference) or not np.isfinite(value):
         return np.nan
@@ -487,6 +490,14 @@ def _build_dose_response(
                     }
                 )
     return pd.DataFrame(rows)
+
+
+def _empty_selectivity_frame(score_columns: list[str]) -> pd.DataFrame:
+    return pd.DataFrame(columns=["perturbation_name", "target_family", *score_columns])
+
+
+def _empty_dose_frame(score_columns: list[str]) -> pd.DataFrame:
+    return pd.DataFrame(columns=["perturbation_name", "target_family", "level", "score_name", "mean_score"])
 
 
 def _plot_family_ceiling_floor(scores_df: pd.DataFrame, output_path: Path, *, perturbation_defs: tuple[PerturbationSpec, ...]) -> None:
@@ -609,6 +620,7 @@ def run_synthetic_neuro_validation(
             dataset_to_sequence_frame(oracle.array, oracle.region_names).to_csv(datasets_dir / "synthetic_oracle_prediction.csv", index=False)
         scores = _quiet_scores_from_arrays(reference.array, oracle.array, region_names=reference.region_names)
         scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(scores)
+        scores.update(_quiet_fidelity_from_arrays(reference.array, oracle.array, region_names=reference.region_names))
         row = _score_row_metadata(spec, "oracle", oracle_seed, target_lookup=target_lookup)
         row.update(scores)
         rows.append(row)
@@ -622,6 +634,7 @@ def run_synthetic_neuro_validation(
                 dataset_to_sequence_frame(perturbed.array, perturbed.region_names).to_csv(datasets_dir / out_name, index=False)
             scores = _quiet_scores_from_arrays(reference.array, perturbed.array, region_names=reference.region_names)
             scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(scores)
+            scores.update(_quiet_fidelity_from_arrays(reference.array, perturbed.array, region_names=reference.region_names))
             row = _score_row_metadata(perturbed_spec, "perturbation", 701, target_lookup=target_lookup)
             row.update(scores)
             rows.append(row)
@@ -630,10 +643,21 @@ def run_synthetic_neuro_validation(
     metric_columns = _metric_score_columns(scores_df)
     family_oracle_summary = _build_oracle_summary(scores_df, FAMILY_COLUMNS)
     metric_oracle_summary = _build_oracle_summary(scores_df, metric_columns)
-    family_selectivity_df = _build_selectivity_table(scores_df, FAMILY_COLUMNS, perturbation_defs)
-    metric_selectivity_df = _build_selectivity_table(scores_df, metric_columns, perturbation_defs)
-    family_dose_df = _build_dose_response(scores_df, FAMILY_COLUMNS, perturbation_defs)
-    metric_dose_df = _build_dose_response(scores_df, metric_columns, perturbation_defs)
+    fidelity_oracle_summary = _build_oracle_summary(scores_df, FIDELITY_COLUMNS)
+    if perturbation_defs:
+        family_selectivity_df = _build_selectivity_table(scores_df, FAMILY_COLUMNS, perturbation_defs)
+        metric_selectivity_df = _build_selectivity_table(scores_df, metric_columns, perturbation_defs)
+        fidelity_selectivity_df = _build_selectivity_table(scores_df, FIDELITY_COLUMNS, perturbation_defs)
+        family_dose_df = _build_dose_response(scores_df, FAMILY_COLUMNS, perturbation_defs)
+        metric_dose_df = _build_dose_response(scores_df, metric_columns, perturbation_defs)
+        fidelity_dose_df = _build_dose_response(scores_df, FIDELITY_COLUMNS, perturbation_defs)
+    else:
+        family_selectivity_df = _empty_selectivity_frame(FAMILY_COLUMNS)
+        metric_selectivity_df = _empty_selectivity_frame(metric_columns)
+        fidelity_selectivity_df = _empty_selectivity_frame(FIDELITY_COLUMNS)
+        family_dose_df = _empty_dose_frame(FAMILY_COLUMNS)
+        metric_dose_df = _empty_dose_frame(metric_columns)
+        fidelity_dose_df = _empty_dose_frame(FIDELITY_COLUMNS)
 
     metadata = {
         "generator_spec": asdict(spec),
@@ -645,48 +669,58 @@ def run_synthetic_neuro_validation(
     scores_path = tables_dir / "synthetic_score_runs.csv"
     family_oracle_path = tables_dir / "synthetic_family_oracle_summary.csv"
     metric_oracle_path = tables_dir / "synthetic_metric_oracle_summary.csv"
+    fidelity_oracle_path = tables_dir / "synthetic_fidelity_oracle_summary.csv"
     family_selectivity_path = tables_dir / "synthetic_family_selectivity.csv"
     metric_selectivity_path = tables_dir / "synthetic_metric_selectivity.csv"
+    fidelity_selectivity_path = tables_dir / "synthetic_fidelity_selectivity.csv"
     family_dose_path = tables_dir / "synthetic_family_dose_response.csv"
     metric_dose_path = tables_dir / "synthetic_metric_dose_response.csv"
+    fidelity_dose_path = tables_dir / "synthetic_fidelity_dose_response.csv"
     metadata_path = output_root / "synthetic_validation_metadata.json"
     scores_df.to_csv(scores_path, index=False)
     family_oracle_summary.to_csv(family_oracle_path, index=False)
     metric_oracle_summary.to_csv(metric_oracle_path, index=False)
+    fidelity_oracle_summary.to_csv(fidelity_oracle_path, index=False)
     family_selectivity_df.to_csv(family_selectivity_path, index=False)
     metric_selectivity_df.to_csv(metric_selectivity_path, index=False)
+    fidelity_selectivity_df.to_csv(fidelity_selectivity_path, index=False)
     family_dose_df.to_csv(family_dose_path, index=False)
     metric_dose_df.to_csv(metric_dose_path, index=False)
+    fidelity_dose_df.to_csv(fidelity_dose_path, index=False)
     metadata_path.write_text(json.dumps(metadata, indent=2))
 
     ceiling_plot = figures_dir / "family_ceiling_floor.png"
     family_selectivity_plot = figures_dir / "family_selectivity_heatmap.png"
     metric_selectivity_plot = figures_dir / "metric_selectivity_heatmap.png"
     dose_plot = figures_dir / "dose_response_curves.png"
-    _plot_family_ceiling_floor(scores_df, ceiling_plot, perturbation_defs=perturbation_defs)
-    _plot_selectivity_heatmap(
-        family_selectivity_df,
-        family_selectivity_plot,
-        score_columns=FAMILY_COLUMNS,
-        title="Family selectivity heatmap",
-    )
-    _plot_selectivity_heatmap(
-        metric_selectivity_df,
-        metric_selectivity_plot,
-        score_columns=metric_columns,
-        title="Metric selectivity heatmap",
-    )
-    _plot_dose_response(family_dose_df, dose_plot, perturbation_defs=perturbation_defs)
+    if perturbation_defs:
+        _plot_family_ceiling_floor(scores_df, ceiling_plot, perturbation_defs=perturbation_defs)
+        _plot_selectivity_heatmap(
+            family_selectivity_df,
+            family_selectivity_plot,
+            score_columns=FAMILY_COLUMNS,
+            title="Family selectivity heatmap",
+        )
+        _plot_selectivity_heatmap(
+            metric_selectivity_df,
+            metric_selectivity_plot,
+            score_columns=metric_columns,
+            title="Metric selectivity heatmap",
+        )
+        _plot_dose_response(family_dose_df, dose_plot, perturbation_defs=perturbation_defs)
 
     return {
         "output_root": output_root,
         "scores_path": scores_path,
         "family_oracle_summary_path": family_oracle_path,
         "metric_oracle_summary_path": metric_oracle_path,
+        "fidelity_oracle_summary_path": fidelity_oracle_path,
         "family_selectivity_path": family_selectivity_path,
         "metric_selectivity_path": metric_selectivity_path,
+        "fidelity_selectivity_path": fidelity_selectivity_path,
         "family_dose_response_path": family_dose_path,
         "metric_dose_response_path": metric_dose_path,
+        "fidelity_dose_response_path": fidelity_dose_path,
         "metadata_path": metadata_path,
         "ceiling_plot": ceiling_plot,
         "family_selectivity_plot": family_selectivity_plot,
@@ -695,8 +729,11 @@ def run_synthetic_neuro_validation(
         "scores_df": scores_df,
         "family_oracle_summary": family_oracle_summary,
         "metric_oracle_summary": metric_oracle_summary,
+        "fidelity_oracle_summary": fidelity_oracle_summary,
         "family_selectivity_df": family_selectivity_df,
         "metric_selectivity_df": metric_selectivity_df,
+        "fidelity_selectivity_df": fidelity_selectivity_df,
         "family_dose_df": family_dose_df,
         "metric_dose_df": metric_dose_df,
+        "fidelity_dose_df": fidelity_dose_df,
     }

@@ -15,7 +15,7 @@ NOTEBOOK_PATH = Path(
 # Execute only the notebook cells needed for baseline metrics + final composite.
 # Metric cells that also contain corruption sweeps are sliced before the sweep block.
 CELL_SPECS = [
-    {"marker": "import pandas as pd"},
+    {"marker": "%matplotlib inline"},
     {
         "marker": "# === Distribution realism (KL only): baseline + corruption degradation ===",
         "stop_before": "# Same corruption families as previous sweep",
@@ -33,32 +33,8 @@ mean_top10_df = pd.DataFrame([{
 """,
     },
     {
-        "marker": "# --- Mutual information realism (STRICT, simple, benchmark-friendly) ---",
-        "stop_before": "# B) Additive noise sweep",
-    },
-    {
-        "marker": "# === Error / fidelity metric (simple, strict, benchmark-friendly) ===",
-        "stop_before": "sigmas = [0.0",
-    },
-    {
         "marker": "# === Quantile / tail realism (simple, strict, benchmark-friendly) ===",
         "stop_before": "# Tail corruption sweep (merged)",
-    },
-    {
-        "marker": "# === FC realism (simple, strict, benchmark-friendly) ===",
-        "stop_before": "# 1) Region mixing noise",
-    },
-    {
-        "marker": "# === PCA realism (simple, strict, benchmark-friendly) ===",
-        "stop_before": "# 1) Region permutation",
-    },
-    {
-        "marker": "# === AUTOCORR realism (improved, more sensitive, still simple/strict) ===",
-        "stop_before": "rows = [{",
-    },
-    {
-        "marker": "# === CROSSCORR realism (more sensitive, still simple/strict/benchmark-friendly) ===",
-        "stop_before": "rows = [{",
     },
     {
         "marker": "# === Higher-order moments realism (simple, strict, benchmark-friendly) ===",
@@ -66,29 +42,21 @@ mean_top10_df = pd.DataFrame([{
     },
     {
         "marker": "# === Corr-connectivity GRAPH realism (simple, strict, benchmark-friendly) ===",
-        "stop_before": "perm_levels = [",
-    },
-    {
-        "marker": "# === CCA realism (stricter, nested-q10, benchmark-friendly) ===",
-        "stop_before": "# 1) Temporal shuffle",
+        "stop_before": "# 1) Corruption sweep",
     },
     {
         "marker": "# === MANIFOLD realism (simple geometry, strict, benchmark-friendly) ===",
-        "stop_before": "# 1) Region permutation corruption sweep",
+        "stop_before": "# 1) Corruption sweep",
     },
     {
         "marker": "# === TRAJECTORY DISTRIBUTION realism (FIXED: global GT-PCA basis, pooled across sequences) ===",
         "stop_before": "# -------------------------------------------------\n# 6) Corruption sweep",
     },
     {
-        "marker": "# === BANDPOWER realism (simple, strict, benchmark-friendly) ===",
-        "stop_before": "# 1) Temporal shuffle corruption sweep",
+        "marker": "# === ADDITIONAL STRUCTURAL METRICS (cross-region information, lagged dynamics, subspaces, states) ===",
     },
     {
-        "marker": "# === ADDITIONAL STRUCTURAL METRICS (partial corr, spectra, subspaces, lagged dynamics) ===",
-    },
-    {
-        "marker": "# === FINAL COMPOSITE (family-based, using exact upstream notebook result names) ===",
+        "marker": "# === FINAL NEURO SCORE COMPOSITE ===",
     },
 ]
 
