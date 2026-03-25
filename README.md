@@ -109,30 +109,30 @@ The active neuro families are:
 ### Family and composite definition
 The default neuro score is a weighted arithmetic mean over family composites:
 
-\[
+$$
 D = \frac{s_{KL} + s_{QNT} + s_{MOM} + s_{Mean}}{4}
-\]
+$$
 
-\[
+$$
 T = s_{TRJDIST}
-\]
+$$
 
-\[
+$$
 R = \frac{s_{GRAPH} + s_{CrossRegionMI} + s_{LaggedCovariance} + s_{ImpulseResponse}}{4}
-\]
+$$
 
-\[
+$$
 G = \frac{s_{MANI} + s_{SubspaceAngle}}{2}
-\]
+$$
 
-\[
+$$
 S = \frac{s_{Occ11} + s_{Occ12} + s_{Trans1} + s_{Trans2} + s_{Trans3}}{5}
-\]
+$$
 
-\[
+$$
 \text{FINAL\_COMPOSITE\_SCORE}
 = 0.22D + 0.18T + 0.24R + 0.18G + 0.18S
-\]
+$$
 
 The CLI reports these as:
 - `family_distribution`
@@ -152,9 +152,9 @@ The direct trace-alignment family is now reported separately:
 
 with:
 
-\[
+$$
 S_{fidelity} = 0.65 \, s_{Error} + 0.35 \, s_{MI}
-\]
+$$
 
 Run it with:
 ```bash
