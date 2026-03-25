@@ -130,8 +130,7 @@ S = \frac{s_{Occ11} + s_{Occ12} + s_{Trans1} + s_{Trans2} + s_{Trans3}}{5}
 $$
 
 $$
-\text{FINAL\_COMPOSITE\_SCORE}
-= 0.22D + 0.18T + 0.24R + 0.18G + 0.18S
+\mathrm{Composite} = 0.22D + 0.18T + 0.24R + 0.18G + 0.18S
 $$
 
 The CLI reports these as:
@@ -216,32 +215,32 @@ from nethobench import (
 - `cross-scores` reports per-axis composites and the final multimodal composite.
 
 ## Example neuro-score output (CLI)
-Green bars indicate strong agreement, yellow indicates intermediate agreement, and red indicates weak agreement. The CLI prints ANSI-colored arrow bars in the terminal; the example below mirrors that format with representative values.
+The terminal CLI uses ANSI colors; the example below shows the same structure in plain text so it renders cleanly on GitHub.
 
 ```text
 Neuro scores:
-  KL_or_JSD_score01                  : 0.742 \033[33m→ 0 ━━━━━━━━━━━▶──── 1\033[0m
-  QNT_score01                        : 0.766 \033[33m→ 0 ━━━━━━━━━━━▶──── 1\033[0m
-  MOM_score01                        : 0.641 \033[33m→ 0 ━━━━━━━━━▶────── 1\033[0m
-  Mean_score01                       : 0.781 \033[33m→ 0 ━━━━━━━━━━━━▶─── 1\033[0m
-  TRJDIST_score01                    : 0.989 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
-  GRAPH_score01                      : 0.996 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
-  CrossRegionMI_score01              : 0.911 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
-  LaggedCovariance_score01           : 0.969 \033[32m↗ 0 ━━━━━━━━━━━━━━▶─ 1\033[0m
-  ImpulseResponse_score01            : 0.922 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
-  MANI_score01                       : 0.884 \033[32m↗ 0 ━━━━━━━━━━━━▶─── 1\033[0m
-  SubspaceAngle_score01              : 0.946 \033[32m↗ 0 ━━━━━━━━━━━━━━▶─ 1\033[0m
-  LatentStateOccupancyK11_score01    : 0.910 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
-  LatentStateOccupancyK12_score01    : 0.903 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
-  LatentStateTransitionLag1K11_score01: 0.861 \033[32m↗ 0 ━━━━━━━━━━━━▶── 1\033[0m
-  LatentStateTransitionLag2K11_score01: 0.844 \033[32m↗ 0 ━━━━━━━━━━━━▶── 1\033[0m
-  LatentStateTransitionLag3K11_score01: 0.829 \033[32m↗ 0 ━━━━━━━━━━━▶─── 1\033[0m
-  family_distribution                : 0.733 \033[33m→ 0 ━━━━━━━━━━━▶──── 1\033[0m
-  family_temporal_spectral           : 0.989 \033[32m↗ 0 ━━━━━━━━━━━━━━━▶ 1\033[0m
-  family_relational                  : 0.950 \033[32m↗ 0 ━━━━━━━━━━━━━━▶─ 1\033[0m
-  family_geometry                    : 0.915 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
-  family_state_dynamics              : 0.869 \033[32m↗ 0 ━━━━━━━━━━━━▶── 1\033[0m
-  FINAL_COMPOSITE_SCORE              : 0.891 \033[32m↗ 0 ━━━━━━━━━━━━━▶── 1\033[0m
+  KL_or_JSD_score01                   : 0.742  [medium]  0 ━━━━━━━━━━━▶──── 1
+  QNT_score01                         : 0.766  [medium]  0 ━━━━━━━━━━━▶──── 1
+  MOM_score01                         : 0.641  [medium]  0 ━━━━━━━━━▶────── 1
+  Mean_score01                        : 0.781  [medium]  0 ━━━━━━━━━━━━▶─── 1
+  TRJDIST_score01                     : 0.989  [high]    0 ━━━━━━━━━━━━━━━▶ 1
+  GRAPH_score01                       : 0.996  [high]    0 ━━━━━━━━━━━━━━━▶ 1
+  CrossRegionMI_score01               : 0.911  [high]    0 ━━━━━━━━━━━━━▶── 1
+  LaggedCovariance_score01            : 0.969  [high]    0 ━━━━━━━━━━━━━━▶─ 1
+  ImpulseResponse_score01             : 0.922  [high]    0 ━━━━━━━━━━━━━▶── 1
+  MANI_score01                        : 0.884  [high]    0 ━━━━━━━━━━━━▶─── 1
+  SubspaceAngle_score01               : 0.946  [high]    0 ━━━━━━━━━━━━━━▶─ 1
+  LatentStateOccupancyK11_score01     : 0.910  [high]    0 ━━━━━━━━━━━━━▶── 1
+  LatentStateOccupancyK12_score01     : 0.903  [high]    0 ━━━━━━━━━━━━━▶── 1
+  LatentStateTransitionLag1K11_score01: 0.861  [high]    0 ━━━━━━━━━━━━▶── 1
+  LatentStateTransitionLag2K11_score01: 0.844  [high]    0 ━━━━━━━━━━━━▶── 1
+  LatentStateTransitionLag3K11_score01: 0.829  [high]    0 ━━━━━━━━━━━▶─── 1
+  family_distribution                 : 0.733  [medium]  0 ━━━━━━━━━━━▶──── 1
+  family_temporal_spectral            : 0.989  [high]    0 ━━━━━━━━━━━━━━━▶ 1
+  family_relational                   : 0.950  [high]    0 ━━━━━━━━━━━━━━▶─ 1
+  family_geometry                     : 0.915  [high]    0 ━━━━━━━━━━━━━▶── 1
+  family_state_dynamics               : 0.869  [high]    0 ━━━━━━━━━━━━▶── 1
+  FINAL_COMPOSITE_SCORE               : 0.891  [high]    0 ━━━━━━━━━━━━━▶── 1
 ```
 
 ## Reproducibility
