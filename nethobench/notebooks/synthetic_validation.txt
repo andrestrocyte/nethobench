@@ -1,0 +1,80 @@
+from pathlib import Path
+import sys
+
+import matplotlib.pyplot as plt
+import pandas as pd
+from IPython.display import Image, display
+
+repo_root = Path.cwd().resolve()
+for candidate in [repo_root, *repo_root.parents, Path.home() / 'nethobench', Path.home() / 'Desktop' / 'nethobench']:
+    candidate = candidate.resolve()
+    if (candidate / 'nethobench' / '__init__.py').is_file():
+        repo_root = candidate
+        break
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
+from nethobench.synthetic import SyntheticNeuralSpec, run_synthetic_neuro_validation
+
+repo_root
+
+output_root = repo_root / 'outputs' / 'synthetic_validation_notebook'
+
+spec = SyntheticNeuralSpec(
+    n_sequences=12,
+    seq_length=240,
+    n_regions=16,
+    latent_dim=4,
+    burn_in=64,
+    system_seed=11,
+)
+
+oracle_replicates = 3
+save_datasets = True
+
+print(spec)
+output_root
+
+result = run_synthetic_neuro_validation(
+    output_root=output_root,
+    spec=spec,
+    oracle_replicates=oracle_replicates,
+    save_datasets=save_datasets,
+)
+
+sorted(result.keys())
+
+family_oracle = pd.read_csv(result['family_oracle_summary_path'])
+metric_oracle = pd.read_csv(result['metric_oracle_summary_path'])
+
+display(family_oracle.sort_values('score_name').reset_index(drop=True))
+display(metric_oracle.sort_values('mean', ascending=False).reset_index(drop=True))
+
+family_selectivity = pd.read_csv(result['family_selectivity_path'])
+metric_selectivity = pd.read_csv(result['metric_selectivity_path'])
+
+display(family_selectivity)
+display(metric_selectivity)
+
+for key in ['ceiling_plot', 'family_selectivity_plot', 'metric_selectivity_plot', 'dose_plot']:
+    print(f'\n{key}: {result[key]}')
+    display(Image(filename=str(result[key])))
+
+rows = []
+for _, row in metric_selectivity.iterrows():
+    payload = row.drop(labels=['perturbation_name', 'target_family']).sort_values(ascending=False)
+    top = payload.head(5)
+    for metric_name, value in top.items():
+        rows.append({
+            'perturbation_name': row['perturbation_name'],
+            'target_family': row['target_family'],
+            'metric_name': metric_name,
+            'relative_drop': value,
+        })
+
+top_metric_drops = pd.DataFrame(rows)
+display(top_metric_drops)
+
+datasets_dir = result['output_root'] / 'datasets'
+dataset_files = sorted(path.name for path in datasets_dir.glob('*.csv'))
+pd.DataFrame({'dataset_file': dataset_files})

@@ -160,14 +160,6 @@ Run it with:
 nethobench fidelity-scores --gt gt_neural.csv --preds pred_neural.csv
 ```
 
-### Legacy metrics
-The previous broader metric inventory is preserved under:
-- `nethobench/legacy/legacy_metrics.py`
-- `nethobench/legacy/legacy_neuro_core_script.py`
-- `nethobench/legacy/notebooks/neuro_metrics_legacy.ipynb`
-
-The public CLI now defaults to the curated neuro score above. The legacy folder is retained for historical comparison, ablations, and migration.
-
 ## Synthetic validation
 `nethobench synthetic-validation` builds a synthetic neural benchmark with fully known structure and validates the active neuro score against it. The generator uses low-dimensional latent dynamics with region loadings and calcium-like observations. The validation:
 
@@ -257,7 +249,6 @@ bash scripts/run_full_project_rerun.sh all
 
 ## Status
 - The default neural benchmark is now the curated structural neuro score described above.
-- The previous broad metric inventory remains available under `legacy/`.
 - Cross-modal metrics remain lightweight and interpretable; extend them in `nethobench/cross.py` if needed.
 
 ## License

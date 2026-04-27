@@ -499,8 +499,7 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = _parse_args()
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    outdir = args.output_root / f"neuro-sanity-{ts}"
+    outdir = args.output_root / f"neuro-sanity"
     final = run(
         data_dir=args.data_dir,
         output_dir=outdir,

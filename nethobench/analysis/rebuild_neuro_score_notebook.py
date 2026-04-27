@@ -7,7 +7,6 @@ import nbformat
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-LEGACY_NOTEBOOK = REPO_ROOT / "nethobench" / "legacy" / "notebooks" / "neuro_metrics_legacy.ipynb"
 TARGET_NOTEBOOK = REPO_ROOT / "nethobench" / "notebooks" / "neuro_metrics.ipynb"
 
 
@@ -853,11 +852,6 @@ plt.tight_layout()
 plt.show()
 """
 
-
-def _load_legacy_notebook():
-    if not LEGACY_NOTEBOOK.is_file():
-        raise FileNotFoundError(f"Legacy neuro notebook missing at {LEGACY_NOTEBOOK}")
-    return nbformat.read(LEGACY_NOTEBOOK, as_version=4)
 
 
 def _find_cell_index(cells, marker: str) -> int:

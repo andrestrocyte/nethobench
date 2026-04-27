@@ -19,15 +19,16 @@ def neurobench_analysis(preds_fname, gt_fname, ddconfig_path):
     import json
     
     
-    preds_df = pd.read_csv(preds_fname, index_col=0)
-    pred_region_names = preds_df.columns.tolist()
-    pred_arr = preds_df.to_numpy()
-    n_pred_trials = preds_df.index.max() + 1
+    preds_df = pd.read_csv(preds_fname)
+    preds_df = preds_df.sort_values(["sequenceId", "itemPosition"]).reset_index(drop=True)
+    preds_regions = [c for c in preds_df.columns if c not in {"sequenceId", "itemPosition"}]
+    n_pred_trials = len(np.unique(preds_df["sequenceId"]))
+    pred_arr = preds_df[preds_regions].to_numpy()
     n_pred_time = pred_arr.shape[0] // n_pred_trials
     n_pred_dims = pred_arr.shape[1]
     data_predicted = pred_arr.reshape(n_pred_trials, n_pred_time, n_pred_dims)
     
-    print("Pred region names:", pred_region_names)
+    print("Pred region names:", preds_regions)
     print("Pred shape:", data_predicted.shape)
     
     gt_df = pd.read_csv(gt_fname)

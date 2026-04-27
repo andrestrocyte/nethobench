@@ -305,8 +305,7 @@ def compute_neuro_scores(
 
 def _timestamped_outdir(base: Optional[Path] = None, stem: Optional[str] = None) -> Path:
     base = Path(base) if base is not None else Path.cwd() / "outputs"
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    outdir = base / (f"{stem}-analysis-{ts}" if stem else f"neuro-analysis-{ts}")
+    outdir = base / (f"{stem}-analysis" if stem else f"neuro-analysis")
     outdir.mkdir(parents=True, exist_ok=True)
     return outdir
 

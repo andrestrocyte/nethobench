@@ -158,15 +158,13 @@ def _quiet_call(func, *args, **kwargs):
 
 
 def _default_json_output(command: str, preds: Path) -> Path:
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    outdir = Path.cwd() / "outputs" / f"{preds.stem}-{command}-{ts}"
+    outdir = Path.cwd() / "outputs" / f"{preds.stem}-{command}"
     outdir.mkdir(parents=True, exist_ok=True)
     return outdir / "scores.json"
 
 
 def _default_output_dir(command: str) -> Path:
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    outdir = Path.cwd() / "outputs" / f"{command}-{ts}"
+    outdir = Path.cwd() / "outputs" / f"{command}"
     outdir.mkdir(parents=True, exist_ok=True)
     return outdir
 
