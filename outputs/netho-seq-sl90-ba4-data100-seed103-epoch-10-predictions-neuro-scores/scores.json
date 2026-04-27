@@ -1,0 +1,28 @@
+{
+  "scores": {
+    "KL_or_JSD_score01": 0.17987934713908188,
+    "QNT_score01": 0.3899581086228577,
+    "MOM_score01": 0.30450759903389424,
+    "Mean_score01": 0.40902754734448604,
+    "TRJDIST_score01": 0.6095090848983182,
+    "GRAPH_score01": 0.9838647679970094,
+    "CrossRegionMI_score01": 0.7678773456589901,
+    "LaggedCovariance_score01": 0.7165051653567606,
+    "ImpulseResponse_score01": 0.4316183582518928,
+    "MANI_score01": 0.8328507443659423,
+    "SubspaceAngle_score01": 0.7541319674223481,
+    "LatentStateOccupancyK11_score01": 0.5503319064226558,
+    "LatentStateOccupancyK12_score01": 0.5549027902610114,
+    "LatentStateTransitionLag1K11_score01": 0.6471352456645814,
+    "LatentStateTransitionLag2K11_score01": 0.6255182158888462,
+    "LatentStateTransitionLag3K11_score01": 0.6071939352400706,
+    "family_distribution": 0.32084315053507995,
+    "family_temporal_spectral": 0.6095090848983182,
+    "family_relational": 0.7249664093161632,
+    "family_geometry": 0.7934913558941452,
+    "family_state_dynamics": 0.5970164186954331,
+    "composite_score": 0.6045804660614181,
+    "FINAL_COMPOSITE_SCORE": 0.6045804660614181,
+    "FINAL_NEURO_COMPOSITE_SCORE": 0.6045804660614181
+  }
+}

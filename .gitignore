@@ -19,7 +19,6 @@ dist/
 .ipynb_checkpoints/
 
 # Outputs
-outputs/
 
 # OS
 .DS_Store
