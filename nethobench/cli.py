@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import argparse
 import contextlib
 from datetime import datetime
@@ -307,15 +308,20 @@ def _run_etho(args: argparse.Namespace) -> None:
     _print_scores("Behavior scores", scores)
     if args.json_out:
         out = Path(args.json_out)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "global_scores": scores,
-            "per_sequence": seq_scores,
-            "per_sequence_mean": seq_means,
-            "per_sequence_std": seq_stds,
-        }
-        out.write_text(json.dumps(payload, indent=2))
-        print(f"Saved scores to {out}")
+    else:
+        out = Path(os.path.join("outputs", f"{args.inf_dir.split(os.sep)[-1]}-etho-scores"))
+    
+    out.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "global_scores": scores,
+        "per_sequence": seq_scores,
+        "per_sequence_mean": seq_means,
+        "per_sequence_std": seq_stds,
+    }
+    with open(os.path.join(out, "scores.json"), "w") as f:
+        f.write(json.dumps(payload, indent=2))
+
+    print(f"Saved scores to {out}")
     if args.run_notebook:
         outdir = run_ethobench_notebook(Path(args.gt_dir), Path(args.inf_dir), output_root=args.output_root)
         print(f"Notebook executed. Outputs in {outdir}")
