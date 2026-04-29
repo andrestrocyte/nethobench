@@ -50,15 +50,28 @@ etho_preds = [
 if __name__ == "__main__":
 
     for gt, preds in neural_tuples:
-        subprocess.run(["nethobench", "neuro-scores", "--gt", f"{gt}",  "--preds",  f"{preds}"])
-        subprocess.run(["nethobench", "neuro-analysis", "--gt", f"{gt}",  "--preds",  f"{preds}"])
-        subprocess.run(["nethobench",  "fidelity-scores", "--gt",  f"{gt}",  "--preds", f"{preds}"])
+        cmd = ["nethobench", "neuro-scores", "--gt", f"{gt}",  "--preds",  f"{preds}"]
+        r = subprocess.run(cmd)
+        assert r.returncode == 0, f"neuro-scores: {' '.join(cmd)}"
+
+        cmd = ["nethobench", "neuro-analysis", "--gt", f"{gt}",  "--preds",  f"{preds}"]
+        r = subprocess.run(cmd)
+        assert r.returncode == 0, f"neuro-analysis: {' '.join(cmd)}"
+
+        cmd = ["nethobench",  "fidelity-scores", "--gt",  f"{gt}",  "--preds", f"{preds}"]
+        r = subprocess.run(cmd)
+        assert r.returncode == 0, f"fidelity-scores: {' '.join(cmd)}"
+
 
 
     for preds in etho_preds:
-        subprocess.run(["nethobench", "etho-scores", "--gt-dir", "data/behavioural/gt.parquet", "--inf-dir", f"{preds}"])
-    
-    subprocess.run(["nethobench", "cross-scores", "--gt", "data/cross/gt/cross-gt-behavior-neuro.csv", "--preds", "data/cross/predictions/sequifier-cross-noisy-behavior-neuro-last-100.csv"])
+        cmd = ["nethobench", "etho-scores", "--gt-dir", "data/behavioural/gt.parquet", "--inf-dir", f"{preds}"]
+        r = subprocess.run(cmd)
+        assert r.returncode == 0, f"etho-scores: {' '.join(cmd)}"
+
+    cmd = ["nethobench", "cross-scores", "--gt", "data/cross/gt/cross-gt-behavior-neuro.csv", "--preds", "data/cross/predictions/sequifier-cross-noisy-behavior-neuro-last-100.csv"]
+    r = subprocess.run(cmd)
+    assert r.returncode == 0, f"cross-scores: {' '.join(cmd)}"
 
 
     my_repo = "."

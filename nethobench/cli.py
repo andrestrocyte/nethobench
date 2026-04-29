@@ -139,10 +139,8 @@ def _render_score_bar(value: float, width: int = 16) -> str:
 def _print_scores(label: str, scores: dict[str, float]) -> None:
     print(f"\n{label}:")
     for key, value in scores.items():
-        if value == value:
-            print(f"  {key:24s}: {value:.3f} {_render_score_bar(value)}")
-        else:
-            print(f"  {key:24s}: NaN")
+        print(f"  {key:24s}: {value:.3f} {_render_score_bar(value)}")
+
 
 
 def _print_composite(label: str, value: float) -> None:
@@ -296,9 +294,7 @@ def _run_neuro_full(args: argparse.Namespace) -> None:
     gt = _prompt_for_file("ground-truth", "gt_", args.gt)
     preds = _prompt_for_file("inference", "inference_", args.preds)
     out = _quiet_call(run_neuro_full_analysis, preds, gt, output_root=args.output_root)
-    _print_scores("Neuro analysis scores", out["scores"])
-    print(f"\nSaved scores to {out['scores_path']}")
-    print(f"Plots and outputs under {out['output_dir']}")
+
 
 
 def _run_etho(args: argparse.Namespace) -> None:
@@ -307,7 +303,7 @@ def _run_etho(args: argparse.Namespace) -> None:
     if args.json_out:
         out = Path(args.json_out)
     else:
-        out = Path(os.path.join("outputs", f"{args.inf_dir.split(os.sep)[-1]}-etho-scores"))
+        out = Path(os.path.join("outputs", f"{args.inf_dir.split(os.sep)[0]}-etho-scores"))
     
     out.mkdir(parents=True, exist_ok=True)
     payload = {

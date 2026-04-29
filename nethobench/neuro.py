@@ -239,8 +239,7 @@ def _compute_scores_from_arrays(
         pred_df.index = seq_ids
         pred_df.to_csv(pred_path)
 
-        _, scores = run_neuro_full_analysis(pred_path, gt_path)
-        return scores
+        return run_neuro_full_analysis(pred_path, gt_path)
 
 def compute_neuro_scores(
     predictions_csv: Path,
@@ -248,7 +247,6 @@ def compute_neuro_scores(
     *,
     per_sequence_stats: bool = False,
     neuro_cols: Optional[list[str]] = None,
-    ddconfig_path: Optional[Path] = None,
 ) -> Dict[str, float]:
     
     if per_sequence_stats:
@@ -289,8 +287,4 @@ def run_neuro_full_analysis(
 
     scores_path = outdir / "scores.json"
     scores_path.write_text(json.dumps(scores, indent=2))
-    return {
-        "output_dir": outdir,
-        "scores": scores,
-        "scores_path": scores_path,
-    }
+    return scores
