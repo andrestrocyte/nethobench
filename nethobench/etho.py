@@ -23,19 +23,6 @@ def _geometric_mean_scores(values: list[float]) -> float:
     arr = np.asarray([_clip01(v) for v in arr], dtype=np.float64)
     return float(np.exp(np.mean(np.log(arr))))
 
-
-def load_file(path: Path) -> pd.DataFrame:
-    path = Path(path)
-    if path.suffix == ".csv":
-        return pd.read_csv(path)
-    try:
-        return pd.read_parquet(path)
-    except Exception:
-        import pyarrow.parquet as pq
-        table = pq.read_table(path, use_pandas_metadata=False)
-        return table.to_pandas()
-
-
 def merge_paired(gt_df: pd.DataFrame, inf_df: pd.DataFrame, headers: List[str]) -> pd.DataFrame:
     merge_keys = ["sequenceId", "itemPosition"]
     value_headers = [h for h in headers if h not in merge_keys]

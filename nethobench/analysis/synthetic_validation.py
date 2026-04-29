@@ -141,10 +141,6 @@ DEFAULT_PERTURBATIONS = (
 )
 
 
-def _clip(value: float, lo: float, hi: float) -> float:
-    return float(np.clip(value, lo, hi))
-
-
 def _region_names(n_regions: int) -> list[str]:
     return [f"synthetic-region-{idx:02d}" for idx in range(1, n_regions + 1)]
 
