@@ -62,8 +62,4 @@ if __name__ == "__main__":
     my_repo = "."
     my_folder = "outputs" # Path relative to the repo root
     
-    try:
-        assert_no_changes_in_folder(my_repo, my_folder)
-        print("Success: No changes found in the specified folder.")
-    except AssertionError as e:
-        print(f"Assertion failed: {e}")
+    assert_no_changes_in_folder(my_repo, my_folder)
