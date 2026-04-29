@@ -20,8 +20,8 @@ from nethobench import (
     run_synthetic_neuro_validation,
     run_cross_full_analysis,
     run_etho_full_analysis,
-    run_neuro_full_analysis,
 )
+from nethobench.calculation import run_neuro_full_analysis
 from nethobench.helpers import _quiet_call
 
 

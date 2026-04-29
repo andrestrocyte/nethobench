@@ -13,16 +13,19 @@ import numpy as np
 import pandas as pd
 
 from nethobench.fidelity import compute_fidelity_scores
-from nethobench.neuro import _compute_scores_from_arrays
+from nethobench.calculation import _compute_scores_from_arrays
 from nethobench.analysis.score_definitions import NEURO_FAMILY_WEIGHTS
 from nethobench.helpers import (
     get_region_names,
     generate_orthogonal_matrix,
-    get_module_assignments,
+    get_module_assignments
+)
+from nethobench.calculation import (
     dataset_to_sequence_frame,
     quiet_scores_from_arrays,
     quiet_fidelity_from_arrays,
 )
+
 
 FAMILY_COLUMNS = [f"family_{name}" for name in NEURO_FAMILY_WEIGHTS] + [
     "FINAL_COMPOSITE_SCORE",

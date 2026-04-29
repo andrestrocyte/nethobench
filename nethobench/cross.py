@@ -10,7 +10,7 @@ from sklearn.cross_decomposition import CCA
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from nethobench.helpers import _clip01, _geometric_mean_scores
-from nethobench.neuro import _compute_scores_from_arrays
+from nethobench.calculation import _compute_scores_from_arrays
 from nethobench.etho import (
     position_kl_score,
     quadrant_score,

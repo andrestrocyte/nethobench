@@ -1,10 +1,11 @@
 import pandas as pd
 from pathlib import Path
+import pandas as pd
 import numpy as np
 import contextlib
 import io
-
 from typing import Optional
+# Assuming these are available in your broader module context
 
 
 def _clip01(x: float, eps: float = 1e-6) -> float:
@@ -147,42 +148,3 @@ def get_module_assignments(n_regions: int, latent_dim: int) -> np.ndarray:
     """Calculates bin assignments for regions across latent dimensions."""
     bins = np.linspace(0, latent_dim, n_regions, endpoint=False)
     return np.floor(bins).astype(int)
-
-
-def dataset_to_sequence_frame(arr: np.ndarray, region_names: list[str]) -> pd.DataFrame:
-    """Converts a 3D [seq, time, region] array to a flat Nethobench-aligned DataFrame."""
-    arr = np.asarray(arr, dtype=np.float64)
-    n_seq, n_time, n_regions = arr.shape
-    seq_ids = np.repeat(np.arange(n_seq), n_time)
-    item_pos = np.tile(np.arange(n_time), n_seq)
-
-    df = pd.DataFrame(arr.reshape(-1, n_regions), columns=region_names)
-    df.insert(0, "itemPosition", item_pos)
-    df.insert(0, "sequenceId", seq_ids)
-    return df
-
-
-def quiet_scores_from_arrays(
-    gt_arr: np.ndarray, pred_arr: np.ndarray, *, region_names: list[str]
-) -> dict[str, float]:
-    """Computes neuro scores headlessly by suppressing stdout/stderr."""
-    sink = io.StringIO()
-    with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-        return _compute_scores_from_arrays(gt_arr, pred_arr, region_names=region_names)
-
-
-def quiet_fidelity_from_arrays(
-    gt_arr: np.ndarray, pred_arr: np.ndarray, *, region_names: list[str]
-) -> dict[str, float]:
-    """Computes fidelity scores headlessly by suppressing stdout/stderr via temp files."""
-    sink = io.StringIO()
-    with tempfile.TemporaryDirectory(prefix="nethobench-synth-fidelity-") as tmpdir:
-        tmpdir_path = Path(tmpdir)
-        gt_path = tmpdir_path / "gt.csv"
-        pred_path = tmpdir_path / "pred.csv"
-
-        dataset_to_sequence_frame(gt_arr, region_names).to_csv(gt_path, index=False)
-        dataset_to_sequence_frame(pred_arr, region_names).to_csv(pred_path, index=False)
-
-        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-            return compute_fidelity_scores(pred_path, gt_path, neuro_cols=region_names)

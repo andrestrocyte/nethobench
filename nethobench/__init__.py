@@ -1,7 +1,7 @@
 from nethobench.cross import compute_cross_scores, run_cross_full_analysis
 from nethobench.etho import compute_etho_scores, run_etho_full_analysis
 from nethobench.fidelity import compute_fidelity_scores
-from nethobench.neuro import compute_neuro_scores, run_neuro_full_analysis
+from nethobench.neuro import compute_neuro_scores
 from nethobench.synthetic import (
     DEFAULT_BIOPHYSICAL_PERTURBATIONS,
     DEFAULT_PERTURBATIONS,
@@ -20,7 +20,6 @@ from nethobench.synthetic import (
 __all__ = [
     "compute_neuro_scores",
     "compute_fidelity_scores",
-    "run_neuro_full_analysis",
     "compute_etho_scores",
     "run_etho_full_analysis",
     "compute_cross_scores",

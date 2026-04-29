@@ -26,7 +26,10 @@ from nethobench.analysis.synthetic_validation import (
 from nethobench.helpers import (
     get_region_names,
     generate_orthogonal_matrix,
-    get_module_assignments,
+    get_module_assignments
+)
+
+from nethobench.calculation import (
     dataset_to_sequence_frame,
     quiet_scores_from_arrays,
     quiet_fidelity_from_arrays,
