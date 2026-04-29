@@ -22,15 +22,6 @@ def _geometric_mean_scores(values: list[float]) -> float:
     return float(np.exp(np.mean(np.log(arr))))
 
 
-def collect_files(directory: Path) -> List[Path]:
-    directory = Path(directory)
-    files = list(directory.glob("*.parquet")) + list(directory.glob("*.csv"))
-    def sort_key(path: Path):
-        stem = path.stem
-        digits = "".join(ch for ch in stem if ch.isdigit())
-        return int(digits) if digits.isdigit() else stem
-    return sorted(files, key=sort_key)
-
 
 def load_file(path: Path) -> pd.DataFrame:
     path = Path(path)
@@ -43,38 +34,6 @@ def load_file(path: Path) -> pd.DataFrame:
         table = pq.read_table(path, use_pandas_metadata=False)
         return table.to_pandas()
 
-
-def load_and_align(gt_dir: Path, inf_dir: Path) -> Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
-    gt_files = collect_files(gt_dir)
-    inf_files = collect_files(inf_dir)
-    if not gt_files:
-        raise FileNotFoundError(f"No parquet/csv files in {gt_dir}")
-    if not inf_files:
-        raise FileNotFoundError(f"No parquet/csv files in {inf_dir}")
-
-    columns = load_file(gt_files[0]).columns.tolist()
-    aligned_gt = []
-    aligned_inf = []
-
-    for path in gt_files:
-        df = load_file(path)
-        if set(df.columns) != set(columns):
-            missing = set(columns) - set(df.columns)
-            extra = set(df.columns) - set(columns)
-            raise ValueError(f"GT header mismatch in {path}: missing {missing}, extra {extra}")
-        aligned_gt.append(df[columns])
-
-    for path in inf_files:
-        df = load_file(path)
-        if set(df.columns) != set(columns):
-            missing = set(columns) - set(df.columns)
-            extra = set(df.columns) - set(columns)
-            raise ValueError(f"INF header mismatch in {path}: missing {missing}, extra {extra}")
-        aligned_inf.append(df[columns])
-
-    gt_df = pd.concat(aligned_gt, ignore_index=True)
-    inf_df = pd.concat(aligned_inf, ignore_index=True)
-    return gt_df, inf_df, columns
 
 
 def merge_paired(gt_df: pd.DataFrame, inf_df: pd.DataFrame, headers: List[str]) -> pd.DataFrame:
@@ -501,8 +460,15 @@ def syllable_score(paired_df: pd.DataFrame, k: int = 8) -> Tuple[float, Dict[str
 
 
 def compute_etho_scores(gt_dir: Path, inf_dir: Path) -> Tuple[Dict[str, float], Dict[str, List[float]], Dict[str, float], Dict[str, float]]:
-    gt_df, inf_df, headers = load_and_align(gt_dir, inf_dir)
-    paired_df = merge_paired(gt_df, inf_df, headers)
+    gt_df = pd.read_parquet(gt_dir)
+    inf_df = pd.read_parquet(inf_dir)
+
+    diff1 = set(list(gt_df.columns)).difference(set(list(inf_df.columns)))
+    diff2 = set(list(inf_df.columns)).difference(set(list(gt_df.columns)))
+
+    assert len(diff1) == 0 and len(diff2) == 0, f"Unequal cols found: in gt but not preds: {diff1}, in preds but not gt: {diff2}"
+
+    paired_df = merge_paired(gt_df, inf_df, list(gt_df.columns))
 
     pos_res = position_kl_score(paired_df)
     stat_res = stationary_score(paired_df)
