@@ -340,11 +340,16 @@ def _run_cross(args: argparse.Namespace) -> None:
     _print_composite("Composite etho", scores.get("etho_composite", float("nan")))
     _print_composite("Composite cross", scores.get("cross_composite", float("nan")))
     _print_composite("Final composite", scores.get("composite", float("nan")))
-    if args.json_out:
+
+    if args.json_out is not None:
         out = Path(args.json_out)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps(scores, indent=2))
-        print(f"Saved scores to {out}")
+    else:
+        out = Path(os.path.join("outputs", f"{args.gt.split(os.sep)[-1].split('.')[0]}-cross-scores"))
+    
+    out.mkdir(parents=True, exist_ok=True)
+    with open(f"{out}/scores.json", "w") as f:
+        f.write(json.dumps(scores, indent=2))
+    print(f"Saved scores to {out}")
 
 
 def _run_cross_full(args: argparse.Namespace) -> None:
