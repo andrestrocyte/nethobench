@@ -7,9 +7,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Force non-interactive backend for headless execution
-matplotlib.use("Agg")
-
 logger = logging.getLogger(__name__)
 
 

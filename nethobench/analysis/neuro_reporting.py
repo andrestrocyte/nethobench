@@ -8,8 +8,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-# Force non-interactive backend to prevent headless environment crashes
-matplotlib.use("Agg")
 
 logger = logging.getLogger(__name__)
 

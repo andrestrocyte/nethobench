@@ -15,6 +15,14 @@ import pandas as pd
 from nethobench.fidelity import compute_fidelity_scores
 from nethobench.neuro import _compute_scores_from_arrays
 from nethobench.analysis.score_definitions import NEURO_FAMILY_WEIGHTS
+from nethobench.helpers import (
+    get_region_names,
+    generate_orthogonal_matrix,
+    get_module_assignments,
+    dataset_to_sequence_frame,
+    quiet_scores_from_arrays,
+    quiet_fidelity_from_arrays,
+)
 
 FAMILY_COLUMNS = [f"family_{name}" for name in NEURO_FAMILY_WEIGHTS] + [
     "FINAL_COMPOSITE_SCORE",
@@ -142,24 +150,9 @@ DEFAULT_PERTURBATIONS = (
 )
 
 
-def _region_names(n_regions: int) -> list[str]:
-    return [f"synthetic-region-{idx:02d}" for idx in range(1, n_regions + 1)]
-
-
-def _orthogonal_matrix(dim: int, rng: np.random.Generator) -> np.ndarray:
-    mat = rng.normal(size=(dim, dim))
-    q, _ = np.linalg.qr(mat)
-    return q
-
-
-def _module_assignments(n_regions: int, latent_dim: int) -> np.ndarray:
-    bins = np.linspace(0, latent_dim, n_regions, endpoint=False)
-    return np.floor(bins).astype(int)
-
-
 def _blended_rotation(dim: int, level: float, rng: np.random.Generator) -> np.ndarray:
     base = np.eye(dim)
-    target = _orthogonal_matrix(dim, rng)
+    target = generate_orthogonal_matrix(dim, rng)
     mixed = ((1.0 - level) * base) + (level * target)
     q, _ = np.linalg.qr(mixed)
     return q
@@ -182,7 +175,7 @@ def _build_system(spec: SyntheticNeuralSpec) -> dict[str, np.ndarray]:
     if np.isfinite(eig) and eig > 0.97:
         A *= 0.97 / float(eig)
 
-    assignments = _module_assignments(n_regions, latent_dim)
+    assignments = get_module_assignments(n_regions, latent_dim)
     W = rng.normal(scale=0.10, size=(n_regions, latent_dim))
     for region in range(n_regions):
         dom = int(assignments[region])
@@ -333,7 +326,7 @@ def generate_synthetic_neural_dataset(
             seq_trace[t] = calcium
         data[seq_idx] = seq_trace[burn:]
 
-    region_names = _region_names(n_regions)
+    region_names = get_region_names(n_regions)
     flat = data.reshape(-1, n_regions)
     summary = {
         "perturbation_name": spec.perturbation_name,
@@ -353,28 +346,6 @@ def generate_synthetic_neural_dataset(
     return SyntheticDataset(array=data, region_names=region_names, summary=summary)
 
 
-def dataset_to_sequence_frame(arr: np.ndarray, region_names: list[str]) -> pd.DataFrame:
-    arr = np.asarray(arr, dtype=np.float64)
-    n_seq, n_time, n_regions = arr.shape
-    seq_ids = np.repeat(np.arange(n_seq), n_time)
-    item_pos = np.tile(np.arange(n_time), n_seq)
-    df = pd.DataFrame(arr.reshape(-1, n_regions), columns=region_names)
-    df.insert(0, "itemPosition", item_pos)
-    df.insert(0, "sequenceId", seq_ids)
-    return df
-
-
-def _quiet_scores_from_arrays(
-    gt_arr: np.ndarray,
-    pred_arr: np.ndarray,
-    *,
-    region_names: list[str],
-) -> dict[str, float]:
-    sink = io.StringIO()
-    with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-        return _compute_scores_from_arrays(gt_arr, pred_arr, region_names=region_names)
-
-
 def _oracle_validation_composite(score_row: dict[str, object]) -> float:
     values = []
     weights = []
@@ -386,23 +357,6 @@ def _oracle_validation_composite(score_row: dict[str, object]) -> float:
     if not values:
         return np.nan
     return float(np.sum(np.asarray(values) * np.asarray(weights)) / np.sum(weights))
-
-
-def _quiet_fidelity_from_arrays(
-    gt_arr: np.ndarray,
-    pred_arr: np.ndarray,
-    *,
-    region_names: list[str],
-) -> dict[str, float]:
-    sink = io.StringIO()
-    with tempfile.TemporaryDirectory(prefix="nethobench-synth-fidelity-") as tmpdir:
-        tmpdir_path = Path(tmpdir)
-        gt_path = tmpdir_path / "gt.csv"
-        pred_path = tmpdir_path / "pred.csv"
-        dataset_to_sequence_frame(gt_arr, region_names).to_csv(gt_path, index=False)
-        dataset_to_sequence_frame(pred_arr, region_names).to_csv(pred_path, index=False)
-        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-            return compute_fidelity_scores(pred_path, gt_path, neuro_cols=region_names)
 
 
 def _relative_drop(reference: float, value: float) -> float:
@@ -707,14 +661,14 @@ def run_synthetic_neuro_validation(
             dataset_to_sequence_frame(oracle.array, oracle.region_names).to_csv(
                 datasets_dir / "synthetic_oracle_prediction.csv", index=False
             )
-        scores = _quiet_scores_from_arrays(
+        scores = quiet_scores_from_arrays(
             reference.array, oracle.array, region_names=reference.region_names
         )
         scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(
             scores
         )
         scores.update(
-            _quiet_fidelity_from_arrays(
+            quiet_fidelity_from_arrays(
                 reference.array, oracle.array, region_names=reference.region_names
             )
         )
@@ -746,7 +700,7 @@ def run_synthetic_neuro_validation(
                 scores
             )
             scores.update(
-                _quiet_fidelity_from_arrays(
+                quiet_fidelity_from_arrays(
                     reference.array,
                     perturbed.array,
                     region_names=reference.region_names,

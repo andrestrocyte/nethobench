@@ -6,21 +6,12 @@ from typing import Dict, List, Tuple, Optional
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
-
-from nethobench.helpers import load_gt_and_preds, _timestamped_outdir
-
-
-def _clip01(x: float, eps: float = 1e-6) -> float:
-    return float(np.clip(x, eps, 1.0 - eps))
-
-
-def _geometric_mean_scores(values: list[float]) -> float:
-    arr = np.asarray(values, dtype=np.float64)
-    arr = arr[np.isfinite(arr)]
-    if arr.size == 0:
-        return np.nan
-    arr = np.asarray([_clip01(v) for v in arr], dtype=np.float64)
-    return float(np.exp(np.mean(np.log(arr))))
+from nethobench.helpers import (
+    load_gt_and_preds,
+    _timestamped_outdir,
+    _clip01,
+    _geometric_mean_scores,
+)
 
 
 def merge_paired(

@@ -7,6 +7,19 @@ import io
 from typing import Optional
 
 
+def _clip01(x: float, eps: float = 1e-6) -> float:
+    return float(np.clip(x, eps, 1.0 - eps))
+
+
+def _geometric_mean_scores(values: list[float]) -> float:
+    arr = np.asarray(values, dtype=np.float64)
+    arr = arr[np.isfinite(arr)]
+    if arr.size == 0:
+        return np.nan
+    arr = np.asarray([_clip01(v) for v in arr], dtype=np.float64)
+    return float(np.exp(np.mean(np.log(arr))))
+
+
 def load_df(path: Path):
     if str(path).endswith(".csv"):
         return pd.read_csv(path, index_col=None, header=0, sep=",")
@@ -116,3 +129,60 @@ def _timestamped_outdir(base: Path | None = None, prefix: str = "ethobench") -> 
     outdir = base / f"{prefix}"
     outdir.mkdir(parents=True, exist_ok=True)
     return outdir
+
+
+def get_region_names(n_regions: int, prefix: str = "synthetic-region") -> list[str]:
+    """Generates standardized region column names."""
+    return [f"{prefix}-{idx:02d}" for idx in range(1, n_regions + 1)]
+
+
+def generate_orthogonal_matrix(dim: int, rng: np.random.Generator) -> np.ndarray:
+    """Generates a random orthogonal matrix."""
+    mat = rng.normal(size=(dim, dim))
+    q, _ = np.linalg.qr(mat)
+    return q
+
+
+def get_module_assignments(n_regions: int, latent_dim: int) -> np.ndarray:
+    """Calculates bin assignments for regions across latent dimensions."""
+    bins = np.linspace(0, latent_dim, n_regions, endpoint=False)
+    return np.floor(bins).astype(int)
+
+
+def dataset_to_sequence_frame(arr: np.ndarray, region_names: list[str]) -> pd.DataFrame:
+    """Converts a 3D [seq, time, region] array to a flat Nethobench-aligned DataFrame."""
+    arr = np.asarray(arr, dtype=np.float64)
+    n_seq, n_time, n_regions = arr.shape
+    seq_ids = np.repeat(np.arange(n_seq), n_time)
+    item_pos = np.tile(np.arange(n_time), n_seq)
+
+    df = pd.DataFrame(arr.reshape(-1, n_regions), columns=region_names)
+    df.insert(0, "itemPosition", item_pos)
+    df.insert(0, "sequenceId", seq_ids)
+    return df
+
+
+def quiet_scores_from_arrays(
+    gt_arr: np.ndarray, pred_arr: np.ndarray, *, region_names: list[str]
+) -> dict[str, float]:
+    """Computes neuro scores headlessly by suppressing stdout/stderr."""
+    sink = io.StringIO()
+    with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+        return _compute_scores_from_arrays(gt_arr, pred_arr, region_names=region_names)
+
+
+def quiet_fidelity_from_arrays(
+    gt_arr: np.ndarray, pred_arr: np.ndarray, *, region_names: list[str]
+) -> dict[str, float]:
+    """Computes fidelity scores headlessly by suppressing stdout/stderr via temp files."""
+    sink = io.StringIO()
+    with tempfile.TemporaryDirectory(prefix="nethobench-synth-fidelity-") as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        gt_path = tmpdir_path / "gt.csv"
+        pred_path = tmpdir_path / "pred.csv"
+
+        dataset_to_sequence_frame(gt_arr, region_names).to_csv(gt_path, index=False)
+        dataset_to_sequence_frame(pred_arr, region_names).to_csv(pred_path, index=False)
+
+        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+            return compute_fidelity_scores(pred_path, gt_path, neuro_cols=region_names)

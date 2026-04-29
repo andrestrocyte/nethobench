@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from sklearn.cross_decomposition import CCA
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
-
+from nethobench.helpers import _clip01, _geometric_mean_scores
 from nethobench.neuro import _compute_scores_from_arrays
 from nethobench.etho import (
     position_kl_score,
@@ -21,19 +21,6 @@ from nethobench.etho import (
     syllable_score,
     trajectory_shape_score,
 )
-
-
-def _clip01(x: float, eps: float = 1e-6) -> float:
-    return float(np.clip(x, eps, 1.0 - eps))
-
-
-def _geometric_mean_scores(values: list[float]) -> float:
-    arr = np.asarray(values, dtype=np.float64)
-    arr = arr[np.isfinite(arr)]
-    if arr.size == 0:
-        return np.nan
-    arr = np.asarray([_clip01(v) for v in arr], dtype=np.float64)
-    return float(np.exp(np.mean(np.log(arr))))
 
 
 def _load_config(

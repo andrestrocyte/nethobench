@@ -21,10 +21,15 @@ from nethobench.analysis.synthetic_validation import (
     _plot_dose_response,
     _plot_family_ceiling_floor,
     _plot_selectivity_heatmap,
-    _quiet_fidelity_from_arrays,
-    _quiet_scores_from_arrays,
     _score_row_metadata,
+)
+from nethobench.helpers import (
+    get_region_names,
+    generate_orthogonal_matrix,
+    get_module_assignments,
     dataset_to_sequence_frame,
+    quiet_scores_from_arrays,
+    quiet_fidelity_from_arrays,
 )
 
 
@@ -118,23 +123,10 @@ def _sigmoid(x: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-np.clip(x, -20.0, 20.0)))
 
 
-def _region_names(n_regions: int) -> list[str]:
-    return [f"biophysical-region-{idx:02d}" for idx in range(1, n_regions + 1)]
-
-
-def _orthogonal_matrix(dim: int, rng: np.random.Generator) -> np.ndarray:
-    mat = rng.normal(size=(dim, dim))
-    q, _ = np.linalg.qr(mat)
-    return q
-
-
-def _module_assignments(n_regions: int, latent_dim: int) -> np.ndarray:
-    bins = np.linspace(0, latent_dim, n_regions, endpoint=False)
-    return np.floor(bins).astype(int)
-
-
 def _blend_rotation(dim: int, level: float, rng: np.random.Generator) -> np.ndarray:
-    mixed = ((1.0 - level) * np.eye(dim)) + (level * _orthogonal_matrix(dim, rng))
+    mixed = ((1.0 - level) * np.eye(dim)) + (
+        level * generate_orthogonal_matrix(dim, rng)
+    )
     q, _ = np.linalg.qr(mixed)
     return q
 
@@ -159,14 +151,14 @@ def _build_biophysical_system(
     perturbation = spec.perturbation_name
 
     state_count = 3
-    assignments = _module_assignments(n_regions, latent_dim)
+    assignments = get_module_assignments(n_regions, latent_dim)
 
     A_states = []
     for state_idx in range(state_count):
         base_scales = np.linspace(
             0.95 - 0.03 * state_idx, 0.70 - 0.02 * state_idx, latent_dim
         )
-        rot = _orthogonal_matrix(latent_dim, rng)
+        rot = generate_orthogonal_matrix(latent_dim, rng)
         cross = rng.normal(scale=0.06, size=(latent_dim, latent_dim))
         cross -= np.diag(np.diag(cross))
         mat = rot @ np.diag(base_scales) @ rot.T
@@ -391,7 +383,7 @@ def generate_biophysical_synthetic_bundle(
             if t >= burn:
                 data[seq_idx, t - burn] = observed
 
-    region_names = _region_names(n_regions)
+    region_names = get_region_names(n_regions)
     flat = data.reshape(-1, n_regions)
     summary = {
         "perturbation_name": spec.perturbation_name,
@@ -456,14 +448,14 @@ def run_biophysical_synthetic_neuro_validation(
             dataset_to_sequence_frame(oracle.array, oracle.region_names).to_csv(
                 datasets_dir / "biophysical_oracle_prediction.csv", index=False
             )
-        scores = _quiet_scores_from_arrays(
+        scores = quiet_scores_from_arrays(
             reference.array, oracle.array, region_names=reference.region_names
         )
         scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(
             scores
         )
         scores.update(
-            _quiet_fidelity_from_arrays(
+            quiet_fidelity_from_arrays(
                 reference.array, oracle.array, region_names=reference.region_names
             )
         )
@@ -488,14 +480,14 @@ def run_biophysical_synthetic_neuro_validation(
                 dataset_to_sequence_frame(
                     perturbed.array, perturbed.region_names
                 ).to_csv(datasets_dir / out_name, index=False)
-            scores = _quiet_scores_from_arrays(
+            scores = quiet_scores_from_arrays(
                 reference.array, perturbed.array, region_names=reference.region_names
             )
             scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(
                 scores
             )
             scores.update(
-                _quiet_fidelity_from_arrays(
+                quiet_fidelity_from_arrays(
                     reference.array,
                     perturbed.array,
                     region_names=reference.region_names,
