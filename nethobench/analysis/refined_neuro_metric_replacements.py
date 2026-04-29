@@ -7,9 +7,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy.stats import kurtosis, skew, spearmanr
-from nethobench.calculation import _align_arrays
+from nethobench.calculation import _align_arrays, weighted_mean_available, EPS
 from nethobench.analysis.sensitive_metric_candidates import (
-    EPS,
     _align_arrays,
     _finite_rows,
     _safe_corrcoef,
@@ -45,21 +44,6 @@ def _extract_score(result: dict) -> float:
     value = result.get("score", np.nan)
     return _finite_float(value)
 
-
-def _weighted_mean_available(
-    values: dict[str, float], weights: dict[str, float]
-) -> float:
-    valid = [
-        (key, values[key], weights[key])
-        for key in values
-        if np.isfinite(values[key]) and weights.get(key, 0.0) > 0
-    ]
-    if not valid:
-        return np.nan
-    total_weight = float(np.sum([weight for _, _, weight in valid]))
-    if total_weight <= 0:
-        return np.nan
-    return float(np.sum([value * weight for _, value, weight in valid]) / total_weight)
 
 
 def _distance_from_score(score: float) -> float:
@@ -99,31 +83,6 @@ def _safe_spearman01(x: np.ndarray, y: np.ndarray) -> float:
     return float(np.clip(0.5 * (corr + 1.0), 0.0, 1.0))
 
 
-def _robust_scale(values: np.ndarray) -> float:
-    values = np.asarray(values, dtype=np.float64)
-    values = values[np.isfinite(values)]
-    if values.size < 2:
-        return np.nan
-    q25, q75 = np.quantile(values, [0.25, 0.75])
-    scale = float(q75 - q25)
-    if not np.isfinite(scale) or scale < 1e-9:
-        scale = float(np.nanstd(values))
-    if not np.isfinite(scale) or scale < 1e-9:
-        scale = float(np.nanmean(np.abs(values)))
-    if not np.isfinite(scale) or scale < 1e-9:
-        return 1.0
-    return scale
-
-
-def _rmse_similarity(gt_values: np.ndarray, pred_values: np.ndarray) -> float:
-    gt_values = np.asarray(gt_values, dtype=np.float64).ravel()
-    pred_values = np.asarray(pred_values, dtype=np.float64).ravel()
-    mask = np.isfinite(gt_values) & np.isfinite(pred_values)
-    if mask.sum() < 3:
-        return np.nan
-    err = float(np.sqrt(np.mean((gt_values[mask] - pred_values[mask]) ** 2)))
-    scale = _robust_scale(gt_values[mask])
-    return float(1.0 / (1.0 + err / max(scale, 1e-6)))
 
 
 def _score_from_components(
@@ -132,11 +91,11 @@ def _score_from_components(
 ) -> tuple[float, dict[str, float]]:
     scores: dict[str, float] = {}
     for name, (corr_score, rmse_score) in components.items():
-        scores[name] = _weighted_mean_available(
+        scores[name] = weighted_mean_available(
             {"corr": corr_score, "rmse": rmse_score},
             {"corr": 0.5, "rmse": 0.5},
         )
-    final_score = _weighted_mean_available(scores, stat_weights)
+    final_score = weighted_mean_available(scores, stat_weights)
     return final_score, scores
 
 
@@ -357,7 +316,7 @@ def _final_graph_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
     cluster_score = _rmse_similarity(
         _local_clustering_from_adj(adj_gt), _local_clustering_from_adj(adj_pred)
     )
-    score = _weighted_mean_available(
+    score = weighted_mean_available(
         {
             "jaccard": jaccard,
             "weight": weight_score,
@@ -520,7 +479,7 @@ def _final_crosscorr_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
     lagged = _extract_score(crosscorr_lagged_matrix_v4(gt_arr, pred_arr))
     topedge = _extract_score(crosscorr_topedge_profiles_v5(gt_arr, pred_arr))
     return {
-        "score": _weighted_mean_available(
+        "score": weighted_mean_available(
             {"lagged": lagged, "topedge": topedge},
             {"lagged": 0.75, "topedge": 0.25},
         )
@@ -531,7 +490,7 @@ def _final_trajectory_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
     occupancy = _extract_score(trajectory_occupancy_velocity_v4(gt_arr, pred_arr))
     path = _extract_score(trajectory_path_features_v3(gt_arr, pred_arr))
     return {
-        "score": _weighted_mean_available(
+        "score": weighted_mean_available(
             {"occupancy": occupancy, "path": path},
             {"occupancy": 0.60, "path": 0.40},
         )
@@ -542,7 +501,7 @@ def _final_manifold_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
     topology = _extract_score(manifold_ph_stratified_lifetime_v7(gt_arr, pred_arr))
     local = _extract_score(manifold_ph_knn_profile_v5(gt_arr, pred_arr))
     return {
-        "score": _weighted_mean_available(
+        "score": weighted_mean_available(
             {"topology": topology, "local": local},
             {"topology": 0.75, "local": 0.25},
         )

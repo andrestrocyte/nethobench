@@ -7,6 +7,7 @@ import io
 from typing import Optional
 
 
+
 def _clip01(x: float, eps: float = 1e-6) -> float:
     return float(np.clip(x, eps, 1.0 - eps))
 

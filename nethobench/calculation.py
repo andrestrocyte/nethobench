@@ -4,8 +4,90 @@ import numpy as np
 import contextlib
 import io
 import tempfile
+from typing import Mapping
 
 
+EPS = 1e-8
+
+
+def _merge_aligned(gt_path: Path, pred_path: Path, cfg: dict) -> pd.DataFrame:
+    seq_key = cfg.get("sequence_key", "sequenceId")
+    time_key = cfg.get("time_key", "itemPosition")
+    gt = pd.read_csv(gt_path)
+    pred = pd.read_csv(pred_path)
+    for col in [seq_key, time_key]:
+        if col not in gt.columns or col not in pred.columns:
+            raise ValueError(f"Missing alignment column {col} in GT or predictions.")
+    merged = pd.merge(
+        gt.sort_values([seq_key, time_key]),
+        pred.sort_values([seq_key, time_key]),
+        on=[seq_key, time_key],
+        suffixes=("_gt", "_inf"),
+        how="inner",
+    )
+    if merged.empty:
+        raise ValueError("No overlapping sequence/time rows after merge.")
+    return merged
+
+
+def weighted_mean_available(
+    values: Mapping[str, float],
+    weights: Mapping[str, float],
+) -> float:
+    keys = [
+        k for k, v in values.items() if np.isfinite(v) and weights.get(k, 0.0) > 0.0
+    ]
+    if not keys:
+        return np.nan
+    denom = float(np.sum([weights[k] for k in keys]))
+    if denom <= 0.0:
+        return np.nan
+    return float(np.sum([weights[k] * float(values[k]) for k in keys]) / denom)
+
+
+
+def _robust_scale(values: np.ndarray) -> float:
+    values = np.asarray(values, dtype=np.float64)
+    values = values[np.isfinite(values)]
+    if values.size < 2:
+        return np.nan
+    q25, q75 = np.quantile(values, [0.25, 0.75])
+    scale = float(q75 - q25)
+    if not np.isfinite(scale) or scale < 1e-9:
+        scale = float(np.nanstd(values))
+    if not np.isfinite(scale) or scale < 1e-9:
+        scale = float(np.nanmean(np.abs(values)))
+    if not np.isfinite(scale) or scale < 1e-9:
+        return 1.0
+    return scale + EPS
+
+
+def _corr_score(a: np.ndarray, b: np.ndarray) -> float:
+    a = np.asarray(a, dtype=np.float64)
+    b = np.asarray(b, dtype=np.float64)
+    mask = np.isfinite(a) & np.isfinite(b)
+    if np.sum(mask) < 3:
+        return np.nan
+    aa = a[mask]
+    bb = b[mask]
+    if np.std(aa) < EPS or np.std(bb) < EPS:
+        return np.nan
+    return float(np.clip((np.corrcoef(aa, bb)[0, 1] + 1.0) / 2.0, 0.0, 1.0))
+
+
+def _rmse_similarity(x: np.ndarray, y: np.ndarray) -> float:
+    x = np.asarray(x, dtype=np.float64).ravel()
+    y = np.asarray(y, dtype=np.float64).ravel()
+    mask = np.isfinite(x) & np.isfinite(y)
+    if mask.sum() < 3:
+        return np.nan
+    err = float(np.sqrt(np.mean((x[mask] - y[mask]) ** 2)))
+    scale = float(np.nanstd(x[mask]))
+    if not np.isfinite(scale) or scale < EPS:
+        scale = float(np.nanmean(np.abs(x[mask])))
+    if not np.isfinite(scale) or scale < EPS:
+        scale = 1.0
+    return float(1.0 / (1.0 + err / scale))
 
 def _align_arrays(
     gt_arr: np.ndarray, pred_arr: np.ndarray

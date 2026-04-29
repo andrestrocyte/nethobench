@@ -5,6 +5,7 @@ from typing import Mapping
 
 import numpy as np
 import pandas as pd
+from nethobench.calculation import weighted_mean_available
 
 NEURO_FAMILY_METRICS: "OrderedDict[str, OrderedDict[str, float]]" = OrderedDict(
     [
@@ -79,20 +80,6 @@ FIDELITY_METRICS: "OrderedDict[str, float]" = OrderedDict(
     ]
 )
 
-
-def weighted_mean_available(
-    values: Mapping[str, float],
-    weights: Mapping[str, float],
-) -> float:
-    keys = [
-        k for k, v in values.items() if np.isfinite(v) and weights.get(k, 0.0) > 0.0
-    ]
-    if not keys:
-        return np.nan
-    denom = float(np.sum([weights[k] for k in keys]))
-    if denom <= 0.0:
-        return np.nan
-    return float(np.sum([weights[k] * float(values[k]) for k in keys]) / denom)
 
 
 def compute_neuro_family_scores(metric_scores: Mapping[str, float]) -> dict[str, float]:

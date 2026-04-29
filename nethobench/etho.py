@@ -12,20 +12,8 @@ from nethobench.helpers import (
     _clip01,
     _geometric_mean_scores,
 )
+from nethobench.calculation import _merge_aligned
 
-
-def merge_paired(
-    gt_df: pd.DataFrame, inf_df: pd.DataFrame, headers: List[str]
-) -> pd.DataFrame:
-    merge_keys = ["sequenceId", "itemPosition"]
-    value_headers = [h for h in headers if h not in merge_keys]
-    return pd.merge(
-        gt_df[merge_keys + value_headers],
-        inf_df[merge_keys + value_headers],
-        on=merge_keys,
-        how="inner",
-        suffixes=("_gt", "_inf"),
-    )
 
 
 def _calc_sym_kl(p: np.ndarray, q: np.ndarray) -> float:
@@ -792,7 +780,13 @@ def compute_etho_scores(
                 "Must provide either paired_df, or both gt_dir and inf_dir."
             )
         gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
-        paired_df = merge_paired(gt_df, inf_df, list(gt_df.columns))
+        paired_df = pd.merge(
+            gt_df.sort_values(["sequenceId", "itemPosition"]),
+            inf_df.sort_values(["sequenceId", "itemPosition"]),
+            on=["sequenceId", "itemPosition"],
+            suffixes=("_gt", "_inf"),
+            how="inner",
+        )
 
     pos_res = position_kl_score(paired_df)
     stat_res = stationary_score(paired_df)
@@ -919,7 +913,13 @@ def run_etho_full_analysis(
 
     # 1. Load Data
     gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
-    paired_df = merge_paired(gt_df, inf_df, list(gt_df.columns))
+    paired_df = pd.merge(
+        gt_df.sort_values(["sequenceId", "itemPosition"]),
+        inf_df.sort_values(["sequenceId", "itemPosition"]),
+        on=["sequenceId", "itemPosition"],
+        suffixes=("_gt", "_inf"),
+        how="inner",
+    )
 
     # 2. Extract Additional Features for the Report
     coord_pairs = []

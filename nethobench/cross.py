@@ -10,6 +10,7 @@ from sklearn.cross_decomposition import CCA
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from nethobench.helpers import _clip01, _geometric_mean_scores
+from nethobench.calculation import _merge_aligned
 from nethobench.analysis.neuro_analysis import load_and_run_neuro_full_analysis
 from nethobench.etho import (
     position_kl_score,
@@ -68,25 +69,6 @@ def _infer_config(df: pd.DataFrame) -> dict:
         ),
     }
 
-
-def _merge_aligned(gt_path: Path, pred_path: Path, cfg: dict) -> pd.DataFrame:
-    seq_key = cfg.get("sequence_key", "sequenceId")
-    time_key = cfg.get("time_key", "itemPosition")
-    gt = pd.read_csv(gt_path)
-    pred = pd.read_csv(pred_path)
-    for col in [seq_key, time_key]:
-        if col not in gt.columns or col not in pred.columns:
-            raise ValueError(f"Missing alignment column {col} in GT or predictions.")
-    merged = pd.merge(
-        gt.sort_values([seq_key, time_key]),
-        pred.sort_values([seq_key, time_key]),
-        on=[seq_key, time_key],
-        suffixes=("_gt", "_inf"),
-        how="inner",
-    )
-    if merged.empty:
-        raise ValueError("No overlapping sequence/time rows after merge.")
-    return merged
 
 
 def _arrays_from_aligned(

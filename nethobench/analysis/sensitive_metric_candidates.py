@@ -6,7 +6,7 @@ from typing import Callable
 import numpy as np
 from scipy import signal
 from sklearn.decomposition import PCA
-from nethobench.calculation import _align_arrays
+from nethobench.calculation import _align_arrays, _robust_scale, _corr_score, EPS
 try:
     from ripser import ripser
 except Exception:  # pragma: no cover - optional dependency during development
@@ -18,7 +18,6 @@ MetricFn = Callable[[Array3D, Array3D], dict]
 CorruptionFn = Callable[[Array3D, float, int], Array3D]
 
 
-EPS = 1e-8
 
 
 @dataclass(frozen=True)
@@ -58,30 +57,6 @@ def _score_from_distance(distance: float) -> float:
     return float(1.0 / (1.0 + distance)) if np.isfinite(distance) else np.nan
 
 
-def _corr_score(a: np.ndarray, b: np.ndarray) -> float:
-    a = np.asarray(a, dtype=np.float64)
-    b = np.asarray(b, dtype=np.float64)
-    mask = np.isfinite(a) & np.isfinite(b)
-    if np.sum(mask) < 3:
-        return np.nan
-    aa = a[mask]
-    bb = b[mask]
-    if np.std(aa) < EPS or np.std(bb) < EPS:
-        return np.nan
-    return float(np.clip((np.corrcoef(aa, bb)[0, 1] + 1.0) / 2.0, 0.0, 1.0))
-
-
-def _robust_scale(x: np.ndarray, floor: float = 0.05) -> float:
-    x = np.asarray(x, dtype=np.float64)
-    x = x[np.isfinite(x)]
-    if x.size < 4:
-        return float(floor)
-    q25, q75 = np.quantile(x, [0.25, 0.75])
-    scale = float(q75 - q25)
-    if not np.isfinite(scale) or scale < floor:
-        scale = float(np.std(x))
-    return float(scale if np.isfinite(scale) and scale >= floor else floor)
-
 
 def _quantile_distance(
     x: np.ndarray, y: np.ndarray, qs: tuple[float, ...] = (0.1, 0.25, 0.5, 0.75, 0.9)
@@ -95,7 +70,7 @@ def _quantile_distance(
     qx = np.quantile(x, qs)
     qy = np.quantile(y, qs)
     scale = _robust_scale(x)
-    return float(np.mean(np.abs(qx - qy) / (scale + EPS)))
+    return float(np.mean(np.abs(qx - qy) / (scale)))
 
 
 def _tv_score_from_hist(hist_g: np.ndarray, hist_p: np.ndarray) -> float:
@@ -658,10 +633,10 @@ def crosscorr_lagged_matrix_v4(gt: Array3D, pred: Array3D) -> dict:
     e1g = Cg1.reshape(-1)
     e1p = Cp1.reshape(-1)
     score0 = 0.5 * _corr_score(e0g, e0p) + 0.5 * _score_from_distance(
-        np.mean(np.abs(e0p - e0g)) / (_robust_scale(e0g) + EPS)
+        np.mean(np.abs(e0p - e0g)) / (_robust_scale(e0g))
     )
     score1 = 0.5 * _corr_score(e1g, e1p) + 0.5 * _score_from_distance(
-        np.mean(np.abs(e1p - e1g)) / (_robust_scale(e1g) + EPS)
+        np.mean(np.abs(e1p - e1g)) / (_robust_scale(e1g))
     )
     return {"score": float(np.nanmean([score0, score1]))}
 
@@ -709,7 +684,7 @@ def crosscorr_topedge_profiles_v5(gt: Array3D, pred: Array3D) -> dict:
         amp_g = cc_g[lag_g + max_lag]
         amp_p = cc_p[lag_p + max_lag]
         amp_score = _score_from_distance(
-            abs(amp_p - amp_g) / (_robust_scale(cc_g) + EPS)
+            abs(amp_p - amp_g) / (_robust_scale(cc_g))
         )
         scores.append(np.nanmean([score_curve, lag_score, amp_score]))
     return {"score": float(np.nanmean(scores)) if scores else np.nan}

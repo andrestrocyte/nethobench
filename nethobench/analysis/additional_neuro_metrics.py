@@ -6,7 +6,7 @@ from scipy.linalg import subspace_angles
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.covariance import LedoitWolf
 from sklearn.feature_selection import mutual_info_regression
-from nethobench.calculation import _align_arrays
+from nethobench.calculation import _align_arrays, _rmse_similarity, weighted_mean_available, _corr_score
 EPS = 1e-9
 
 
@@ -48,47 +48,10 @@ def _apply_reference_scaler(
     return out
 
 
-def _safe_corr01(x: np.ndarray, y: np.ndarray) -> float:
-    x = np.asarray(x, dtype=np.float64).ravel()
-    y = np.asarray(y, dtype=np.float64).ravel()
-    mask = np.isfinite(x) & np.isfinite(y)
-    if mask.sum() < 3:
-        return np.nan
-    xx = x[mask]
-    yy = y[mask]
-    if np.nanstd(xx) < EPS or np.nanstd(yy) < EPS:
-        return np.nan
-    corr = np.corrcoef(xx, yy)[0, 1]
-    if not np.isfinite(corr):
-        return np.nan
-    return float(np.clip(0.5 * (corr + 1.0), 0.0, 1.0))
 
 
-def _rmse_similarity(x: np.ndarray, y: np.ndarray) -> float:
-    x = np.asarray(x, dtype=np.float64).ravel()
-    y = np.asarray(y, dtype=np.float64).ravel()
-    mask = np.isfinite(x) & np.isfinite(y)
-    if mask.sum() < 3:
-        return np.nan
-    err = float(np.sqrt(np.mean((x[mask] - y[mask]) ** 2)))
-    scale = float(np.nanstd(x[mask]))
-    if not np.isfinite(scale) or scale < EPS:
-        scale = float(np.nanmean(np.abs(x[mask])))
-    if not np.isfinite(scale) or scale < EPS:
-        scale = 1.0
-    return float(1.0 / (1.0 + err / scale))
 
 
-def _blend_scores(*scores: float, weights: tuple[float, ...] | None = None) -> float:
-    values = np.asarray(scores, dtype=np.float64)
-    mask = np.isfinite(values)
-    if not np.any(mask):
-        return np.nan
-    if weights is None:
-        return float(np.nanmean(values[mask]))
-    w = np.asarray(weights, dtype=np.float64)[mask]
-    vals = values[mask]
-    return float(np.sum(w * vals) / np.sum(w))
 
 
 def _upper_tri(mat: np.ndarray) -> np.ndarray:
@@ -147,10 +110,10 @@ def _spectrum_similarity(x: np.ndarray, y: np.ndarray) -> float:
     n = min(x.size, y.size)
     x = x[:n]
     y = y[:n]
-    return _blend_scores(
-        _safe_corr01(np.log(x + EPS), np.log(y + EPS)),
-        _rmse_similarity(x, y),
-        weights=(0.55, 0.45),
+    return weighted_mean_available(
+        dict(enumerate([_corr_score(np.log(x + EPS), np.log(y + EPS)),
+        _rmse_similarity(x, y)])),
+        weights={0:0.55, 1:0.45},
     )
 
 
@@ -159,10 +122,10 @@ def _matrix_similarity(gt_mat: np.ndarray | None, pred_mat: np.ndarray | None) -
         return np.nan
     gt_vec = _upper_tri(gt_mat)
     pred_vec = _upper_tri(pred_mat)
-    return _blend_scores(
-        _safe_corr01(gt_vec, pred_vec),
-        _rmse_similarity(gt_vec, pred_vec),
-        weights=(0.6, 0.4),
+    return weighted_mean_available(
+        dict(enumerate([_corr_score(gt_vec, pred_vec),
+        _rmse_similarity(gt_vec, pred_vec)])),
+        weights={0:0.6, 1:0.4},
     )
 
 
@@ -379,11 +342,11 @@ def _hist_similarity(gt_hist: np.ndarray, pred_hist: np.ndarray) -> float:
     gt_hist = gt_hist / np.sum(gt_hist)
     pred_hist = pred_hist / np.sum(pred_hist)
     overlap = float(np.sum(np.minimum(gt_hist, pred_hist)))
-    return _blend_scores(
-        overlap,
-        _safe_corr01(gt_hist, pred_hist),
-        _rmse_similarity(gt_hist, pred_hist),
-        weights=(0.40, 0.25, 0.35),
+    return weighted_mean_available(
+        dict(enumerate([overlap,
+        _corr_score(gt_hist, pred_hist),
+        _rmse_similarity(gt_hist, pred_hist)])),
+        weights={0:0.40, 1:0.25, 2:0.35},
     )
 
 
@@ -633,7 +596,7 @@ def _dfc_state_transition_score(gt: np.ndarray, pred: np.ndarray) -> float:
     pred_seq = _split_assignments(pred_assign, pred_counts)
     lag2 = _transition_similarity(gt_seq, pred_seq, n_states=8, lag=2)
     lag3 = _transition_similarity(gt_seq, pred_seq, n_states=8, lag=3)
-    return _blend_scores(lag2, lag3, weights=(0.55, 0.45))
+    return weighted_mean_available(dict(enumerate([lag2, lag3])), weights={0:0.55, 1:0.45})
 
 
 def compute_additional_structural_metrics(
@@ -676,10 +639,10 @@ def compute_additional_structural_metrics(
     )
 
     partial_corr = _matrix_similarity(gt_pcorr, pred_pcorr)
-    psd_shape = _blend_scores(
-        _safe_corr01(np.log(gt_psd + EPS), np.log(pred_psd + EPS)),
-        _rmse_similarity(gt_psd, pred_psd),
-        weights=(0.55, 0.45),
+    psd_shape = weighted_mean_available(
+        dict(enumerate([_corr_score(np.log(gt_psd + EPS), np.log(pred_psd + EPS)),
+        _rmse_similarity(gt_psd, pred_psd)])),
+        weights={0:0.55, 1:0.45},
     )
 
     dim_gt = _effective_dimension(gt_cov)
