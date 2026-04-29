@@ -6,7 +6,6 @@ from typing import Dict, Tuple, Union
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import nbformat
 from sklearn.cross_decomposition import CCA
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
@@ -374,7 +373,6 @@ def compute_cross_scores(predictions_csv: Path, ground_truth_csv: Path, config: 
         "composite": final_comp,
     }
 
-
 def run_cross_full_analysis(
     predictions_csv: Path,
     ground_truth_csv: Path,
@@ -383,44 +381,29 @@ def run_cross_full_analysis(
     output_root: Path | None = None,
 ) -> Path:
     """
-    Execute the bundled cross-modal notebook headlessly, saving figures + executed notebook.
+    Execute the full cross-modal analysis natively, saving JSON metrics and rendering plots.
     """
-    from nbconvert.preprocessors import ExecutePreprocessor
+    from datetime import datetime
+    try:
+        from .analysis.cross_reporting import generate_full_cross_report
+    except ImportError:
+        def generate_full_cross_report(*args, **kwargs):
+            pass # Failsafe if reporting module is missing
 
-    nb_path = Path(__file__).parent / "notebooks" / "cross_modal_metrics.ipynb"
-    if not nb_path.is_file():
-        raise FileNotFoundError(f"Cross-modal notebook missing at {nb_path}")
-
+    # Set up output directory
     outdir_root = Path(output_root) if output_root else Path.cwd() / "outputs"
-    outdir = outdir_root / f"cross-analysis-{Path(predictions_csv).stem}"
+    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    outdir = outdir_root / f"cross-analysis-{Path(predictions_csv).stem}-{timestamp}"
     outdir.mkdir(parents=True, exist_ok=True)
 
-    nb = nbformat.read(nb_path, as_version=4)
-    patch = f"""
-import os
-from pathlib import Path
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-gt_path = Path(r"{ground_truth_csv}")
-pred_path = Path(r"{predictions_csv}")
-config_path = Path(r"{config_path}")
-outdir = Path(r"{outdir}")
-plot_counter = {{'n': 0}}
-orig_show = plt.show
-def saving_show(*args, **kwargs):
-    figs = [plt.figure(num) for num in plt.get_fignums()]
-    for fig in figs:
-        plot_counter['n'] += 1
-        fig.savefig(outdir / f"figure_{{plot_counter['n']:03d}}.png", dpi=200, bbox_inches='tight')
-    plt.close('all')
-plt.show = saving_show
-"""
-    nb.cells.insert(0, nbformat.v4.new_code_cell(patch))
+    # Compute all cross-modal scores
+    scores = compute_cross_scores(predictions_csv, ground_truth_csv, config_path)
 
-    ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
-    ep.preprocess(nb, {'metadata': {'path': nb_path.parent}})
-    executed_path = outdir / "executed_cross_modal.ipynb"
-    with executed_path.open("w", encoding="utf-8") as f:
-        nbformat.write(nb, f)
+    # Export to JSON
+    with (outdir / "scores.json").open("w", encoding="utf-8") as f:
+        json.dump(scores, f, indent=2)
+
+    # Generate Matplotlib Figures
+    generate_full_cross_report(scores, outdir)
+
     return outdir
