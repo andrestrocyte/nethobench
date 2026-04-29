@@ -23,22 +23,6 @@ EPS = 1e-12
 # Alignment & Robust Statistics Helpers
 # ---------------------------------------------------------
 
-def _align_gt_pred(gt_arr: np.ndarray, pred_arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    gt_arr = np.asarray(gt_arr, dtype=np.float64)
-    pred_arr = np.asarray(pred_arr, dtype=np.float64)
-    
-    gt_len = gt_arr.shape[1]
-    pr_len = pred_arr.shape[1]
-    
-    if pr_len != gt_len and pr_len % gt_len == 0:
-        factor = pr_len // gt_len
-        pred_res = pred_arr.reshape(pred_arr.shape[0], gt_len, factor, pred_arr.shape[2]).mean(axis=2)
-        return gt_arr, pred_res
-    elif pr_len != gt_len:
-        m = min(gt_len, pr_len)
-        return gt_arr[:, :m, :], pred_arr[:, :m, :]
-    
-    return gt_arr, pred_arr
 
 def _iqr_robust(x: np.ndarray) -> float:
     x = np.asarray(x, dtype=np.float64)
@@ -101,7 +85,6 @@ def _tail_binned_hist(gt_vals: np.ndarray, pr_vals: np.ndarray, bins: int = 60, 
     return p, q
 
 def compute_kl_score(gt_arr: np.ndarray, pred_arr: np.ndarray, bins: int = 60, support_q: tuple = (0.001, 0.999)) -> float:
-    gt_arr, pred_arr = _align_gt_pred(gt_arr, pred_arr)
     n_seq, _, n_reg = gt_arr.shape
 
     kl_sym_sr = np.full((n_seq, n_reg), np.nan, dtype=np.float64)
@@ -134,7 +117,6 @@ def compute_kl_score(gt_arr: np.ndarray, pred_arr: np.ndarray, bins: int = 60, s
 # ---------------------------------------------------------
 
 def compute_mean_score01_top10(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
-    gt_arr, pred_arr = _align_gt_pred(gt_arr, pred_arr)
     n_seq, _, n_reg = gt_arr.shape
 
     mu_gt = np.nanmean(gt_arr, axis=1)  
@@ -175,7 +157,6 @@ def compute_quantile_score01_simple(
     top_q_regions: float = 0.25, 
     rng_seed: int = 0
 ) -> float:
-    gt_arr, pred_arr = _align_gt_pred(gt_arr, pred_arr)
     n_seq, _, n_reg = gt_arr.shape
     rng = np.random.default_rng(rng_seed)
 

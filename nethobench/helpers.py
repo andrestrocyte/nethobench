@@ -1,6 +1,10 @@
 import pandas as pd
 from pathlib import Path
 import numpy as np
+import contextlib
+import io
+from datetime import datetime
+
 from typing import Optional
 
 def load_df(path: Path):
@@ -87,3 +91,15 @@ def _load_and_align(
     pred_arr = pred_arr[:, :max_len, :]
     return gt_arr, pred_arr, overlap
 
+
+
+def _quiet_call(func, *args, **kwargs):
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+        return func(*args, **kwargs)
+
+def _timestamped_outdir(base: Path | None = None, prefix: str = "ethobench") -> Path:
+    base = Path(base) if base is not None else Path.cwd() / "outputs"
+    outdir = base / f"{prefix}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    outdir.mkdir(parents=True, exist_ok=True)
+    return outdir

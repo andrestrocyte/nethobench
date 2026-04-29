@@ -9,13 +9,13 @@ import numpy as np
 import pandas as pd
 from sklearn.feature_selection import mutual_info_regression
 
-from nethobench.analysis.neuro_scoring import calculate_neuro_composites, _align_gt_pred
+from nethobench.analysis.neuro_scoring import calculate_neuro_composites
 from nethobench.analysis.score_definitions import (
     compute_neuro_composite,
     compute_fidelity_composite,
 )
 from nethobench.analysis.neuro_reporting import generate_full_neuro_report
-from nethobench.helpers import  _load_and_align
+from nethobench.helpers import _load_and_align
 
 # --- Sequence Loading & Alignment Helpers ---
   
@@ -42,7 +42,6 @@ def _robust_median_mad(x: np.ndarray) -> tuple[float, float]:
     return med, s
 
 def compute_error_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
-    gt_arr, pred_arr = _align_gt_pred(gt_arr, pred_arr)
     n_seq, _, n_reg = gt_arr.shape
     iqr_gt = np.array([_robust_iqr(gt_arr[:, :, r].reshape(-1)) for r in range(n_reg)])
     nrmse_sr = np.full((n_seq, n_reg), np.nan)
@@ -70,7 +69,6 @@ def compute_error_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
     return float(1.0 / (1.0 + D)) if np.isfinite(D) else np.nan
 
 def compute_mi_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
-    gt_arr, pred_arr = _align_gt_pred(gt_arr, pred_arr)
     n_seq, _, n_reg = gt_arr.shape
     rng = np.random.default_rng(0)
     mi_all = np.full((n_seq, n_reg), np.nan)
@@ -161,13 +159,4 @@ def compute_composite_scores(
     
     return _compute_scores_from_arrays(gt, pred)
 
-
-# --- Full Analysis Run ---
-
-def _timestamped_outdir(base: Optional[Path] = None, stem: Optional[str] = None) -> Path:
-    base = Path(base) if base is not None else Path.cwd() / "outputs"
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S") # Fixed undefined 'ts' bug from original code
-    outdir = base / (f"{stem}-legacy-analysis-{ts}" if stem else f"legacy-neuro-analysis-{ts}")
-    outdir.mkdir(parents=True, exist_ok=True)
-    return outdir
 

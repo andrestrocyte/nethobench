@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import os
 import argparse
-import contextlib
 from datetime import datetime
-import io
 import json
 from pathlib import Path
 from typing import Iterable, Optional
@@ -25,7 +23,7 @@ from nethobench import (
     run_etho_full_analysis,
     run_neuro_full_analysis,
 )
-
+from nethobench.helpers import _quiet_call
 
 def _find_candidates(prefix: str) -> list[Path]:
     cwd = Path.cwd()
@@ -150,10 +148,6 @@ def _print_composite(label: str, value: float) -> None:
         print(f"{label:18s}: NaN")
 
 
-def _quiet_call(func, *args, **kwargs):
-    buffer = io.StringIO()
-    with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
-        return func(*args, **kwargs)
 
 
 def _default_json_output(command: str, preds: Path) -> Path:

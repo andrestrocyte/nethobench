@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
@@ -8,7 +7,7 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
 
-from nethobench.helpers import load_gt_and_preds
+from nethobench.helpers import load_gt_and_preds, _timestamped_outdir
 
 
 def _clip01(x: float, eps: float = 1e-6) -> float:
@@ -844,9 +843,4 @@ def run_etho_full_analysis(gt_dir: Path, inf_dir: Path, *, output_root: Path | N
     
     return outdir
 
-def _timestamped_outdir(base: Path | None = None, prefix: str = "ethobench") -> Path:
-    base = Path(base) if base is not None else Path.cwd() / "outputs"
-    outdir = base / f"{prefix}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    outdir.mkdir(parents=True, exist_ok=True)
-    return outdir
 

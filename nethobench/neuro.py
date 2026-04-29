@@ -10,9 +10,8 @@ from typing import Dict, Optional
 import numpy as np
 import pandas as pd
 from nethobench.analysis.neuro_scoring import calculate_neuro_composites
-from nethobench.helpers import load_gt_and_preds
+from nethobench.helpers import _load_and_align, _timestamped_outdir
 from nethobench.analysis.neuro_reporting import generate_full_neuro_report
-from nethobench.helpers import  _load_and_align
 
 
 def _compute_scores_from_arrays(
@@ -71,12 +70,6 @@ def compute_neuro_scores(
     return calculate_neuro_composites(gt_arr, pred_arr)
 
 
-def _timestamped_outdir(base: Optional[Path] = None, stem: Optional[str] = None) -> Path:
-    base = Path(base) if base is not None else Path.cwd() / "outputs"
-    outdir = base / (f"{stem}-analysis" if stem else f"neuro-analysis")
-    outdir.mkdir(parents=True, exist_ok=True)
-    return outdir
-
 def run_neuro_full_analysis(
     predictions_csv: Path,
     ground_truth_csv: Path,
@@ -86,7 +79,7 @@ def run_neuro_full_analysis(
     Execute the active neuro notebook headlessly, save figures, and export notebook-derived scores.
     """
     preds_path = Path(predictions_csv)
-    outdir = _timestamped_outdir(output_root, stem=preds_path.stem)
+    outdir = _timestamped_outdir(output_root, prefix=preds_path.stem)
     gt_arr, pred_arr, region_names = _load_and_align(preds_path, Path(ground_truth_csv))
     
     scores = calculate_neuro_composites(gt_arr, pred_arr)
