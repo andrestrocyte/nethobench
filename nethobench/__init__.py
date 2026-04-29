@@ -1,5 +1,5 @@
 from .cross import compute_cross_scores, run_cross_full_analysis
-from .etho import compute_etho_scores, run_ethobench_notebook
+from .etho import compute_etho_scores, run_etho_full_analysis
 from .fidelity import compute_fidelity_scores
 from .neuro import compute_neuro_scores, run_neuro_full_analysis
 from .synthetic import (
@@ -22,7 +22,7 @@ __all__ = [
     "compute_fidelity_scores",
     "run_neuro_full_analysis",
     "compute_etho_scores",
-    "run_ethobench_notebook",
+    "run_etho_full_analysis",
     "compute_cross_scores",
     "run_cross_full_analysis",
     "DEFAULT_BIOPHYSICAL_PERTURBATIONS",

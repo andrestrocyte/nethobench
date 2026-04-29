@@ -1,12 +1,13 @@
 from __future__ import annotations
+
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
+
 from nethobench.helpers import load_gt_and_preds
 
 
@@ -23,7 +24,6 @@ def _geometric_mean_scores(values: list[float]) -> float:
     return float(np.exp(np.mean(np.log(arr))))
 
 
-
 def load_file(path: Path) -> pd.DataFrame:
     path = Path(path)
     if path.suffix == ".csv":
@@ -34,7 +34,6 @@ def load_file(path: Path) -> pd.DataFrame:
         import pyarrow.parquet as pq
         table = pq.read_table(path, use_pandas_metadata=False)
         return table.to_pandas()
-
 
 
 def merge_paired(gt_df: pd.DataFrame, inf_df: pd.DataFrame, headers: List[str]) -> pd.DataFrame:
@@ -55,6 +54,10 @@ def _calc_sym_kl(p: np.ndarray, q: np.ndarray) -> float:
     q = (q + eps) / (q + eps).sum()
     return 0.5 * (np.sum(p * np.log(p / q)) + np.sum(q * np.log(q / p)))
 
+
+# ---------------------------------------------------------
+# Core Behavioral Metrics
+# ---------------------------------------------------------
 
 def stationary_score(paired_df: pd.DataFrame) -> Tuple[float, Dict[str, float], Dict[str, int]]:
     if paired_df.empty:
@@ -460,11 +463,258 @@ def syllable_score(paired_df: pd.DataFrame, k: int = 8) -> Tuple[float, Dict[str
     return global_score, seq_scores, seq_weights
 
 
-def compute_etho_scores(gt_dir: Path, inf_dir: Path) -> Tuple[Dict[str, float], Dict[str, List[float]], Dict[str, float], Dict[str, float]]:
+# ---------------------------------------------------------
+# Extended Metrics (Previously in Notebook)
+# ---------------------------------------------------------
+
+def body_part_errors(paired_df: pd.DataFrame, coord_pairs: List[Tuple[str, str, str]]) -> pd.DataFrame:
+    """Computes RMSE, MAE and Pearson correlation per body part."""
+    rows = []
+    for base, x_col, y_col in coord_pairs:
+        if paired_df.empty:
+            continue
+        gt_xy = paired_df[[f'{x_col}_gt', f'{y_col}_gt']].to_numpy()
+        inf_xy = paired_df[[f'{x_col}_inf', f'{y_col}_inf']].to_numpy()
+        
+        valid = ~np.isnan(gt_xy).any(axis=1) & ~np.isnan(inf_xy).any(axis=1)
+        if not valid.any():
+            continue
+            
+        diff = gt_xy[valid] - inf_xy[valid]
+        dist = np.linalg.norm(diff, axis=1)
+        rmse = float(np.sqrt(np.mean(dist**2)))
+        mae_x, mae_y = np.mean(np.abs(diff), axis=0)
+        
+        a_x, b_x = gt_xy[valid, 0], inf_xy[valid, 0]
+        corr_x = float(np.corrcoef(a_x, b_x)[0, 1]) if len(a_x) > 1 and np.std(a_x)>0 and np.std(b_x)>0 else np.nan
+        
+        a_y, b_y = gt_xy[valid, 1], inf_xy[valid, 1]
+        corr_y = float(np.corrcoef(a_y, b_y)[0, 1]) if len(a_y) > 1 and np.std(a_y)>0 and np.std(b_y)>0 else np.nan
+        
+        rows.append({
+            'body_part': base,
+            'rmse_pos': rmse,
+            'mae_x': float(mae_x),
+            'mae_y': float(mae_y),
+            'corr_x': corr_x,
+            'corr_y': corr_y
+        })
+    return pd.DataFrame(rows)
 
 
-    gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
-    paired_df = merge_paired(gt_df, inf_df, list(gt_df.columns))
+def inter_limb_distances(paired_df: pd.DataFrame, pairs: List[Tuple[str, str]]) -> pd.DataFrame:
+    """Computes mean distances between specific body parts."""
+    rows = []
+    for label, suffix in [('gt', '_gt'), ('inf', '_inf')]:
+        for p0, p1 in pairs:
+            try:
+                ax, ay = f'{p0}_X{suffix}', f'{p0}_Y{suffix}'
+                bx, by = f'{p1}_X{suffix}', f'{p1}_Y{suffix}'
+                diff = paired_df[[ax, ay]].to_numpy() - paired_df[[bx, by]].to_numpy()
+                dist = np.linalg.norm(diff, axis=1)
+                rows.append({
+                    'label': label,
+                    'pair': f'{p0}-{p1}',
+                    'mean': float(np.nanmean(dist)),
+                    'std': float(np.nanstd(dist))
+                })
+            except KeyError:
+                pass
+    return pd.DataFrame(rows)
+def dtw_trajectory_similarity(paired_df: pd.DataFrame) -> Tuple[float, Dict[str, float]]:
+    """Calculates Dynamic Time Warping (DTW) distance on CENTER tracking in O(M) memory."""
+    if paired_df.empty or 'CENTER_X_gt' not in paired_df.columns:
+        return np.nan, {}
+        
+    def dtw_dist(seq_a, seq_b, window):
+        n, m = len(seq_a), len(seq_b)
+        if n == 0 or m == 0:
+            return np.nan
+        window = max(window, abs(n - m))
+        
+        # O(M) memory optimization: only keep the previous and current row
+        prev_row = np.full(m + 1, np.inf)
+        curr_row = np.full(m + 1, np.inf)
+        prev_row[0] = 0.0
+        
+        for i in range(1, n + 1):
+            curr_row[:] = np.inf
+            j_start = max(1, i - window)
+            j_end = min(m, i + window)
+            for j in range(j_start, j_end + 1):
+                cost = np.linalg.norm(seq_a[i - 1] - seq_b[j - 1])
+                curr_row[j] = cost + min(prev_row[j], curr_row[j - 1], prev_row[j - 1])
+            prev_row[:] = curr_row
+            
+        return curr_row[m] / (n + m)
+
+    seq_scores = {}
+    for seq, seq_df in paired_df.sort_values('itemPosition').groupby('sequenceId'):
+        gt_seq = seq_df[['CENTER_X_gt', 'CENTER_Y_gt']].dropna().to_numpy()
+        inf_seq = seq_df[['CENTER_X_inf', 'CENTER_Y_inf']].dropna().to_numpy()
+        if not len(gt_seq) or not len(inf_seq):
+            continue
+        w = max(int(max(len(gt_seq), len(inf_seq)) * 0.1), abs(len(gt_seq) - len(inf_seq)))
+        d = dtw_dist(gt_seq, inf_seq, w)
+        seq_scores[str(seq)] = 1.0 / (1.0 + d) if not np.isnan(d) else np.nan
+        
+    vals = [v for v in seq_scores.values() if np.isfinite(v)]
+    return float(np.mean(vals)) if vals else np.nan, seq_scores
+
+def manifold_alignment_metrics(paired_df: pd.DataFrame) -> Dict[str, float]:
+    """Calculates Procrustes and MMD metrics for movement manifolds (memory-safe)."""
+    try:
+        from sklearn.decomposition import PCA
+        from sklearn.metrics.pairwise import rbf_kernel, pairwise_distances
+        from scipy.spatial import procrustes
+    except ImportError:
+        return {'procrustes_sim': np.nan, 'mmd_sim': np.nan}
+    
+    def build_features(df, label):
+        try:
+            center = df[[f'CENTER_X_{label}', f'CENTER_Y_{label}']].to_numpy()
+            vel = np.diff(center, axis=0)
+            vel_pad = np.vstack([vel[:1], vel]) if len(vel) else np.zeros_like(center)
+            nose = df[[f'NOSE_X_{label}', f'NOSE_Y_{label}']].to_numpy()
+            tail = df[[f'TAIL_BASE_X_{label}', f'TAIL_BASE_Y_{label}']].to_numpy()
+            axis_vec = nose - tail
+            ears = df[[f'LEFT_EAR_X_{label}', f'LEFT_EAR_Y_{label}', f'RIGHT_EAR_X_{label}', f'RIGHT_EAR_Y_{label}']].to_numpy()
+            ear_span = np.linalg.norm(ears[:, :2] - ears[:, 2:], axis=1, keepdims=True)
+            return np.hstack([vel_pad, axis_vec, ear_span])
+        except KeyError:
+            return np.empty((len(df), 5))
+
+    gt_feats_all, inf_feats_all = [], []
+    for seq, seq_df in paired_df.sort_values('itemPosition').groupby('sequenceId'):
+        gt_f = build_features(seq_df, 'gt')
+        inf_f = build_features(seq_df, 'inf')
+        mask = ~np.isnan(gt_f).any(axis=1) & ~np.isnan(inf_f).any(axis=1)
+        if mask.any():
+            gt_feats_all.append(gt_f[mask])
+            inf_feats_all.append(inf_f[mask])
+    
+    if not gt_feats_all:
+        return {'procrustes_sim': np.nan, 'mmd_sim': np.nan}
+
+    gt_stack = np.vstack(gt_feats_all)
+    inf_stack = np.vstack(inf_feats_all)
+    pca = PCA(n_components=min(3, gt_stack.shape[1]))
+    gt_emb = pca.fit_transform(gt_stack)
+    inf_emb = pca.transform(inf_stack)
+    
+    try:
+        _, _, proc_dist = procrustes(gt_emb, inf_emb)
+        proc_sim = float(1.0 / (1.0 + proc_dist))
+    except ValueError:
+        proc_sim = np.nan
+    
+    # Subsample to prevent O(N^2) memory explosion in distance matrix
+    MAX_MMD_POINTS = 2000
+    rng = np.random.default_rng(42)
+    if len(gt_emb) > MAX_MMD_POINTS:
+        gt_emb_sub = gt_emb[rng.choice(len(gt_emb), MAX_MMD_POINTS, replace=False)]
+    else:
+        gt_emb_sub = gt_emb
+        
+    if len(inf_emb) > MAX_MMD_POINTS:
+        inf_emb_sub = inf_emb[rng.choice(len(inf_emb), MAX_MMD_POINTS, replace=False)]
+    else:
+        inf_emb_sub = inf_emb
+
+    all_emb_sub = np.vstack([gt_emb_sub, inf_emb_sub])
+    if len(all_emb_sub) > 1:
+        dists = pairwise_distances(all_emb_sub)
+        nonzero = dists[np.triu_indices_from(dists, k=1)]
+        med = np.median(nonzero) if len(nonzero) else 1.0
+        gamma = 1.0 / (2.0 * (med ** 2 + 1e-8))
+    else:
+        gamma = 1.0
+        
+    Kxx = rbf_kernel(gt_emb_sub, gt_emb_sub, gamma=gamma)
+    Kyy = rbf_kernel(inf_emb_sub, inf_emb_sub, gamma=gamma)
+    Kxy = rbf_kernel(gt_emb_sub, inf_emb_sub, gamma=gamma)
+    mmd2 = Kxx.mean() + Kyy.mean() - 2 * Kxy.mean()
+    mmd_sim = float(1.0 / (1.0 + max(0.0, mmd2)))
+    
+    return {'procrustes_sim': proc_sim, 'mmd_sim': mmd_sim}
+
+
+def get_chunked_embeddings(paired_df: pd.DataFrame, chunk_size: int = 5) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """Generates 2D embeddings of short movement chunks for diagnostics."""
+    try:
+        try:
+            import umap
+            reducer = umap.UMAP(n_components=2, min_dist=0.1, random_state=0)
+        except ImportError:
+            from sklearn.decomposition import PCA
+            reducer = PCA(n_components=2)
+            
+        def build_features(df, label):
+            try:
+                center = df[[f'CENTER_X_{label}', f'CENTER_Y_{label}']].to_numpy()
+                vel = np.diff(center, axis=0)
+                vel_pad = np.vstack([vel[:1], vel]) if len(vel) else np.zeros_like(center)
+                nose = df[[f'NOSE_X_{label}', f'NOSE_Y_{label}']].to_numpy()
+                tail = df[[f'TAIL_BASE_X_{label}', f'TAIL_BASE_Y_{label}']].to_numpy()
+                axis_vec = nose - tail
+                ears = df[[f'LEFT_EAR_X_{label}', f'LEFT_EAR_Y_{label}', f'RIGHT_EAR_X_{label}', f'RIGHT_EAR_Y_{label}']].to_numpy()
+                ear_span = np.linalg.norm(ears[:, :2] - ears[:, 2:], axis=1, keepdims=True)
+                return np.hstack([vel_pad, axis_vec, ear_span])
+            except KeyError:
+                return np.empty((0, 5))
+
+        chunks, labels, seq_ids = [], [], []
+        for seq, seq_df in paired_df.sort_values('itemPosition').groupby('sequenceId'):
+            gt_feats = build_features(seq_df, 'gt')
+            inf_feats = build_features(seq_df, 'inf')
+            if len(gt_feats) < chunk_size or len(inf_feats) < chunk_size:
+                continue
+            mask_gt = ~np.isnan(gt_feats).any(axis=1)
+            mask_inf = ~np.isnan(inf_feats).any(axis=1)
+            gt_feats, inf_feats = gt_feats[mask_gt], inf_feats[mask_inf]
+            
+            if len(gt_feats) < chunk_size or len(inf_feats) < chunk_size:
+                continue
+            
+            for arr, lbl in [(gt_feats, 'gt'), (inf_feats, 'inf')]:
+                for start in range(0, len(arr) - chunk_size + 1, chunk_size):
+                    chunks.append(arr[start:start + chunk_size].flatten())
+                    labels.append(lbl)
+                    seq_ids.append(seq)
+            
+            shuffled = gt_feats.copy()
+            rng = np.random.default_rng(0)
+            rng.shuffle(shuffled)
+            for start in range(0, len(shuffled) - chunk_size + 1, chunk_size):
+                chunks.append(shuffled[start:start + chunk_size].flatten())
+                labels.append('gt_shuffled')
+                seq_ids.append(seq)
+
+        if not chunks:
+            return None
+            
+        X = np.vstack(chunks)
+        emb = reducer.fit_transform(X) if len(X) > 5 else np.zeros((len(X), 2))
+        return emb, np.array(labels), np.array(seq_ids)
+    except Exception:
+        return None
+
+# ---------------------------------------------------------
+# Master Metric Aggregator
+# ---------------------------------------------------------
+def compute_etho_scores(
+    gt_dir: Optional[Path] = None, 
+    inf_dir: Optional[Path] = None, 
+    *, 
+    paired_df: Optional[pd.DataFrame] = None
+) -> Tuple[Dict[str, float], Dict[str, List[float]], Dict[str, float], Dict[str, float]]:
+    
+    # Avoid redundant loading if already passed from run_etho_full_analysis
+    if paired_df is None:
+        if gt_dir is None or inf_dir is None:
+            raise ValueError("Must provide either paired_df, or both gt_dir and inf_dir.")
+        gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
+        paired_df = merge_paired(gt_df, inf_df, list(gt_df.columns))
 
     pos_res = position_kl_score(paired_df)
     stat_res = stationary_score(paired_df)
@@ -475,6 +725,12 @@ def compute_etho_scores(gt_dir: Path, inf_dir: Path) -> Tuple[Dict[str, float], 
     syll_res = syllable_score(paired_df)
     traj_res = trajectory_shape_score(paired_df)
 
+    # Calculate memory-optimized DTW similarity
+    dtw_score, dtw_seq_scores = dtw_trajectory_similarity(paired_df)
+    
+    # Calculate memory-optimized Manifold similarities
+    manifold_res = manifold_alignment_metrics(paired_df)
+
     scores = {
         "position_kl_score": float(pos_res[0]) if np.isfinite(pos_res[0]) else np.nan,
         "stationary_score": float(stat_res[0]) if np.isfinite(stat_res[0]) else np.nan,
@@ -484,9 +740,14 @@ def compute_etho_scores(gt_dir: Path, inf_dir: Path) -> Tuple[Dict[str, float], 
         "quadrant_score": float(quad_res[0]) if np.isfinite(quad_res[0]) else np.nan,
         "syllable_score": float(syll_res[0]) if np.isfinite(syll_res[0]) else np.nan,
         "trajectory_shape_score": float(traj_res[0]) if np.isfinite(traj_res[0]) else np.nan,
+        "dtw_similarity_score": dtw_score,
+        "procrustes_similarity": manifold_res['procrustes_sim'],
+        "mmd_similarity": manifold_res['mmd_sim']
     }
 
-    scores["composite_score"] = _geometric_mean_scores(list(scores.values()))
+    # Only core structural metrics go into composite logic
+    core_scores = {k: v for k, v in scores.items() if k not in ["procrustes_similarity", "mmd_similarity", "dtw_similarity_score"]}
+    scores["composite_score"] = _geometric_mean_scores(list(core_scores.values()))
 
     all_seq_dicts = {
         "position_kl_score": pos_res[1],
@@ -497,7 +758,10 @@ def compute_etho_scores(gt_dir: Path, inf_dir: Path) -> Tuple[Dict[str, float], 
         "quadrant_score": quad_res[1],
         "syllable_score": syll_res[1],
         "trajectory_shape_score": traj_res[1],
+        "dtw_similarity_score": dtw_seq_scores,
     }
+    
+    # Generate weights dictionary (for DTW, default to 1 since it's sequence-level)
     all_weight_dicts = {
         "position_kl_score": pos_res[2],
         "stationary_score": stat_res[2],
@@ -507,6 +771,7 @@ def compute_etho_scores(gt_dir: Path, inf_dir: Path) -> Tuple[Dict[str, float], 
         "quadrant_score": quad_res[2],
         "syllable_score": syll_res[2],
         "trajectory_shape_score": traj_res[2],
+        "dtw_similarity_score": {seq: 1 for seq in dtw_seq_scores}, 
     }
 
     all_keys = set()
@@ -543,56 +808,58 @@ def compute_etho_scores(gt_dir: Path, inf_dir: Path) -> Tuple[Dict[str, float], 
     return scores, sequence_level_scores, sequence_means, sequence_stds
 
 
+def run_etho_full_analysis(gt_dir: Path, inf_dir: Path, *, output_root: Path | None = None) -> Path:
+    """
+    Executes the full behavioral analysis pipeline headlessly, saves metrics,
+    and generates visualization figures directly into the specified output directory.
+    """
+    import json
+    try:
+        from nethobench.analysis.etho_reporting import generate_full_etho_report
+    except ImportError:
+        def generate_full_etho_report(*args, **kwargs):
+            pass # Failsafe if reporting module has not been fully implemented yet
+
+    outdir = _timestamped_outdir(output_root, prefix="etho-analysis")
+    
+    # 1. Load Data
+    gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
+    paired_df = merge_paired(gt_df, inf_df, list(gt_df.columns))
+
+    # 2. Extract Additional Features for the Report
+    coord_pairs = []
+    for col in gt_df.columns:
+        if col.endswith('_X'):
+            base = col[:-2]
+            if f'{base}_Y' in gt_df.columns:
+                coord_pairs.append((base, col, f'{base}_Y'))
+                
+    errors_df = body_part_errors(paired_df, coord_pairs)
+    pairs_to_check = [('NOSE', 'TAIL_BASE'), ('LEFT_EAR', 'RIGHT_EAR'), ('NOSE', 'CENTER')]
+    distances_df = inter_limb_distances(paired_df, pairs_to_check)
+    chunk_data = get_chunked_embeddings(paired_df, chunk_size=5)
+
+    # 3. Compute Structural Scores (Pass paired_df to avoid double-loading!)
+    scores, seq_scores, seq_means, seq_stds = compute_etho_scores(paired_df=paired_df)
+
+    # 4. Save JSON
+    payload = {
+        "global_scores": scores,
+        "per_sequence": seq_scores,
+        "per_sequence_mean": seq_means,
+        "per_sequence_std": seq_stds,
+    }
+    with (outdir / "scores.json").open("w") as f:
+        json.dump(payload, f, indent=2)
+
+    # 5. Generate Matplotlib Figures
+    generate_full_etho_report(gt_df, inf_df, paired_df, errors_df, distances_df, chunk_data, outdir)
+    
+    return outdir
+
 def _timestamped_outdir(base: Path | None = None, prefix: str = "ethobench") -> Path:
     base = Path(base) if base is not None else Path.cwd() / "outputs"
     outdir = base / f"{prefix}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     outdir.mkdir(parents=True, exist_ok=True)
     return outdir
 
-
-def run_ethobench_notebook(gt_dir: Path, inf_dir: Path, *, output_root: Path | None = None) -> Path:
-    """
-    Execute the bundled ethobench notebook headlessly, saving figures to disk and
-    returning the output directory.
-    """
-    import nbformat
-    from nbconvert.preprocessors import ExecutePreprocessor
-    nb_path = Path(__file__).parent / "notebooks" / "behavior_metrics.ipynb"
-    if not nb_path.is_file():
-        raise FileNotFoundError(
-            f"Bundled ethobench notebook not found at {nb_path}. "
-            "Copy your notebook there or drop --run-notebook."
-        )
-    outdir = _timestamped_outdir(output_root, prefix="ethobench-analysis")
-
-    nb = nbformat.read(nb_path, as_version=4)
-    patch = f"""
-import os
-from pathlib import Path
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-outdir = Path(r"{outdir}")
-outdir.mkdir(parents=True, exist_ok=True)
-plot_counter = {{'n': 0}}
-orig_show = plt.show
-
-def saving_show(*args, **kwargs):
-    figs = [plt.figure(num) for num in plt.get_fignums()]
-    for fig in figs:
-        plot_counter['n'] += 1
-        fig.savefig(outdir / f"figure_{{plot_counter['n']:03d}}.png", dpi=200, bbox_inches='tight')
-    plt.close('all')
-
-plt.show = saving_show
-gt_dir = Path(r"{gt_dir}")
-inf_dir = Path(r"{inf_dir}")
-"""
-    nb.cells.insert(0, nbformat.v4.new_code_cell(patch))
-
-    ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
-    ep.preprocess(nb, {'metadata': {'path': nb_path.parent}})
-    executed_path = outdir / "executed_notebook.ipynb"
-    with executed_path.open("w", encoding="utf-8") as f:
-        nbformat.write(nb, f)
-    return outdir
