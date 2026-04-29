@@ -205,7 +205,7 @@ def _compute_scores_from_arrays(gt_arr: np.ndarray, pred_arr: np.ndarray) -> Dic
     return flat_scores
 
 
-def compute_legacy_neuro_scores(
+def compute_composite_scores(
     predictions_csv: Path,
     ground_truth_csv: Path,
     *,

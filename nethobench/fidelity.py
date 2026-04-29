@@ -6,7 +6,7 @@ from typing import Dict, Optional
 import numpy as np
 
 from .analysis.score_definitions import compute_fidelity_composite
-from .legacy.legacy_metrics import compute_legacy_neuro_scores
+from .analysis.composite_scores import compute_composite_scores
 
 
 def compute_fidelity_scores(
@@ -17,7 +17,7 @@ def compute_fidelity_scores(
     neuro_cols: Optional[list[str]] = None,
     ddconfig_path: Optional[Path] = None,
 ) -> Dict[str, float]:
-    legacy_scores = compute_legacy_neuro_scores(
+    legacy_scores = compute_composite_scores(
         predictions_csv,
         ground_truth_csv,
         per_sequence_stats=per_sequence_stats,

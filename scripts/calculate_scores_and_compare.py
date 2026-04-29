@@ -50,30 +50,26 @@ etho_preds = [
 if __name__ == "__main__":
 
     for gt, preds in neural_tuples:
-        if False:
-            cmd = ["nethobench", "neuro-scores", "--gt", f"{gt}",  "--preds",  f"{preds}"]
-            r = subprocess.run(cmd)
-            assert r.returncode == 0, f"neuro-scores: {' '.join(cmd)}"
+        cmd = ["nethobench", "neuro-scores", "--gt", f"{gt}",  "--preds",  f"{preds}"]
+        r = subprocess.run(cmd)
+        assert r.returncode == 0, f"neuro-scores: {' '.join(cmd)}"
 
-            cmd = ["nethobench", "neuro-analysis", "--gt", f"{gt}",  "--preds",  f"{preds}"]
-            r = subprocess.run(cmd)
-            assert r.returncode == 0, f"neuro-analysis: {' '.join(cmd)}"
+        cmd = ["nethobench", "neuro-analysis", "--gt", f"{gt}",  "--preds",  f"{preds}"]
+        r = subprocess.run(cmd)
+        assert r.returncode == 0, f"neuro-analysis: {' '.join(cmd)}"
 
         cmd = ["nethobench",  "fidelity-scores", "--gt",  f"{gt}",  "--preds", f"{preds}"]
         r = subprocess.run(cmd)
         assert r.returncode == 0, f"fidelity-scores: {' '.join(cmd)}"
 
-
-    if False:
-
-        for preds in etho_preds:
-            cmd = ["nethobench", "etho-scores", "--gt-dir", "data/behavioural/gt.parquet", "--inf-dir", f"{preds}"]
-            r = subprocess.run(cmd)
-            assert r.returncode == 0, f"etho-scores: {' '.join(cmd)}"
-
-        cmd = ["nethobench", "cross-scores", "--gt", "data/cross/gt/cross-gt-behavior-neuro.csv", "--preds", "data/cross/predictions/sequifier-cross-noisy-behavior-neuro-last-100.csv"]
+    for preds in etho_preds:
+        cmd = ["nethobench", "etho-scores", "--gt-dir", "data/behavioural/gt.parquet", "--inf-dir", f"{preds}"]
         r = subprocess.run(cmd)
-        assert r.returncode == 0, f"cross-scores: {' '.join(cmd)}"
+        assert r.returncode == 0, f"etho-scores: {' '.join(cmd)}"
+
+    cmd = ["nethobench", "cross-scores", "--gt", "data/cross/gt/cross-gt-behavior-neuro.csv", "--preds", "data/cross/predictions/sequifier-cross-noisy-behavior-neuro-last-100.csv"]
+    r = subprocess.run(cmd)
+    assert r.returncode == 0, f"cross-scores: {' '.join(cmd)}"
 
 
     my_repo = "."
