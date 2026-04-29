@@ -3,7 +3,6 @@ from pathlib import Path
 import numpy as np
 import contextlib
 import io
-from datetime import datetime
 
 from typing import Optional
 
@@ -100,6 +99,6 @@ def _quiet_call(func, *args, **kwargs):
 
 def _timestamped_outdir(base: Path | None = None, prefix: str = "ethobench") -> Path:
     base = Path(base) if base is not None else Path.cwd() / "outputs"
-    outdir = base / f"{prefix}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    outdir = base / f"{prefix}"
     outdir.mkdir(parents=True, exist_ok=True)
     return outdir

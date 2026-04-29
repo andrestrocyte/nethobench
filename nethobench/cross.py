@@ -383,7 +383,6 @@ def run_cross_full_analysis(
     """
     Execute the full cross-modal analysis natively, saving JSON metrics and rendering plots.
     """
-    from datetime import datetime
     try:
         from .analysis.cross_reporting import generate_full_cross_report
     except ImportError:
@@ -392,8 +391,7 @@ def run_cross_full_analysis(
 
     # Set up output directory
     outdir_root = Path(output_root) if output_root else Path.cwd() / "outputs"
-    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-    outdir = outdir_root / f"cross-analysis-{Path(predictions_csv).stem}-{timestamp}"
+    outdir = outdir_root / f"cross-analysis-{Path(predictions_csv).stem}"
     outdir.mkdir(parents=True, exist_ok=True)
 
     # Compute all cross-modal scores

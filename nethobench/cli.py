@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import argparse
-from datetime import datetime
 import json
 from pathlib import Path
 from typing import Iterable, Optional
