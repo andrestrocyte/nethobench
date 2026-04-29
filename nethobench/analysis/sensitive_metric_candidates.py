@@ -6,7 +6,7 @@ from typing import Callable
 import numpy as np
 from scipy import signal
 from sklearn.decomposition import PCA
-
+from nethobench.calculation import _align_arrays
 try:
     from ripser import ripser
 except Exception:  # pragma: no cover - optional dependency during development
@@ -38,16 +38,6 @@ class CorruptionSpec:
     apply_fn: CorruptionFn
 
 
-def _align_arrays(gt: Array3D, pred: Array3D) -> tuple[Array3D, Array3D]:
-    gt = np.asarray(gt, dtype=np.float64)
-    pred = np.asarray(pred, dtype=np.float64)
-    if gt.shape[1] != pred.shape[1]:
-        m = min(gt.shape[1], pred.shape[1])
-        gt = gt[:, :m, :]
-        pred = pred[:, :m, :]
-    if gt.shape != pred.shape:
-        raise ValueError(f"Aligned mismatch: {gt.shape} vs {pred.shape}")
-    return gt, pred
 
 
 def _finite_rows(X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

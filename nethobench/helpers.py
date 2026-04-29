@@ -5,7 +5,6 @@ import numpy as np
 import contextlib
 import io
 from typing import Optional
-# Assuming these are available in your broader module context
 
 
 def _clip01(x: float, eps: float = 1e-6) -> float:

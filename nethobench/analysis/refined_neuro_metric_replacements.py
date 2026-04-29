@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy.stats import kurtosis, skew, spearmanr
-
+from nethobench.calculation import _align_arrays
 from nethobench.analysis.sensitive_metric_candidates import (
     EPS,
     _align_arrays,
@@ -81,30 +81,6 @@ def _metric_display_name(metric_key: str) -> str:
     }
     return names.get(metric_key, metric_key)
 
-
-def _align_common_arrays(
-    gt_arr: np.ndarray, pred_arr: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
-    gt = np.asarray(gt_arr, dtype=np.float64)
-    pred = np.asarray(pred_arr, dtype=np.float64)
-    if gt.ndim != 3 or pred.ndim != 3:
-        raise ValueError(
-            f"Expected 3D arrays [n_seq, T, n_reg], got {gt.shape} and {pred.shape}"
-        )
-    if gt.shape[0] != pred.shape[0] or gt.shape[2] != pred.shape[2]:
-        raise ValueError(
-            f"GT/pred sequence-region mismatch: {gt.shape} vs {pred.shape}"
-        )
-    gt_len = gt.shape[1]
-    pred_len = pred.shape[1]
-    if pred_len != gt_len and pred_len % gt_len == 0:
-        factor = pred_len // gt_len
-        pred = pred.reshape(pred.shape[0], gt_len, factor, pred.shape[2]).mean(axis=2)
-    elif gt_len != pred_len:
-        keep = min(gt_len, pred_len)
-        gt = gt[:, :keep, :]
-        pred = pred[:, :keep, :]
-    return gt, pred
 
 
 def _safe_spearman01(x: np.ndarray, y: np.ndarray) -> float:
@@ -287,7 +263,7 @@ def _binary_clustering(adj: np.ndarray) -> np.ndarray:
 
 
 def _final_moment_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
-    gt, pred = _align_common_arrays(gt_arr, pred_arr)
+    gt, pred = _align_arrays(gt_arr, pred_arr)
     gt_feats = _moment_feature_arrays(gt)
     pred_feats = _moment_feature_arrays(pred)
     components = {}
@@ -339,7 +315,7 @@ def _perfected_moment_score_legacy(gt_arr: np.ndarray, pred_arr: np.ndarray) -> 
 
 
 def _final_graph_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
-    gt, pred = _align_common_arrays(gt_arr, pred_arr)
+    gt, pred = _align_arrays(gt_arr, pred_arr)
     corr_gt = _corrcoef_from_flat(gt)
     corr_pred = _corrcoef_from_flat(pred)
     if corr_gt is None or corr_pred is None or corr_gt.shape != corr_pred.shape:

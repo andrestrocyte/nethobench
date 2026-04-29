@@ -18,6 +18,7 @@ from nethobench.analysis.direct_neuro_metrics import (
 from nethobench.analysis.additional_neuro_metrics import (
     compute_additional_structural_metrics,
 )
+from nethobench.calculation import _iqr_robust
 
 EPS = 1e-12
 
@@ -26,17 +27,6 @@ EPS = 1e-12
 # ---------------------------------------------------------
 
 
-def _iqr_robust(x: np.ndarray) -> float:
-    x = np.asarray(x, dtype=np.float64)
-    x = x[np.isfinite(x)]
-    if x.size < 10:
-        s = np.nanstd(x)
-        return float(s if np.isfinite(s) and s > 0 else 1.0)
-    q25, q75 = np.nanquantile(x, [0.25, 0.75])
-    s = float(q75 - q25)
-    if not np.isfinite(s) or s <= 0:
-        s = float(np.nanstd(x))
-    return float(s if np.isfinite(s) and s > 0 else 1.0)
 
 
 def _topq_mean(x: np.ndarray, q: float = 0.25) -> float:

@@ -3,70 +3,33 @@ from pathlib import Path
 import numpy as np
 import contextlib
 import io
-import json
-from typing import Optional, Dict
 import tempfile
 
-from nethobench.analysis.neuro_scoring import calculate_neuro_composites
-from nethobench.analysis.neuro_reporting import generate_full_neuro_report
-from nethobench.helpers import _load_and_align, _timestamped_outdir
 
 
-def _compute_scores_from_arrays(
-    gt: np.ndarray,
-    pred: np.ndarray,
-    *,
-    region_names: Optional[list[str]] = None,
-    ddconfig_path: Optional[Path] = None,
-) -> Dict[str, float]:
+def _align_arrays(
+    gt_arr: np.ndarray, pred_arr: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    gt = np.asarray(gt_arr, dtype=np.float64)
+    pred = np.asarray(pred_arr, dtype=np.float64)
     if gt.ndim != 3 or pred.ndim != 3:
-        raise ValueError("Expected gt/pred arrays with shape [n_seq, n_time, n_reg].")
-    if gt.shape != pred.shape:
-        raise ValueError(f"Shape mismatch: {gt.shape} vs {pred.shape}")
-
-    n_seq, n_time, n_reg = gt.shape
-    region_names = region_names or [f"R{i}" for i in range(n_reg)]
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir_path = Path(tmpdir)
-        gt_path = tmpdir_path / "gt.csv"
-        pred_path = tmpdir_path / "pred.csv"
-
-        seq_ids = np.repeat(np.arange(n_seq), n_time)
-        item_pos = np.tile(np.arange(n_time), n_seq)
-
-        gt_df = pd.DataFrame(gt.reshape(-1, n_reg), columns=region_names)
-        gt_df.insert(0, "itemPosition", item_pos)
-        gt_df.insert(0, "sequenceId", seq_ids)
-        gt_df.to_csv(gt_path, index=False)
-
-        pred_df = pd.DataFrame(pred.reshape(-1, n_reg), columns=region_names)
-        pred_df.index = seq_ids
-        pred_df.to_csv(pred_path)
-
-        return run_neuro_full_analysis(pred_path, gt_path)
-
-
-def run_neuro_full_analysis(
-    predictions_csv: Path,
-    ground_truth_csv: Path,
-    output_root: Optional[Path] = None,
-) -> Dict[str, object]:
-    """
-    Execute the active neuro notebook headlessly, save figures, and export notebook-derived scores.
-    """
-    preds_path = Path(predictions_csv)
-    outdir = _timestamped_outdir(output_root, prefix=preds_path.stem)
-    gt_arr, pred_arr, region_names = _load_and_align(preds_path, Path(ground_truth_csv))
-
-    scores = calculate_neuro_composites(gt_arr, pred_arr)
-
-    generate_full_neuro_report(gt_arr, pred_arr, region_names, scores, outdir)
-
-    scores_path = outdir / "scores.json"
-    scores_path.write_text(json.dumps(scores, indent=2))
-    return scores
-
+        raise ValueError(
+            f"Expected [n_seq, T, n_reg] arrays, got {gt.shape} and {pred.shape}"
+        )
+    if gt.shape[0] != pred.shape[0] or gt.shape[2] != pred.shape[2]:
+        raise ValueError(
+            f"GT/pred sequence-region mismatch: {gt.shape} vs {pred.shape}"
+        )
+    if pred.shape[1] != gt.shape[1] and pred.shape[1] % gt.shape[1] == 0:
+        factor = pred.shape[1] // gt.shape[1]
+        pred = pred.reshape(pred.shape[0], gt.shape[1], factor, pred.shape[2]).mean(
+            axis=2
+        )
+    elif pred.shape[1] != gt.shape[1]:
+        keep = min(gt.shape[1], pred.shape[1])
+        gt = gt[:, :keep, :]
+        pred = pred[:, :keep, :]
+    return gt, pred
 
 
 
@@ -95,7 +58,7 @@ def quiet_scores_from_arrays(
     """Computes neuro scores headlessly by suppressing stdout/stderr."""
     sink = io.StringIO()
     with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-        return _compute_scores_from_arrays(gt_arr, pred_arr, region_names=region_names)
+        return load_and_run_neuro_full_analysis(gt_arr, pred_arr, region_names=region_names)
 
 
 
@@ -111,3 +74,15 @@ def dataset_to_sequence_frame(arr: np.ndarray, region_names: list[str]) -> pd.Da
     df.insert(0, "sequenceId", seq_ids)
     return df
 
+
+def _iqr_robust(x: np.ndarray) -> float:
+    x = np.asarray(x, dtype=np.float64)
+    x = x[np.isfinite(x)]
+    if x.size < 10:
+        s = np.nanstd(x)
+        return float(s if np.isfinite(s) and s > 0 else 1.0)
+    q25, q75 = np.nanquantile(x, [0.25, 0.75])
+    s = float(q75 - q25)
+    if not np.isfinite(s) or s <= 0:
+        s = float(np.nanstd(x))
+    return float(s if np.isfinite(s) and s > 0 else 1.0)

@@ -6,33 +6,9 @@ from scipy.linalg import subspace_angles
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.covariance import LedoitWolf
 from sklearn.feature_selection import mutual_info_regression
-
+from nethobench.calculation import _align_arrays
 EPS = 1e-9
 
-
-def _align_arrays(
-    gt_arr: np.ndarray, pred_arr: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
-    gt = np.asarray(gt_arr, dtype=np.float64)
-    pred = np.asarray(pred_arr, dtype=np.float64)
-    if gt.ndim != 3 or pred.ndim != 3:
-        raise ValueError(
-            f"Expected [n_seq, T, n_reg] arrays, got {gt.shape} and {pred.shape}"
-        )
-    if gt.shape[0] != pred.shape[0] or gt.shape[2] != pred.shape[2]:
-        raise ValueError(
-            f"GT/pred sequence-region mismatch: {gt.shape} vs {pred.shape}"
-        )
-    if pred.shape[1] != gt.shape[1] and pred.shape[1] % gt.shape[1] == 0:
-        factor = pred.shape[1] // gt.shape[1]
-        pred = pred.reshape(pred.shape[0], gt.shape[1], factor, pred.shape[2]).mean(
-            axis=2
-        )
-    elif pred.shape[1] != gt.shape[1]:
-        keep = min(gt.shape[1], pred.shape[1])
-        gt = gt[:, :keep, :]
-        pred = pred[:, :keep, :]
-    return gt, pred
 
 
 def _pooled_rows(arr: np.ndarray) -> np.ndarray:

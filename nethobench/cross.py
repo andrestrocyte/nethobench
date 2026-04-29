@@ -10,7 +10,7 @@ from sklearn.cross_decomposition import CCA
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from nethobench.helpers import _clip01, _geometric_mean_scores
-from nethobench.calculation import _compute_scores_from_arrays
+from nethobench.analysis.neuro_analysis import load_and_run_neuro_full_analysis
 from nethobench.etho import (
     position_kl_score,
     quadrant_score,
@@ -314,7 +314,7 @@ def compute_cross_scores(
     # --- Neuro axis ---
     gt_neuro = _arrays_from_aligned(aligned, neuro_cols, "gt", cfg)
     pr_neuro = _arrays_from_aligned(aligned, neuro_cols, "inf", cfg)
-    neuro_scores = _compute_scores_from_arrays(
+    neuro_scores = load_and_run_neuro_full_analysis(
         gt_neuro, pr_neuro, region_names=neuro_cols
     )
 

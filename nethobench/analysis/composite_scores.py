@@ -15,23 +15,8 @@ from nethobench.analysis.score_definitions import (
 )
 from nethobench.analysis.neuro_reporting import generate_full_neuro_report
 from nethobench.helpers import _load_and_align
+from nethobench.calculation import _iqr_robust
 
-# --- Sequence Loading & Alignment Helpers ---
-
-# --- Legacy Fidelity Implementations ---
-
-
-def _robust_iqr(x: np.ndarray) -> float:
-    x = np.asarray(x, dtype=np.float64)
-    x = x[np.isfinite(x)]
-    if x.size < 10:
-        s = np.nanstd(x)
-        return float(s if np.isfinite(s) and s > 1e-12 else 1.0)
-    q25, q75 = np.nanquantile(x, [0.25, 0.75])
-    s = float(q75 - q25)
-    if not np.isfinite(s) or s <= 1e-12:
-        s = float(np.nanstd(x))
-    return float(s if np.isfinite(s) and s > 1e-12 else 1.0)
 
 
 def _robust_median_mad(x: np.ndarray) -> tuple[float, float]:
@@ -47,7 +32,7 @@ def _robust_median_mad(x: np.ndarray) -> tuple[float, float]:
 
 def compute_error_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
     n_seq, _, n_reg = gt_arr.shape
-    iqr_gt = np.array([_robust_iqr(gt_arr[:, :, r].reshape(-1)) for r in range(n_reg)])
+    iqr_gt = np.array([_iqr_robust(gt_arr[:, :, r].reshape(-1)) for r in range(n_reg)])
     nrmse_sr = np.full((n_seq, n_reg), np.nan)
 
     for i in range(n_seq):
@@ -129,7 +114,7 @@ def compute_mi_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
 # --- Core Scoring Functions ---
 
 
-def _compute_scores_from_arrays(
+def load_and_run_neuro_full_analysis(
     gt_arr: np.ndarray, pred_arr: np.ndarray
 ) -> Dict[str, float]:
     """Computes legacy composites directly from in-memory arrays."""
@@ -179,4 +164,4 @@ def compute_composite_scores(
         neuro_cols=neuro_cols,
     )
 
-    return _compute_scores_from_arrays(gt, pred)
+    return load_and_run_neuro_full_analysis(gt, pred)

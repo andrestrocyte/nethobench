@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from nethobench.fidelity import compute_fidelity_scores
-from nethobench.calculation import _compute_scores_from_arrays
+from nethobench.analysis.neuro_analysis import load_and_run_neuro_full_analysis
 from nethobench.analysis.score_definitions import NEURO_FAMILY_WEIGHTS
 from nethobench.helpers import (
     get_region_names,
