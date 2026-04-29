@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 
 
-ACTIVE_LEGACY_NOTEBOOK = Path(__file__).parent / "notebooks" / "neuro_metrics_legacy.ipynb"
 ACTIVE_LEGACY_CORE_SCRIPT = Path(__file__).parent / "legacy_neuro_core_script.py"
 
 
@@ -131,10 +130,8 @@ def _run_legacy_notebook(
             "WRAPPED_NOTEBOOK_PATH": str(Path(save_wrapped_notebook)) if save_wrapped_notebook is not None else None,
             "ENABLE_PLOTS": bool(save_plots_dir is not None),
             "__name__": "__main__",
-            "ACTIVE_NEURO_NOTEBOOK": str(ACTIVE_LEGACY_NOTEBOOK),
         }
         env = runpy.run_path(str(ACTIVE_LEGACY_CORE_SCRIPT), init_globals=init_globals)
-        env["ACTIVE_NEURO_NOTEBOOK"] = str(ACTIVE_LEGACY_NOTEBOOK)
         env["ACTIVE_NEURO_CORE_SCRIPT"] = str(ACTIVE_LEGACY_CORE_SCRIPT)
         return env, _flatten_scores(env)
     finally:
