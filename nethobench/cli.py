@@ -202,7 +202,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     neuro_full.add_argument("--gt", help="Ground-truth neural CSV (auto-detected if omitted).")
     neuro_full.add_argument("--preds", help="Predicted neural CSV (auto-detected if omitted).")
-    neuro_full.add_argument("--ddconfig", required=True, help="ddconfig JSON used by the notebook.")
     neuro_full.add_argument("--output-root", type=Path, help="Output root (default ./outputs/).")
     neuro_full.set_defaults(func=_run_neuro_full)
 
@@ -296,10 +295,9 @@ def _run_fidelity(args: argparse.Namespace) -> None:
 def _run_neuro_full(args: argparse.Namespace) -> None:
     gt = _prompt_for_file("ground-truth", "gt_", args.gt)
     preds = _prompt_for_file("inference", "inference_", args.preds)
-    out = _quiet_call(run_neuro_full_analysis, preds, gt, Path(args.ddconfig), output_root=args.output_root)
+    out = _quiet_call(run_neuro_full_analysis, preds, gt, output_root=args.output_root)
     _print_scores("Neuro analysis scores", out["scores"])
     print(f"\nSaved scores to {out['scores_path']}")
-    print(f"Wrapped notebook saved to {out['wrapped_notebook']}")
     print(f"Plots and outputs under {out['output_dir']}")
 
 

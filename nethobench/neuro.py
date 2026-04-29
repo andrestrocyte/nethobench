@@ -9,7 +9,9 @@ from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
-
+from nethobench.analysis.neuro_scoring import calculate_neuro_composites
+from nethobench.helpers import load_gt_and_preds
+from nethobench.analysis.neuro_reporting import generate_full_neuro_report
 
 ACTIVE_NEURO_NOTEBOOK = Path(__file__).parent / "notebooks" / "neuro_metrics.ipynb"
 ACTIVE_NEURO_CORE_SCRIPT = Path(__file__).parent / "analysis" / "neuro_metrics_core_script.py"
@@ -135,38 +137,6 @@ def _patch_runtime_lines(
     return "\n".join(lines)
 
 
-def _run_active_neuro_notebook(
-    predictions_csv: Path,
-    ground_truth_csv: Path,
-    *,
-    ddconfig_path: Optional[Path] = None,
-    save_plots_dir: Optional[Path] = None,
-    save_wrapped_notebook: Optional[Path] = None,
-) -> tuple[dict, Dict[str, float]]:
-    if not ACTIVE_NEURO_CORE_SCRIPT.is_file():
-        raise FileNotFoundError(f"Active neuro core script missing at {ACTIVE_NEURO_CORE_SCRIPT}")
-
-    dd_path, cleanup_path = _ensure_ddconfig(ddconfig_path)
-    try:
-        init_globals = {
-            "preds_fname": str(Path(predictions_csv)),
-            "gt_fname": str(Path(ground_truth_csv)),
-            "ddconfig_path": str(dd_path),
-            "SAVE_PLOTS_DIR": str(Path(save_plots_dir)) if save_plots_dir is not None else None,
-            "WRAPPED_NOTEBOOK_PATH": str(Path(save_wrapped_notebook)) if save_wrapped_notebook is not None else None,
-            "ENABLE_PLOTS": bool(save_plots_dir is not None),
-            "__name__": "__main__",
-            "ACTIVE_NEURO_NOTEBOOK": str(ACTIVE_NEURO_NOTEBOOK),
-        }
-        env = runpy.run_path(str(ACTIVE_NEURO_CORE_SCRIPT), init_globals=init_globals)
-        env["ACTIVE_NEURO_NOTEBOOK"] = str(ACTIVE_NEURO_NOTEBOOK)
-        env["ACTIVE_NEURO_CORE_SCRIPT"] = str(ACTIVE_NEURO_CORE_SCRIPT)
-        return env, _flatten_active_notebook_scores(env)
-    finally:
-        if cleanup_path and cleanup_path.exists():
-            cleanup_path.unlink(missing_ok=True)
-
-
 def _execute_full_neuro_notebook(
     predictions_csv: Path,
     ground_truth_csv: Path,
@@ -269,9 +239,8 @@ def _compute_scores_from_arrays(
         pred_df.index = seq_ids
         pred_df.to_csv(pred_path)
 
-        _, scores = _run_active_neuro_notebook(pred_path, gt_path, ddconfig_path=ddconfig_path)
+        _, scores = run_neuro_full_analysis(pred_path, gt_path)
         return scores
-
 
 def compute_neuro_scores(
     predictions_csv: Path,
@@ -281,26 +250,19 @@ def compute_neuro_scores(
     neuro_cols: Optional[list[str]] = None,
     ddconfig_path: Optional[Path] = None,
 ) -> Dict[str, float]:
-    """
-    Compute neural plausibility scores using the bundled benchmark notebook logic.
-    """
+    
     if per_sequence_stats:
         raise ValueError("per_sequence_stats is not supported for notebook-based neuro scores.")
 
-    if neuro_cols:
-        gt, pred, overlap = _load_and_align(
-            Path(predictions_csv),
-            Path(ground_truth_csv),
-            neuro_cols=neuro_cols,
-        )
-        return _compute_scores_from_arrays(gt, pred, region_names=overlap, ddconfig_path=ddconfig_path)
-
-    _, scores = _run_active_neuro_notebook(
+    # 1. Use the existing helper to load CSVs and reshape them into 3D tensors
+    # shape: [n_sequences, n_timesteps, n_regions]
+    gt_arr, pred_arr, overlap = _load_and_align(
         Path(predictions_csv),
         Path(ground_truth_csv),
-        ddconfig_path=ddconfig_path,
+        neuro_cols=neuro_cols,
     )
-    return scores
+    
+    return calculate_neuro_composites(gt_arr, pred_arr)
 
 
 def _timestamped_outdir(base: Optional[Path] = None, stem: Optional[str] = None) -> Path:
@@ -309,12 +271,9 @@ def _timestamped_outdir(base: Optional[Path] = None, stem: Optional[str] = None)
     outdir.mkdir(parents=True, exist_ok=True)
     return outdir
 
-
 def run_neuro_full_analysis(
     predictions_csv: Path,
     ground_truth_csv: Path,
-    ddconfig_path: Path,
-    *,
     output_root: Optional[Path] = None,
 ) -> Dict[str, object]:
     """
@@ -322,19 +281,11 @@ def run_neuro_full_analysis(
     """
     preds_path = Path(predictions_csv)
     outdir = _timestamped_outdir(output_root, stem=preds_path.stem)
-    wrapped_notebook = outdir / "wrapped_neuro_metrics.ipynb"
-    _execute_full_neuro_notebook(
-        preds_path,
-        Path(ground_truth_csv),
-        ddconfig_path=Path(ddconfig_path),
-        save_plots_dir=outdir,
-        save_wrapped_notebook=wrapped_notebook,
-    )
-    _, scores = _run_active_neuro_notebook(
-        preds_path,
-        Path(ground_truth_csv),
-        ddconfig_path=ddconfig_path,
-    )
+    gt_arr, pred_arr, region_names = _load_and_align(preds_path, Path(ground_truth_csv))
+    
+    scores = calculate_neuro_composites(gt_arr, pred_arr)
+
+    generate_full_neuro_report(gt_arr, pred_arr, region_names, scores, outdir)
 
     scores_path = outdir / "scores.json"
     scores_path.write_text(json.dumps(scores, indent=2))
@@ -342,5 +293,4 @@ def run_neuro_full_analysis(
         "output_dir": outdir,
         "scores": scores,
         "scores_path": scores_path,
-        "wrapped_notebook": wrapped_notebook,
     }

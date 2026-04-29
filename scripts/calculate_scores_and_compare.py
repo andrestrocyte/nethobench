@@ -51,7 +51,9 @@ if __name__ == "__main__":
 
     for gt, preds in neural_tuples:
         subprocess.run(["nethobench", "neuro-scores", "--gt", f"{gt}",  "--preds",  f"{preds}"])
+        subprocess.run(["nethobench", "neuro-analysis", "--gt", f"{gt}",  "--preds",  f"{preds}"])
         subprocess.run(["nethobench",  "fidelity-scores", "--gt",  f"{gt}",  "--preds", f"{preds}"])
+
 
     for preds in etho_preds:
         subprocess.run(["nethobench", "etho-scores", "--gt-dir", "data/behavioural/gt.parquet", "--inf-dir", f"{preds}"])

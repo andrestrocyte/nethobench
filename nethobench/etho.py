@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
+from nethobench.helpers import load_gt_and_preds
 
 
 def _clip01(x: float, eps: float = 1e-6) -> float:
@@ -460,14 +461,9 @@ def syllable_score(paired_df: pd.DataFrame, k: int = 8) -> Tuple[float, Dict[str
 
 
 def compute_etho_scores(gt_dir: Path, inf_dir: Path) -> Tuple[Dict[str, float], Dict[str, List[float]], Dict[str, float], Dict[str, float]]:
-    gt_df = pd.read_parquet(gt_dir)
-    inf_df = pd.read_parquet(inf_dir)
 
-    diff1 = set(list(gt_df.columns)).difference(set(list(inf_df.columns)))
-    diff2 = set(list(inf_df.columns)).difference(set(list(gt_df.columns)))
 
-    assert len(diff1) == 0 and len(diff2) == 0, f"Unequal cols found: in gt but not preds: {diff1}, in preds but not gt: {diff2}"
-
+    gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
     paired_df = merge_paired(gt_df, inf_df, list(gt_df.columns))
 
     pos_res = position_kl_score(paired_df)
