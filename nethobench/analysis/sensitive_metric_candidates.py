@@ -55,7 +55,9 @@ def _finite_rows(X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return X[mask], Y[mask]
 
 
-def _standardize_with_gt(Xg: np.ndarray, Xp: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def _standardize_with_gt(
+    Xg: np.ndarray, Xp: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     mu = np.mean(Xg, axis=0, keepdims=True)
     sd = np.std(Xg, axis=0, keepdims=True)
     sd = np.where(sd < EPS, 1.0, sd)
@@ -91,7 +93,9 @@ def _robust_scale(x: np.ndarray, floor: float = 0.05) -> float:
     return float(scale if np.isfinite(scale) and scale >= floor else floor)
 
 
-def _quantile_distance(x: np.ndarray, y: np.ndarray, qs: tuple[float, ...] = (0.1, 0.25, 0.5, 0.75, 0.9)) -> float:
+def _quantile_distance(
+    x: np.ndarray, y: np.ndarray, qs: tuple[float, ...] = (0.1, 0.25, 0.5, 0.75, 0.9)
+) -> float:
     x = np.asarray(x, dtype=np.float64)
     y = np.asarray(y, dtype=np.float64)
     x = x[np.isfinite(x)]
@@ -133,7 +137,9 @@ def _gt_hist_score(xg: np.ndarray, xp: np.ndarray, bins: int = 12) -> float:
     return _tv_score_from_hist(hg, hp)
 
 
-def _choose_k(Xg: np.ndarray, var_target: float = 0.9, k_min: int = 2, k_max: int = 8) -> int:
+def _choose_k(
+    Xg: np.ndarray, var_target: float = 0.9, k_min: int = 2, k_max: int = 8
+) -> int:
     k_fit = int(min(k_max, Xg.shape[1], Xg.shape[0] - 1))
     if k_fit < 2:
         return 1
@@ -143,7 +149,9 @@ def _choose_k(Xg: np.ndarray, var_target: float = 0.9, k_min: int = 2, k_max: in
     return int(np.clip(k, k_min, k_fit))
 
 
-def _fit_gt_pca_pooled(gt: Array3D, pred: Array3D, k_max: int = 8) -> tuple[np.ndarray, np.ndarray, np.ndarray, PCA]:
+def _fit_gt_pca_pooled(
+    gt: Array3D, pred: Array3D, k_max: int = 8
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, PCA]:
     Xg = gt.reshape(-1, gt.shape[-1])
     Xp = pred.reshape(-1, pred.shape[-1])
     Xg, Xp = _finite_rows(Xg, Xp)
@@ -188,13 +196,17 @@ def _crosscorr_1d(x: np.ndarray, y: np.ndarray, max_lag: int) -> np.ndarray:
     return full[center - max_lag : center + max_lag + 1].astype(np.float64)
 
 
-def _welch_relative_psd(x: np.ndarray, fs: float = 30.0) -> tuple[np.ndarray, np.ndarray]:
+def _welch_relative_psd(
+    x: np.ndarray, fs: float = 30.0
+) -> tuple[np.ndarray, np.ndarray]:
     x = np.asarray(x, dtype=np.float64)
     x = x[np.isfinite(x)]
     if x.size < 64:
         return np.array([]), np.array([])
     nperseg = min(256, x.size)
-    freqs, pxx = signal.welch(x, fs=fs, nperseg=nperseg, noverlap=min(nperseg // 2, nperseg - 1))
+    freqs, pxx = signal.welch(
+        x, fs=fs, nperseg=nperseg, noverlap=min(nperseg // 2, nperseg - 1)
+    )
     mask = freqs > 0
     freqs = freqs[mask]
     pxx = pxx[mask]
@@ -226,8 +238,16 @@ def _upper_triangle(C: np.ndarray) -> np.ndarray:
 def _lagged_corr_matrix(arr: Array3D, lag: int) -> np.ndarray | None:
     if arr.shape[1] <= lag + 2:
         return None
-    left = arr[:, :-lag, :].reshape(-1, arr.shape[-1]) if lag > 0 else arr.reshape(-1, arr.shape[-1])
-    right = arr[:, lag:, :].reshape(-1, arr.shape[-1]) if lag > 0 else arr.reshape(-1, arr.shape[-1])
+    left = (
+        arr[:, :-lag, :].reshape(-1, arr.shape[-1])
+        if lag > 0
+        else arr.reshape(-1, arr.shape[-1])
+    )
+    right = (
+        arr[:, lag:, :].reshape(-1, arr.shape[-1])
+        if lag > 0
+        else arr.reshape(-1, arr.shape[-1])
+    )
     mask = np.isfinite(left).all(axis=1) & np.isfinite(right).all(axis=1)
     left = left[mask]
     right = right[mask]
@@ -328,7 +348,9 @@ def _stratified_latent_clouds(
         clouds_p.append(Zp[idx])
     if not clouds_g or not clouds_p:
         return None, None
-    return np.vstack(clouds_g).astype(np.float64), np.vstack(clouds_p).astype(np.float64)
+    return np.vstack(clouds_g).astype(np.float64), np.vstack(clouds_p).astype(
+        np.float64
+    )
 
 
 def _ripser_diagrams(X: np.ndarray, *, maxdim: int = 1, n_perm: int = 64):
@@ -375,10 +397,14 @@ def _betti_curve(dgm: np.ndarray | None, grid: np.ndarray) -> np.ndarray:
     deaths = deaths[mask]
     if births.size == 0:
         return np.zeros_like(grid, dtype=np.float64)
-    return np.asarray([np.sum((births <= t) & (t < deaths)) for t in grid], dtype=np.float64)
+    return np.asarray(
+        [np.sum((births <= t) & (t < deaths)) for t in grid], dtype=np.float64
+    )
 
 
-def _betti_curve_similarity(dgm_g: np.ndarray | None, dgm_p: np.ndarray | None) -> float:
+def _betti_curve_similarity(
+    dgm_g: np.ndarray | None, dgm_p: np.ndarray | None
+) -> float:
     finite = []
     for dgm in (dgm_g, dgm_p):
         if dgm is None or len(dgm) == 0:
@@ -408,7 +434,7 @@ def _participation_ratio(X: np.ndarray) -> float:
     vals = vals[np.isfinite(vals) & (vals > 0)]
     if vals.size == 0:
         return np.nan
-    return float((np.sum(vals) ** 2) / (np.sum(vals ** 2) + EPS))
+    return float((np.sum(vals) ** 2) / (np.sum(vals**2) + EPS))
 
 
 def _pairwise_distances(X: np.ndarray) -> np.ndarray:
@@ -423,7 +449,9 @@ def _knn_distance_profile(X: np.ndarray, k: int = 5) -> np.ndarray:
         return np.array([], dtype=np.float64)
     D = _pairwise_distances(X)
     np.fill_diagonal(D, np.inf)
-    kth = np.partition(D, kth=min(k - 1, D.shape[1] - 1), axis=1)[:, min(k - 1, D.shape[1] - 1)]
+    kth = np.partition(D, kth=min(k - 1, D.shape[1] - 1), axis=1)[
+        :, min(k - 1, D.shape[1] - 1)
+    ]
     return kth[np.isfinite(kth)]
 
 
@@ -460,14 +488,20 @@ def trajectory_path_features_v3(gt: Array3D, pred: Array3D) -> dict:
         vp = np.diff(seq_p, axis=0)
         if vg.shape[0] < 4 or vp.shape[0] < 4:
             continue
+
         def _seq_features(z, v):
             path = np.sum(np.linalg.norm(v, axis=1))
             disp = np.linalg.norm(z[-1] - z[0])
-            radius = np.mean(np.linalg.norm(z - np.mean(z, axis=0, keepdims=True), axis=1))
+            radius = np.mean(
+                np.linalg.norm(z - np.mean(z, axis=0, keepdims=True), axis=1)
+            )
             persistence = disp / (path + EPS)
             speed = np.linalg.norm(v, axis=1)
             speed_lag1 = _corr_score(speed[1:], speed[:-1])
-            return np.array([path, disp, radius, persistence, speed_lag1], dtype=np.float64)
+            return np.array(
+                [path, disp, radius, persistence, speed_lag1], dtype=np.float64
+            )
+
         features_g.append(_seq_features(seq_g, vg))
         features_p.append(_seq_features(seq_p, vp))
     if not features_g:
@@ -475,7 +509,9 @@ def trajectory_path_features_v3(gt: Array3D, pred: Array3D) -> dict:
     fg = np.vstack(features_g)
     fp = np.vstack(features_p)
     denom = np.nanmean(np.abs(fg), axis=0) + EPS
-    distance = np.nanmean(np.abs(np.nanmean(fp, axis=0) - np.nanmean(fg, axis=0)) / denom)
+    distance = np.nanmean(
+        np.abs(np.nanmean(fp, axis=0) - np.nanmean(fg, axis=0)) / denom
+    )
     return {"score": _score_from_distance(distance)}
 
 
@@ -494,14 +530,26 @@ def trajectory_occupancy_velocity_v4(gt: Array3D, pred: Array3D) -> dict:
     occ_scores = []
     for dim in range(k):
         occ_scores.append(_gt_hist_score(Zg[:, dim], Zp[:, dim], bins=12))
-    Zg_seq = pca.transform(gt.reshape(-1, gt.shape[-1])).reshape(gt.shape[0], gt.shape[1], k)
-    Zp_seq = pca.transform(pred.reshape(-1, pred.shape[-1])).reshape(pred.shape[0], pred.shape[1], k)
+    Zg_seq = pca.transform(gt.reshape(-1, gt.shape[-1])).reshape(
+        gt.shape[0], gt.shape[1], k
+    )
+    Zp_seq = pca.transform(pred.reshape(-1, pred.shape[-1])).reshape(
+        pred.shape[0], pred.shape[1], k
+    )
     vg = np.diff(Zg_seq, axis=1).reshape(-1, k)
     vp = np.diff(Zp_seq, axis=1).reshape(-1, k)
-    speed_score = _score_from_distance(_quantile_distance(np.linalg.norm(vg, axis=1), np.linalg.norm(vp, axis=1)))
-    turn_g = np.sum(vg[1:] * vg[:-1], axis=1) / ((np.linalg.norm(vg[1:], axis=1) * np.linalg.norm(vg[:-1], axis=1)) + EPS)
-    turn_p = np.sum(vp[1:] * vp[:-1], axis=1) / ((np.linalg.norm(vp[1:], axis=1) * np.linalg.norm(vp[:-1], axis=1)) + EPS)
-    turn_score = _score_from_distance(_quantile_distance(turn_g, turn_p, qs=(0.1, 0.3, 0.5, 0.7, 0.9)))
+    speed_score = _score_from_distance(
+        _quantile_distance(np.linalg.norm(vg, axis=1), np.linalg.norm(vp, axis=1))
+    )
+    turn_g = np.sum(vg[1:] * vg[:-1], axis=1) / (
+        (np.linalg.norm(vg[1:], axis=1) * np.linalg.norm(vg[:-1], axis=1)) + EPS
+    )
+    turn_p = np.sum(vp[1:] * vp[:-1], axis=1) / (
+        (np.linalg.norm(vp[1:], axis=1) * np.linalg.norm(vp[:-1], axis=1)) + EPS
+    )
+    turn_score = _score_from_distance(
+        _quantile_distance(turn_g, turn_p, qs=(0.1, 0.3, 0.5, 0.7, 0.9))
+    )
     return {"score": float(np.nanmean(occ_scores + [speed_score, turn_score]))}
 
 
@@ -522,12 +570,15 @@ def bandpower_band_fraction_v2(gt: Array3D, pred: Array3D) -> dict:
     mean_p = np.nanmean(np.vstack(specs_p), axis=0)
     csum = np.cumsum(mean_g)
     splits = [np.searchsorted(csum, q) for q in (1.0 / 3.0, 2.0 / 3.0)]
-    bands = [slice(0, splits[0]), slice(splits[0], splits[1]), slice(splits[1], mean_g.size)]
+    bands = [
+        slice(0, splits[0]),
+        slice(splits[0], splits[1]),
+        slice(splits[1], mean_g.size),
+    ]
     frac_g = np.array([np.sum(mean_g[band]) for band in bands], dtype=np.float64)
     frac_p = np.array([np.sum(mean_p[band]) for band in bands], dtype=np.float64)
     score = 1.0 - 0.5 * np.sum(np.abs(frac_g - frac_p))
     return {"score": float(np.clip(score, 0.0, 1.0))}
-
 
 
 def pca_reconstruction_transfer_v4(gt: Array3D, pred: Array3D) -> dict:
@@ -547,11 +598,16 @@ def pca_reconstruction_transfer_v4(gt: Array3D, pred: Array3D) -> dict:
     Xp_rec = pca.inverse_transform(Zp)
     err_g = np.mean((Xg_z - Xg_rec) ** 2)
     err_p = np.mean((Xp_z - Xp_rec) ** 2)
-    var_g = np.mean(Xg_z ** 2)
-    var_p = np.mean(Xp_z ** 2)
+    var_g = np.mean(Xg_z**2)
+    var_p = np.mean(Xp_z**2)
     frac_g = 1.0 - (err_g / (var_g + EPS))
     frac_p = 1.0 - (err_p / (var_p + EPS))
-    var_score = _score_from_distance(np.mean(np.abs(np.var(Zp, axis=0) - np.var(Zg, axis=0)) / (np.var(Zg, axis=0) + 0.05)))
+    var_score = _score_from_distance(
+        np.mean(
+            np.abs(np.var(Zp, axis=0) - np.var(Zg, axis=0))
+            / (np.var(Zg, axis=0) + 0.05)
+        )
+    )
     rec_score = float(np.clip(frac_p / (frac_g + EPS), 0.0, 1.0))
     return {"score": float(np.clip(0.5 * rec_score + 0.5 * var_score, 0.0, 1.0))}
 
@@ -560,7 +616,7 @@ def pca_reconstruction_product_v6(gt: Array3D, pred: Array3D) -> dict:
     base = pca_reconstruction_transfer_v4(gt, pred).get("score", np.nan)
     if not np.isfinite(base):
         return {"score": np.nan}
-    return {"score": float(np.clip(base ** 2, 0.0, 1.0))}
+    return {"score": float(np.clip(base**2, 0.0, 1.0))}
 
 
 def autocorr_weighted_rmse_v4(gt: Array3D, pred: Array3D) -> dict:
@@ -569,13 +625,26 @@ def autocorr_weighted_rmse_v4(gt: Array3D, pred: Array3D) -> dict:
     weights = 1.0 / np.sqrt(np.arange(1, max_lag + 1, dtype=np.float64))
     region_scores = []
     for region in range(gt.shape[-1]):
-        ac_g = np.nanmean(np.vstack([_autocorr_1d(gt[s, :, region], max_lag) for s in range(gt.shape[0])]), axis=0)
-        ac_p = np.nanmean(np.vstack([_autocorr_1d(pred[s, :, region], max_lag) for s in range(pred.shape[0])]), axis=0)
+        ac_g = np.nanmean(
+            np.vstack(
+                [_autocorr_1d(gt[s, :, region], max_lag) for s in range(gt.shape[0])]
+            ),
+            axis=0,
+        )
+        ac_p = np.nanmean(
+            np.vstack(
+                [
+                    _autocorr_1d(pred[s, :, region], max_lag)
+                    for s in range(pred.shape[0])
+                ]
+            ),
+            axis=0,
+        )
         if not np.isfinite(ac_g).any() or not np.isfinite(ac_p).any():
             continue
         diff = (ac_p - ac_g) * weights
         denom = np.sqrt(np.mean((ac_g * weights) ** 2)) + 0.05
-        region_scores.append(_score_from_distance(np.sqrt(np.mean(diff ** 2)) / denom))
+        region_scores.append(_score_from_distance(np.sqrt(np.mean(diff**2)) / denom))
     return {"score": float(np.nanmean(region_scores)) if region_scores else np.nan}
 
 
@@ -583,8 +652,7 @@ def autocorr_weighted_rmse_power_v6(gt: Array3D, pred: Array3D) -> dict:
     base = autocorr_weighted_rmse_v4(gt, pred).get("score", np.nan)
     if not np.isfinite(base):
         return {"score": np.nan}
-    return {"score": float(np.clip(base ** 2, 0.0, 1.0))}
-
+    return {"score": float(np.clip(base**2, 0.0, 1.0))}
 
 
 def crosscorr_lagged_matrix_v4(gt: Array3D, pred: Array3D) -> dict:
@@ -599,8 +667,12 @@ def crosscorr_lagged_matrix_v4(gt: Array3D, pred: Array3D) -> dict:
     e0p = _upper_triangle(Cp0)
     e1g = Cg1.reshape(-1)
     e1p = Cp1.reshape(-1)
-    score0 = 0.5 * _corr_score(e0g, e0p) + 0.5 * _score_from_distance(np.mean(np.abs(e0p - e0g)) / (_robust_scale(e0g) + EPS))
-    score1 = 0.5 * _corr_score(e1g, e1p) + 0.5 * _score_from_distance(np.mean(np.abs(e1p - e1g)) / (_robust_scale(e1g) + EPS))
+    score0 = 0.5 * _corr_score(e0g, e0p) + 0.5 * _score_from_distance(
+        np.mean(np.abs(e0p - e0g)) / (_robust_scale(e0g) + EPS)
+    )
+    score1 = 0.5 * _corr_score(e1g, e1p) + 0.5 * _score_from_distance(
+        np.mean(np.abs(e1p - e1g)) / (_robust_scale(e1g) + EPS)
+    )
     return {"score": float(np.nanmean([score0, score1]))}
 
 
@@ -620,8 +692,24 @@ def crosscorr_topedge_profiles_v5(gt: Array3D, pred: Array3D) -> dict:
     max_lag = min(16, gt.shape[1] // 12)
     scores = []
     for i, j in pairs:
-        cc_g = np.nanmean(np.vstack([_crosscorr_1d(gt[s, :, i], gt[s, :, j], max_lag) for s in range(gt.shape[0])]), axis=0)
-        cc_p = np.nanmean(np.vstack([_crosscorr_1d(pred[s, :, i], pred[s, :, j], max_lag) for s in range(pred.shape[0])]), axis=0)
+        cc_g = np.nanmean(
+            np.vstack(
+                [
+                    _crosscorr_1d(gt[s, :, i], gt[s, :, j], max_lag)
+                    for s in range(gt.shape[0])
+                ]
+            ),
+            axis=0,
+        )
+        cc_p = np.nanmean(
+            np.vstack(
+                [
+                    _crosscorr_1d(pred[s, :, i], pred[s, :, j], max_lag)
+                    for s in range(pred.shape[0])
+                ]
+            ),
+            axis=0,
+        )
         if not np.isfinite(cc_g).any() or not np.isfinite(cc_p).any():
             continue
         score_curve = _corr_score(cc_g, cc_p)
@@ -630,7 +718,9 @@ def crosscorr_topedge_profiles_v5(gt: Array3D, pred: Array3D) -> dict:
         lag_score = 1.0 - (abs(lag_p - lag_g) / max_lag)
         amp_g = cc_g[lag_g + max_lag]
         amp_p = cc_p[lag_p + max_lag]
-        amp_score = _score_from_distance(abs(amp_p - amp_g) / (_robust_scale(cc_g) + EPS))
+        amp_score = _score_from_distance(
+            abs(amp_p - amp_g) / (_robust_scale(cc_g) + EPS)
+        )
         scores.append(np.nanmean([score_curve, lag_score, amp_score]))
     return {"score": float(np.nanmean(scores)) if scores else np.nan}
 
@@ -655,14 +745,18 @@ def manifold_ph_knn_profile_v5(gt: Array3D, pred: Array3D) -> dict:
     score_life = manifold_ph_lifetime_profile_v1(gt, pred).get("score", np.nan)
     knn_g = _knn_distance_profile(Zg, k=5)
     knn_p = _knn_distance_profile(Zp, k=5)
-    score_knn = _score_from_distance(_quantile_distance(knn_g, knn_p, qs=(0.1, 0.25, 0.5, 0.75, 0.9)))
+    score_knn = _score_from_distance(
+        _quantile_distance(knn_g, knn_p, qs=(0.1, 0.25, 0.5, 0.75, 0.9))
+    )
     if not np.isfinite(score_life) or not np.isfinite(score_knn):
         return {"score": np.nan}
     return {"score": float(np.sqrt(score_life * score_knn))}
 
 
 def manifold_ph_stratified_lifetime_v7(gt: Array3D, pred: Array3D) -> dict:
-    Zg, Zp = _stratified_latent_clouds(gt, pred, k_max=3, points_per_seq=2, max_sequences=48, seed=5)
+    Zg, Zp = _stratified_latent_clouds(
+        gt, pred, k_max=3, points_per_seq=2, max_sequences=48, seed=5
+    )
     if Zg is None or Zp is None:
         return {"score": np.nan}
     dgms_g = _ripser_diagrams(Zg, maxdim=1, n_perm=64)
@@ -672,6 +766,7 @@ def manifold_ph_stratified_lifetime_v7(gt: Array3D, pred: Array3D) -> dict:
     score_h0 = _lifetime_similarity(_lifetimes(dgms_g[0]), _lifetimes(dgms_p[0]))
     score_h1 = _lifetime_similarity(_lifetimes(dgms_g[1]), _lifetimes(dgms_p[1]))
     return {"score": float(np.nanmean([score_h0, score_h1]))}
+
 
 def corruption_time_shuffle_blend(data: Array3D, level: float, seed: int) -> Array3D:
     rng = np.random.default_rng(seed)
@@ -701,4 +796,3 @@ def corruption_region_shift_desync(data: Array3D, level: float, seed: int) -> Ar
             shift = rng.integers(-max_shift, max_shift + 1)
             out[seq, :, region] = np.roll(out[seq, :, region], int(shift))
     return out
-

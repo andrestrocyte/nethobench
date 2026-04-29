@@ -47,6 +47,7 @@ def _compute_scores_from_arrays(
 
         return run_neuro_full_analysis(pred_path, gt_path)
 
+
 def compute_neuro_scores(
     predictions_csv: Path,
     ground_truth_csv: Path,
@@ -54,9 +55,11 @@ def compute_neuro_scores(
     per_sequence_stats: bool = False,
     neuro_cols: Optional[list[str]] = None,
 ) -> Dict[str, float]:
-    
+
     if per_sequence_stats:
-        raise ValueError("per_sequence_stats is not supported for notebook-based neuro scores.")
+        raise ValueError(
+            "per_sequence_stats is not supported for notebook-based neuro scores."
+        )
 
     # 1. Use the existing helper to load CSVs and reshape them into 3D tensors
     # shape: [n_sequences, n_timesteps, n_regions]
@@ -65,7 +68,7 @@ def compute_neuro_scores(
         Path(ground_truth_csv),
         neuro_cols=neuro_cols,
     )
-    
+
     return calculate_neuro_composites(gt_arr, pred_arr)
 
 
@@ -80,7 +83,7 @@ def run_neuro_full_analysis(
     preds_path = Path(predictions_csv)
     outdir = _timestamped_outdir(output_root, prefix=preds_path.stem)
     gt_arr, pred_arr, region_names = _load_and_align(preds_path, Path(ground_truth_csv))
-    
+
     scores = calculate_neuro_composites(gt_arr, pred_arr)
 
     generate_full_neuro_report(gt_arr, pred_arr, region_names, scores, outdir)

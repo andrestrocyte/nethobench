@@ -24,6 +24,7 @@ from nethobench import (
 )
 from nethobench.helpers import _quiet_call
 
+
 def _find_candidates(prefix: str) -> list[Path]:
     cwd = Path.cwd()
     return sorted(path for path in cwd.glob(f"{prefix}*") if path.is_file())
@@ -86,7 +87,9 @@ def _prompt_for_config(provided: Optional[str]) -> Optional[Path]:
         print("Detected possible config JSON files:")
         for idx, candidate in enumerate(jsons, start=1):
             print(f"  [{idx}] {candidate.name}")
-        response = input("Enter config filename (or leave blank to auto-infer): ").strip()
+        response = input(
+            "Enter config filename (or leave blank to auto-infer): "
+        ).strip()
         if response.isdigit():
             idx = int(response) - 1
             if 0 <= idx < len(jsons):
@@ -139,14 +142,11 @@ def _print_scores(label: str, scores: dict[str, float]) -> None:
         print(f"  {key:24s}: {value:.3f} {_render_score_bar(value)}")
 
 
-
 def _print_composite(label: str, value: float) -> None:
     if value == value:
         print(f"{label:18s}: {value:.3f} {_render_score_bar(value)}")
     else:
         print(f"{label:18s}: NaN")
-
-
 
 
 def _default_json_output(command: str, preds: Path) -> Path:
@@ -161,7 +161,9 @@ def _default_output_dir(command: str) -> Path:
     return outdir
 
 
-def _save_json_payload(payload: dict, *, requested: Optional[str], command: str, preds: Path) -> Path:
+def _save_json_payload(
+    payload: dict, *, requested: Optional[str], command: str, preds: Path
+) -> Path:
     out = Path(requested) if requested else _default_json_output(command, preds)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2))
@@ -176,14 +178,24 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     neuro = subparsers.add_parser("neuro-scores", help="Compute neural-only scores.")
-    neuro.add_argument("--gt", help="Ground-truth neural CSV (auto-detected if omitted).")
-    neuro.add_argument("--preds", help="Predicted neural CSV (auto-detected if omitted).")
+    neuro.add_argument(
+        "--gt", help="Ground-truth neural CSV (auto-detected if omitted)."
+    )
+    neuro.add_argument(
+        "--preds", help="Predicted neural CSV (auto-detected if omitted)."
+    )
     neuro.add_argument("--json-out", help="Optional JSON output path.")
     neuro.set_defaults(func=_run_neuro)
 
-    fidelity = subparsers.add_parser("fidelity-scores", help="Compute the separate fidelity-only neural family.")
-    fidelity.add_argument("--gt", help="Ground-truth neural CSV (auto-detected if omitted).")
-    fidelity.add_argument("--preds", help="Predicted neural CSV (auto-detected if omitted).")
+    fidelity = subparsers.add_parser(
+        "fidelity-scores", help="Compute the separate fidelity-only neural family."
+    )
+    fidelity.add_argument(
+        "--gt", help="Ground-truth neural CSV (auto-detected if omitted)."
+    )
+    fidelity.add_argument(
+        "--preds", help="Predicted neural CSV (auto-detected if omitted)."
+    )
     fidelity.add_argument("--json-out", help="Optional JSON output path.")
     fidelity.set_defaults(func=_run_fidelity)
 
@@ -191,14 +203,24 @@ def _build_parser() -> argparse.ArgumentParser:
         "neuro-analysis",
         help="Run full NeuroBench analysis and save figures.",
     )
-    neuro_full.add_argument("--gt", help="Ground-truth neural CSV (auto-detected if omitted).")
-    neuro_full.add_argument("--preds", help="Predicted neural CSV (auto-detected if omitted).")
-    neuro_full.add_argument("--output-root", type=Path, help="Output root (default ./outputs/).")
+    neuro_full.add_argument(
+        "--gt", help="Ground-truth neural CSV (auto-detected if omitted)."
+    )
+    neuro_full.add_argument(
+        "--preds", help="Predicted neural CSV (auto-detected if omitted)."
+    )
+    neuro_full.add_argument(
+        "--output-root", type=Path, help="Output root (default ./outputs/)."
+    )
     neuro_full.set_defaults(func=_run_neuro_full)
 
     etho = subparsers.add_parser("etho-scores", help="Compute behavior-only scores.")
-    etho.add_argument("--gt-dir", required=True, help="Directory with GT pose parquet/CSV.")
-    etho.add_argument("--inf-dir", required=True, help="Directory with inference pose parquet/CSV.")
+    etho.add_argument(
+        "--gt-dir", required=True, help="Directory with GT pose parquet/CSV."
+    )
+    etho.add_argument(
+        "--inf-dir", required=True, help="Directory with inference pose parquet/CSV."
+    )
     etho.add_argument("--json-out", help="Optional JSON output path.")
     etho.set_defaults(func=_run_etho)
 
@@ -206,18 +228,31 @@ def _build_parser() -> argparse.ArgumentParser:
         "etho-analysis",
         help="Run full EthoBench analysis and save figures natively.",
     )
-    etho_full.add_argument("--gt-dir", required=True, help="Directory with GT pose parquet/CSV.")
-    etho_full.add_argument("--inf-dir", required=True, help="Directory with inference pose parquet/CSV.")
-    etho_full.add_argument("--output-root", type=Path, help="Output root (default ./outputs/).")
+    etho_full.add_argument(
+        "--gt-dir", required=True, help="Directory with GT pose parquet/CSV."
+    )
+    etho_full.add_argument(
+        "--inf-dir", required=True, help="Directory with inference pose parquet/CSV."
+    )
+    etho_full.add_argument(
+        "--output-root", type=Path, help="Output root (default ./outputs/)."
+    )
     etho_full.set_defaults(func=_run_etho_full)
 
     cross = subparsers.add_parser(
         "cross-scores",
         help="Compute neuro + behavior + cross-modal scores from multimodal CSVs.",
     )
-    cross.add_argument("--gt", help="Ground-truth multimodal CSV (auto-detected if omitted).")
-    cross.add_argument("--preds", help="Predicted multimodal CSV (auto-detected if omitted).")
-    cross.add_argument("--config", help="JSON config describing neuro/behavior columns (auto-inferred if omitted).")
+    cross.add_argument(
+        "--gt", help="Ground-truth multimodal CSV (auto-detected if omitted)."
+    )
+    cross.add_argument(
+        "--preds", help="Predicted multimodal CSV (auto-detected if omitted)."
+    )
+    cross.add_argument(
+        "--config",
+        help="JSON config describing neuro/behavior columns (auto-inferred if omitted).",
+    )
     cross.add_argument("--json-out", help="Optional JSON output path.")
     cross.set_defaults(func=_run_cross)
 
@@ -225,48 +260,165 @@ def _build_parser() -> argparse.ArgumentParser:
         "cross-analysis",
         help="Execute cross-modal notebook headlessly and save figures + executed notebook.",
     )
-    cross_full.add_argument("--gt", help="Ground-truth multimodal CSV (auto-detected if omitted).")
-    cross_full.add_argument("--preds", help="Predicted multimodal CSV (auto-detected if omitted).")
-    cross_full.add_argument("--config", help="JSON config describing neuro/behavior columns (auto-inferred if omitted).")
-    cross_full.add_argument("--output-root", type=Path, help="Output root (default ./outputs/).")
+    cross_full.add_argument(
+        "--gt", help="Ground-truth multimodal CSV (auto-detected if omitted)."
+    )
+    cross_full.add_argument(
+        "--preds", help="Predicted multimodal CSV (auto-detected if omitted)."
+    )
+    cross_full.add_argument(
+        "--config",
+        help="JSON config describing neuro/behavior columns (auto-inferred if omitted).",
+    )
+    cross_full.add_argument(
+        "--output-root", type=Path, help="Output root (default ./outputs/)."
+    )
     cross_full.set_defaults(func=_run_cross_full)
 
     synthetic = subparsers.add_parser(
         "synthetic-validation",
         help="Generate synthetic neural datasets with known structure and audit the neuro benchmark.",
     )
-    synthetic.add_argument("--output-root", type=Path, help="Output root (default ./outputs/synthetic-validation-<timestamp>/).")
-    synthetic.add_argument("--n-sequences", type=int, default=12, help="Number of sequences in the synthetic dataset.")
-    synthetic.add_argument("--seq-length", type=int, default=240, help="Sequence length in time bins.")
-    synthetic.add_argument("--n-regions", type=int, default=16, help="Number of neural regions.")
-    synthetic.add_argument("--latent-dim", type=int, default=4, help="Latent dynamical dimensionality.")
-    synthetic.add_argument("--burn-in", type=int, default=64, help="Burn-in steps discarded from each sequence.")
-    synthetic.add_argument("--system-seed", type=int, default=11, help="Random seed for the fixed synthetic system.")
-    synthetic.add_argument("--oracle-replicates", type=int, default=3, help="Number of oracle draws scored against the reference dataset.")
-    synthetic.add_argument("--no-save-datasets", action="store_true", help="Skip saving the generated CSV datasets.")
+    synthetic.add_argument(
+        "--output-root",
+        type=Path,
+        help="Output root (default ./outputs/synthetic-validation-<timestamp>/).",
+    )
+    synthetic.add_argument(
+        "--n-sequences",
+        type=int,
+        default=12,
+        help="Number of sequences in the synthetic dataset.",
+    )
+    synthetic.add_argument(
+        "--seq-length", type=int, default=240, help="Sequence length in time bins."
+    )
+    synthetic.add_argument(
+        "--n-regions", type=int, default=16, help="Number of neural regions."
+    )
+    synthetic.add_argument(
+        "--latent-dim", type=int, default=4, help="Latent dynamical dimensionality."
+    )
+    synthetic.add_argument(
+        "--burn-in",
+        type=int,
+        default=64,
+        help="Burn-in steps discarded from each sequence.",
+    )
+    synthetic.add_argument(
+        "--system-seed",
+        type=int,
+        default=11,
+        help="Random seed for the fixed synthetic system.",
+    )
+    synthetic.add_argument(
+        "--oracle-replicates",
+        type=int,
+        default=3,
+        help="Number of oracle draws scored against the reference dataset.",
+    )
+    synthetic.add_argument(
+        "--no-save-datasets",
+        action="store_true",
+        help="Skip saving the generated CSV datasets.",
+    )
     synthetic.set_defaults(func=_run_synthetic_validation)
 
     synthetic_bio = subparsers.add_parser(
         "synthetic-validation-biophysical",
         help="Generate a harder spike/event-driven calcium world with known structure and audit the neuro benchmark.",
     )
-    synthetic_bio.add_argument("--output-root", type=Path, help="Output root (default ./outputs/synthetic-validation-biophysical-<timestamp>/).")
-    synthetic_bio.add_argument("--n-sequences", type=int, default=24, help="Number of sequences in the synthetic dataset.")
-    synthetic_bio.add_argument("--seq-length", type=int, default=768, help="Sequence length in time bins.")
-    synthetic_bio.add_argument("--n-regions", type=int, default=16, help="Number of neural regions.")
-    synthetic_bio.add_argument("--latent-dim", type=int, default=6, help="Latent dynamical dimensionality.")
-    synthetic_bio.add_argument("--burn-in", type=int, default=128, help="Burn-in steps discarded from each sequence.")
-    synthetic_bio.add_argument("--system-seed", type=int, default=37, help="Random seed for the fixed synthetic system.")
-    synthetic_bio.add_argument("--oracle-replicates", type=int, default=3, help="Number of oracle draws scored against the reference dataset.")
-    synthetic_bio.add_argument("--state-switch-prob", type=float, default=0.018, help="Probability of switching hidden dynamical regimes at each step.")
-    synthetic_bio.add_argument("--shared-event-prob", type=float, default=0.020, help="Probability of shared latent burst events.")
-    synthetic_bio.add_argument("--refractory-strength", type=float, default=1.40, help="Strength of latent refractory suppression.")
-    synthetic_bio.add_argument("--calcium-tau-rise", type=float, default=3.5, help="Mean calcium rise time constant.")
-    synthetic_bio.add_argument("--calcium-tau-decay", type=float, default=18.0, help="Mean calcium decay time constant.")
-    synthetic_bio.add_argument("--observation-noise", type=float, default=0.018, help="Additive observation noise scale.")
-    synthetic_bio.add_argument("--neuropil-noise", type=float, default=0.012, help="Shared neuropil contamination scale.")
-    synthetic_bio.add_argument("--baseline-drift-scale", type=float, default=0.035, help="Slow baseline drift amplitude.")
-    synthetic_bio.add_argument("--no-save-datasets", action="store_true", help="Skip saving the generated CSV datasets.")
+    synthetic_bio.add_argument(
+        "--output-root",
+        type=Path,
+        help="Output root (default ./outputs/synthetic-validation-biophysical-<timestamp>/).",
+    )
+    synthetic_bio.add_argument(
+        "--n-sequences",
+        type=int,
+        default=24,
+        help="Number of sequences in the synthetic dataset.",
+    )
+    synthetic_bio.add_argument(
+        "--seq-length", type=int, default=768, help="Sequence length in time bins."
+    )
+    synthetic_bio.add_argument(
+        "--n-regions", type=int, default=16, help="Number of neural regions."
+    )
+    synthetic_bio.add_argument(
+        "--latent-dim", type=int, default=6, help="Latent dynamical dimensionality."
+    )
+    synthetic_bio.add_argument(
+        "--burn-in",
+        type=int,
+        default=128,
+        help="Burn-in steps discarded from each sequence.",
+    )
+    synthetic_bio.add_argument(
+        "--system-seed",
+        type=int,
+        default=37,
+        help="Random seed for the fixed synthetic system.",
+    )
+    synthetic_bio.add_argument(
+        "--oracle-replicates",
+        type=int,
+        default=3,
+        help="Number of oracle draws scored against the reference dataset.",
+    )
+    synthetic_bio.add_argument(
+        "--state-switch-prob",
+        type=float,
+        default=0.018,
+        help="Probability of switching hidden dynamical regimes at each step.",
+    )
+    synthetic_bio.add_argument(
+        "--shared-event-prob",
+        type=float,
+        default=0.020,
+        help="Probability of shared latent burst events.",
+    )
+    synthetic_bio.add_argument(
+        "--refractory-strength",
+        type=float,
+        default=1.40,
+        help="Strength of latent refractory suppression.",
+    )
+    synthetic_bio.add_argument(
+        "--calcium-tau-rise",
+        type=float,
+        default=3.5,
+        help="Mean calcium rise time constant.",
+    )
+    synthetic_bio.add_argument(
+        "--calcium-tau-decay",
+        type=float,
+        default=18.0,
+        help="Mean calcium decay time constant.",
+    )
+    synthetic_bio.add_argument(
+        "--observation-noise",
+        type=float,
+        default=0.018,
+        help="Additive observation noise scale.",
+    )
+    synthetic_bio.add_argument(
+        "--neuropil-noise",
+        type=float,
+        default=0.012,
+        help="Shared neuropil contamination scale.",
+    )
+    synthetic_bio.add_argument(
+        "--baseline-drift-scale",
+        type=float,
+        default=0.035,
+        help="Slow baseline drift amplitude.",
+    )
+    synthetic_bio.add_argument(
+        "--no-save-datasets",
+        action="store_true",
+        help="Skip saving the generated CSV datasets.",
+    )
     synthetic_bio.set_defaults(func=_run_synthetic_validation_biophysical)
 
     return parser
@@ -277,7 +429,9 @@ def _run_neuro(args: argparse.Namespace) -> None:
     preds = _prompt_for_file("inference", "inference_", args.preds)
     scores = _quiet_call(compute_neuro_scores, preds, gt)
     _print_scores("Neuro scores", scores)
-    out = _save_json_payload({"scores": scores}, requested=args.json_out, command="neuro-scores", preds=preds)
+    out = _save_json_payload(
+        {"scores": scores}, requested=args.json_out, command="neuro-scores", preds=preds
+    )
     print(f"Saved scores to {out}")
 
 
@@ -286,7 +440,12 @@ def _run_fidelity(args: argparse.Namespace) -> None:
     preds = _prompt_for_file("inference", "inference_", args.preds)
     scores = _quiet_call(compute_fidelity_scores, preds, gt)
     _print_scores("Fidelity scores", scores)
-    out = _save_json_payload({"scores": scores}, requested=args.json_out, command="fidelity-scores", preds=preds)
+    out = _save_json_payload(
+        {"scores": scores},
+        requested=args.json_out,
+        command="fidelity-scores",
+        preds=preds,
+    )
     print(f"Saved scores to {out}")
 
 
@@ -297,13 +456,19 @@ def _run_neuro_full(args: argparse.Namespace) -> None:
 
 
 def _run_etho(args: argparse.Namespace) -> None:
-    scores, seq_scores, seq_means, seq_stds = _quiet_call(compute_etho_scores, Path(args.gt_dir), Path(args.inf_dir))
+    scores, seq_scores, seq_means, seq_stds = _quiet_call(
+        compute_etho_scores, Path(args.gt_dir), Path(args.inf_dir)
+    )
     _print_scores("Behavior scores", scores)
     if args.json_out:
         out = Path(args.json_out)
     else:
-        out = Path(os.path.join("outputs", f"{args.inf_dir.split(os.sep)[-1].split('.')[0]}-etho-scores"))
-    
+        out = Path(
+            os.path.join(
+                "outputs", f"{args.inf_dir.split(os.sep)[-1].split('.')[0]}-etho-scores"
+            )
+        )
+
     out.mkdir(parents=True, exist_ok=True)
     payload = {
         "global_scores": scores,
@@ -318,7 +483,12 @@ def _run_etho(args: argparse.Namespace) -> None:
 
 
 def _run_etho_full(args: argparse.Namespace) -> None:
-    outdir = _quiet_call(run_etho_full_analysis, Path(args.gt_dir), Path(args.inf_dir), output_root=args.output_root)
+    outdir = _quiet_call(
+        run_etho_full_analysis,
+        Path(args.gt_dir),
+        Path(args.inf_dir),
+        output_root=args.output_root,
+    )
     print(f"Behavioral full analysis executed natively. Outputs under {outdir}")
 
 
@@ -339,8 +509,12 @@ def _run_cross(args: argparse.Namespace) -> None:
     if args.json_out is not None:
         out = Path(args.json_out)
     else:
-        out = Path(os.path.join("outputs", f"{args.gt.split(os.sep)[-1].split('.')[0]}-cross-scores"))
-    
+        out = Path(
+            os.path.join(
+                "outputs", f"{args.gt.split(os.sep)[-1].split('.')[0]}-cross-scores"
+            )
+        )
+
     out.mkdir(parents=True, exist_ok=True)
     with open(f"{out}/scores.json", "w") as f:
         f.write(json.dumps(scores, indent=2))
@@ -351,7 +525,9 @@ def _run_cross_full(args: argparse.Namespace) -> None:
     gt = _prompt_for_file("ground-truth", "gt_", args.gt)
     preds = _prompt_for_file("inference", "inference_", args.preds)
     cfg_path = _prompt_for_config(args.config)
-    outdir = _quiet_call(run_cross_full_analysis, preds, gt, cfg_path, output_root=args.output_root)
+    outdir = _quiet_call(
+        run_cross_full_analysis, preds, gt, cfg_path, output_root=args.output_root
+    )
     print(f"Cross-modal full analysis executed. Outputs under {outdir}")
 
 
@@ -373,8 +549,14 @@ def _run_synthetic_validation(args: argparse.Namespace) -> None:
         save_datasets=not args.no_save_datasets,
     )
     oracle = out["family_oracle_summary"].set_index("score_name")["mean"].to_dict()
-    metric_oracle = out["metric_oracle_summary"].set_index("score_name")["mean"].sort_values(ascending=False)
-    fidelity_oracle = out["fidelity_oracle_summary"].set_index("score_name")["mean"].to_dict()
+    metric_oracle = (
+        out["metric_oracle_summary"]
+        .set_index("score_name")["mean"]
+        .sort_values(ascending=False)
+    )
+    fidelity_oracle = (
+        out["fidelity_oracle_summary"].set_index("score_name")["mean"].to_dict()
+    )
     selectivity = out["family_selectivity_df"]
     metric_selectivity = out["metric_selectivity_df"]
 
@@ -434,7 +616,9 @@ def _run_synthetic_validation(args: argparse.Namespace) -> None:
     print(f"  family dose response  : {out['family_dose_response_path']}")
     print(f"  metric dose response  : {out['metric_dose_response_path']}")
     print(f"  fidelity dose response: {out['fidelity_dose_response_path']}")
-    print(f"  figures               : {out['ceiling_plot']}, {out['family_selectivity_plot']}, {out['metric_selectivity_plot']}, {out['dose_plot']}")
+    print(
+        f"  figures               : {out['ceiling_plot']}, {out['family_selectivity_plot']}, {out['metric_selectivity_plot']}, {out['dose_plot']}"
+    )
 
 
 def _run_synthetic_validation_biophysical(args: argparse.Namespace) -> None:
@@ -454,7 +638,9 @@ def _run_synthetic_validation_biophysical(args: argparse.Namespace) -> None:
         neuropil_noise=args.neuropil_noise,
         baseline_drift_scale=args.baseline_drift_scale,
     )
-    output_root = args.output_root or _default_output_dir("synthetic-validation-biophysical")
+    output_root = args.output_root or _default_output_dir(
+        "synthetic-validation-biophysical"
+    )
     out = _quiet_call(
         run_biophysical_synthetic_neuro_validation,
         output_root=output_root,
@@ -463,8 +649,14 @@ def _run_synthetic_validation_biophysical(args: argparse.Namespace) -> None:
         save_datasets=not args.no_save_datasets,
     )
     oracle = out["family_oracle_summary"].set_index("score_name")["mean"].to_dict()
-    metric_oracle = out["metric_oracle_summary"].set_index("score_name")["mean"].sort_values(ascending=False)
-    fidelity_oracle = out["fidelity_oracle_summary"].set_index("score_name")["mean"].to_dict()
+    metric_oracle = (
+        out["metric_oracle_summary"]
+        .set_index("score_name")["mean"]
+        .sort_values(ascending=False)
+    )
+    fidelity_oracle = (
+        out["fidelity_oracle_summary"].set_index("score_name")["mean"].to_dict()
+    )
     selectivity = out["family_selectivity_df"]
     metric_selectivity = out["metric_selectivity_df"]
 
@@ -524,7 +716,9 @@ def _run_synthetic_validation_biophysical(args: argparse.Namespace) -> None:
     print(f"  family dose response  : {out['family_dose_response_path']}")
     print(f"  metric dose response  : {out['metric_dose_response_path']}")
     print(f"  fidelity dose response: {out['fidelity_dose_response_path']}")
-    print(f"  figures               : {out['ceiling_plot']}, {out['family_selectivity_plot']}, {out['metric_selectivity_plot']}, {out['dose_plot']}")
+    print(
+        f"  figures               : {out['ceiling_plot']}, {out['family_selectivity_plot']}, {out['metric_selectivity_plot']}, {out['dose_plot']}"
+    )
 
 
 def main(argv: Optional[Iterable[str]] = None) -> None:

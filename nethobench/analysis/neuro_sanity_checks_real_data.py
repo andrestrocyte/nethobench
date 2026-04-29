@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 
 from nethobench.neuro import compute_neuro_scores
 
-
 NOISE_RE = re.compile(r"\.noise_(\d+(?:\.\d+)?)\.csv$")
 
 
@@ -41,7 +40,8 @@ def _prepare_gt_subset(
     first = True
     for chunk in pd.read_csv(source_csv, chunksize=chunksize):
         filt = chunk[
-            (chunk["sequenceId"] < seq_limit) & (chunk["itemPosition"] < max_item_position)
+            (chunk["sequenceId"] < seq_limit)
+            & (chunk["itemPosition"] < max_item_position)
         ]
         if filt.empty:
             continue
@@ -124,11 +124,17 @@ def _score_pair(
                 import contextlib
 
                 with contextlib.redirect_stdout(_out), contextlib.redirect_stderr(_err):
-                    scores = compute_neuro_scores(pred_csv, gt_csv, ddconfig_path=ddconfig)
+                    scores = compute_neuro_scores(
+                        pred_csv, gt_csv, ddconfig_path=ddconfig
+                    )
                 buf.write(_out.getvalue())
                 buf.write(_err.getvalue())
     elapsed = time.time() - start
-    out = {k: float(v) for k, v in scores.items() if isinstance(v, (int, float, np.floating))}
+    out = {
+        k: float(v)
+        for k, v in scores.items()
+        if isinstance(v, (int, float, np.floating))
+    }
     out["runtime_sec"] = float(elapsed)
     return out
 
@@ -143,12 +149,18 @@ def _spearman(x: np.ndarray, y: np.ndarray) -> float:
     return float(np.corrcoef(xr, yr)[0, 1])
 
 
-def _monotonicity(df: pd.DataFrame, metric: str, descending: bool = True) -> Dict[str, float]:
+def _monotonicity(
+    df: pd.DataFrame, metric: str, descending: bool = True
+) -> Dict[str, float]:
     d = df.sort_values("noise_sigma")
     vals = d[metric].to_numpy(dtype=np.float64)
     sig = d["noise_sigma"].to_numpy(dtype=np.float64)
     if len(vals) < 2:
-        return {"spearman": float("nan"), "adjacent_ok_frac": float("nan"), "range_delta": float("nan")}
+        return {
+            "spearman": float("nan"),
+            "adjacent_ok_frac": float("nan"),
+            "range_delta": float("nan"),
+        }
     diffs = np.diff(vals)
     ok = diffs <= 0 if descending else diffs >= 0
     return {
@@ -158,7 +170,9 @@ def _monotonicity(df: pd.DataFrame, metric: str, descending: bool = True) -> Dic
     }
 
 
-def _build_report_tables(results: pd.DataFrame) -> Dict[str, Dict[str, Dict[str, float]]]:
+def _build_report_tables(
+    results: pd.DataFrame,
+) -> Dict[str, Dict[str, Dict[str, float]]]:
     tables: Dict[str, Dict[str, Dict[str, float]]] = {}
     metric_candidates = [
         "composite_score",
@@ -232,11 +246,15 @@ def _save_v2_v3_plots(results: pd.DataFrame, output_dir: Path) -> None:
         ("synthetic_gt_noise", "Synthetic GT Corruption"),
         ("synthetic_pred_noise", "Synthetic Inference Corruption"),
     ]
-    present = [(g, t) for g, t in panel_groups if g in set(results["scenario_group"].unique())]
+    present = [
+        (g, t) for g, t in panel_groups if g in set(results["scenario_group"].unique())
+    ]
     if not present:
         return
 
-    fig, axes = plt.subplots(1, len(present), figsize=(6 * len(present), 5), sharey=True)
+    fig, axes = plt.subplots(
+        1, len(present), figsize=(6 * len(present), 5), sharey=True
+    )
     if len(present) == 1:
         axes = [axes]
 
@@ -259,8 +277,12 @@ def _save_v2_v3_plots(results: pd.DataFrame, output_dir: Path) -> None:
             lw=2.0,
             label="Composite v3 (strict)",
         )
-        ax.axhline(base_v2, linestyle="--", linewidth=1.1, alpha=0.7, label="Baseline v2")
-        ax.axhline(base_v3, linestyle=":", linewidth=1.4, alpha=0.8, label="Baseline v3")
+        ax.axhline(
+            base_v2, linestyle="--", linewidth=1.1, alpha=0.7, label="Baseline v2"
+        )
+        ax.axhline(
+            base_v3, linestyle=":", linewidth=1.4, alpha=0.8, label="Baseline v3"
+        )
         ax.set_title(title)
         ax.set_xlabel("Noise sigma")
         ax.set_ylabel("Composite score")
@@ -277,12 +299,18 @@ def _save_v2_v3_plots(results: pd.DataFrame, output_dir: Path) -> None:
                 }
             )
 
-    fig.suptitle("Composite Comparison: Monotonic v2 vs Strict Multiplicative v3", fontsize=13)
+    fig.suptitle(
+        "Composite Comparison: Monotonic v2 vs Strict Multiplicative v3", fontsize=13
+    )
     fig.tight_layout(rect=[0, 0, 1, 0.95])
-    fig.savefig(output_dir / "composite_v2_vs_v3_side_by_side.png", dpi=180, bbox_inches="tight")
+    fig.savefig(
+        output_dir / "composite_v2_vs_v3_side_by_side.png", dpi=180, bbox_inches="tight"
+    )
     plt.close(fig)
 
-    pd.DataFrame(export_rows).to_csv(output_dir / "composite_v2_vs_v3_side_by_side.csv", index=False)
+    pd.DataFrame(export_rows).to_csv(
+        output_dir / "composite_v2_vs_v3_side_by_side.csv", index=False
+    )
 
 
 def run(
@@ -299,7 +327,9 @@ def run(
 
     gt_base = data_dir / "data-clean.csv"
     ddconfig = data_dir / "data-clean-all.json"
-    pred_base = data_dir / "sequifier-netho-hp-search-9-run-2-best-10000-predictions.csv"
+    pred_base = (
+        data_dir / "sequifier-netho-hp-search-9-run-2-best-10000-predictions.csv"
+    )
     if not gt_base.is_file() or not ddconfig.is_file() or not pred_base.is_file():
         raise FileNotFoundError("Missing expected files in data_dir.")
 
@@ -334,7 +364,10 @@ def run(
     )
 
     # Provided GT-corruption ladder from your directory.
-    provided_noisy = sorted(data_dir.glob("data-clean.noise_*.csv"), key=lambda p: _extract_noise_level(p) or -1.0)
+    provided_noisy = sorted(
+        data_dir.glob("data-clean.noise_*.csv"),
+        key=lambda p: _extract_noise_level(p) or -1.0,
+    )
     for p in provided_noisy:
         sigma = _extract_noise_level(p)
         if sigma is None:
@@ -407,7 +440,9 @@ def run(
         row["pred_csv"] = str(row["pred_csv"])
         row["run_index"] = i
         rows.append(row)
-        print(f"[{i:02d}/{len(scenarios):02d}] {sc['scenario_name']}: composite={scores.get('composite_score', float('nan')):.4f} runtime={scores['runtime_sec']:.2f}s")
+        print(
+            f"[{i:02d}/{len(scenarios):02d}] {sc['scenario_name']}: composite={scores.get('composite_score', float('nan')):.4f} runtime={scores['runtime_sec']:.2f}s"
+        )
 
     results = pd.DataFrame(rows).sort_values("run_index").reset_index(drop=True)
     metrics_json = output_dir / "scores_per_scenario.json"

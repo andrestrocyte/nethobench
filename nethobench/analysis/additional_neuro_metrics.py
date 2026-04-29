@@ -7,20 +7,27 @@ from sklearn.cluster import MiniBatchKMeans
 from sklearn.covariance import LedoitWolf
 from sklearn.feature_selection import mutual_info_regression
 
-
 EPS = 1e-9
 
 
-def _align_arrays(gt_arr: np.ndarray, pred_arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def _align_arrays(
+    gt_arr: np.ndarray, pred_arr: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     gt = np.asarray(gt_arr, dtype=np.float64)
     pred = np.asarray(pred_arr, dtype=np.float64)
     if gt.ndim != 3 or pred.ndim != 3:
-        raise ValueError(f"Expected [n_seq, T, n_reg] arrays, got {gt.shape} and {pred.shape}")
+        raise ValueError(
+            f"Expected [n_seq, T, n_reg] arrays, got {gt.shape} and {pred.shape}"
+        )
     if gt.shape[0] != pred.shape[0] or gt.shape[2] != pred.shape[2]:
-        raise ValueError(f"GT/pred sequence-region mismatch: {gt.shape} vs {pred.shape}")
+        raise ValueError(
+            f"GT/pred sequence-region mismatch: {gt.shape} vs {pred.shape}"
+        )
     if pred.shape[1] != gt.shape[1] and pred.shape[1] % gt.shape[1] == 0:
         factor = pred.shape[1] // gt.shape[1]
-        pred = pred.reshape(pred.shape[0], gt.shape[1], factor, pred.shape[2]).mean(axis=2)
+        pred = pred.reshape(pred.shape[0], gt.shape[1], factor, pred.shape[2]).mean(
+            axis=2
+        )
     elif pred.shape[1] != gt.shape[1]:
         keep = min(gt.shape[1], pred.shape[1])
         gt = gt[:, :keep, :]
@@ -56,7 +63,9 @@ def _fit_reference_scaler(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return med, scale
 
 
-def _apply_reference_scaler(data: np.ndarray, center: np.ndarray, scale: np.ndarray) -> np.ndarray:
+def _apply_reference_scaler(
+    data: np.ndarray, center: np.ndarray, scale: np.ndarray
+) -> np.ndarray:
     data = np.asarray(data, dtype=np.float64)
     out = (data - center) / scale
     out[~np.isfinite(out)] = 0.0
@@ -122,7 +131,9 @@ def _covariance(flat: np.ndarray) -> np.ndarray | None:
     return cov
 
 
-def _ledoit_cov_precision(flat: np.ndarray) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
+def _ledoit_cov_precision(
+    flat: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
     if flat.shape[0] < 5 or flat.shape[1] < 2:
         return None, None
     model = LedoitWolf().fit(flat)
@@ -207,7 +218,7 @@ def _effective_dimension(cov: np.ndarray | None) -> float:
     eigs = eigs[np.isfinite(eigs) & (eigs > EPS)]
     if eigs.size == 0:
         return np.nan
-    pr = float((np.sum(eigs) ** 2) / np.sum(eigs ** 2))
+    pr = float((np.sum(eigs) ** 2) / np.sum(eigs**2))
     return pr / cov.shape[0]
 
 
@@ -228,7 +239,9 @@ def _principal_subspace(cov: np.ndarray | None, max_dim: int = 6) -> np.ndarray 
     return eigvecs[:, :k]
 
 
-def _subspace_angle_score(gt_cov: np.ndarray | None, pred_cov: np.ndarray | None) -> float:
+def _subspace_angle_score(
+    gt_cov: np.ndarray | None, pred_cov: np.ndarray | None
+) -> float:
     gt_basis = _principal_subspace(gt_cov)
     pred_basis = _principal_subspace(pred_cov)
     if gt_basis is None or pred_basis is None:
@@ -271,7 +284,9 @@ def _var1_coefficients(flat: np.ndarray, ridge: float = 1e-2) -> np.ndarray | No
     return coeff
 
 
-def _mi_matrix(flat: np.ndarray, max_points: int = 1500, n_neighbors: int = 5) -> np.ndarray | None:
+def _mi_matrix(
+    flat: np.ndarray, max_points: int = 1500, n_neighbors: int = 5
+) -> np.ndarray | None:
     if flat.shape[0] < 40 or flat.shape[1] < 2:
         return None
     rng = np.random.default_rng(0)
@@ -286,8 +301,12 @@ def _mi_matrix(flat: np.ndarray, max_points: int = 1500, n_neighbors: int = 5) -
             x = flat[:, i]
             y = flat[:, j]
             try:
-                mi_xy = mutual_info_regression(x.reshape(-1, 1), y, n_neighbors=n_neighbors, random_state=0)[0]
-                mi_yx = mutual_info_regression(y.reshape(-1, 1), x, n_neighbors=n_neighbors, random_state=0)[0]
+                mi_xy = mutual_info_regression(
+                    x.reshape(-1, 1), y, n_neighbors=n_neighbors, random_state=0
+                )[0]
+                mi_yx = mutual_info_regression(
+                    y.reshape(-1, 1), x, n_neighbors=n_neighbors, random_state=0
+                )[0]
                 value = 0.5 * (max(float(mi_xy), 0.0) + max(float(mi_yx), 0.0))
             except Exception:
                 value = np.nan
@@ -296,7 +315,9 @@ def _mi_matrix(flat: np.ndarray, max_points: int = 1500, n_neighbors: int = 5) -
     return out
 
 
-def _fit_pca_basis(flat: np.ndarray, n_components: int = 3) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
+def _fit_pca_basis(
+    flat: np.ndarray, n_components: int = 3
+) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
     if flat.shape[0] < 10 or flat.shape[1] < 2:
         return None, None
     mean = np.mean(flat, axis=0, keepdims=True)
@@ -311,7 +332,9 @@ def _fit_pca_basis(flat: np.ndarray, n_components: int = 3) -> tuple[np.ndarray,
     return mean.ravel(), vt[:k].T
 
 
-def _project_rows(flat: np.ndarray, mean: np.ndarray | None, basis: np.ndarray | None) -> np.ndarray | None:
+def _project_rows(
+    flat: np.ndarray, mean: np.ndarray | None, basis: np.ndarray | None
+) -> np.ndarray | None:
     if mean is None or basis is None:
         return None
     centered = flat - mean
@@ -329,7 +352,11 @@ def _fit_kmeans_centers(
     random_state: int = 0,
 ) -> np.ndarray | None:
     features = np.asarray(features, dtype=np.float64)
-    if features.ndim != 2 or features.shape[0] < max(12, n_clusters) or features.shape[1] < 1:
+    if (
+        features.ndim != 2
+        or features.shape[0] < max(12, n_clusters)
+        or features.shape[1] < 1
+    ):
         return None
     n_clusters = int(np.clip(n_clusters, 2, features.shape[0]))
     fit_features = features
@@ -349,7 +376,9 @@ def _fit_kmeans_centers(
     return centers
 
 
-def _assign_to_centers(features: np.ndarray, centers: np.ndarray | None) -> np.ndarray | None:
+def _assign_to_centers(
+    features: np.ndarray, centers: np.ndarray | None
+) -> np.ndarray | None:
     if centers is None:
         return None
     features = np.asarray(features, dtype=np.float64)
@@ -382,7 +411,9 @@ def _hist_similarity(gt_hist: np.ndarray, pred_hist: np.ndarray) -> float:
     )
 
 
-def _occupancy_similarity(gt_assign: np.ndarray | None, pred_assign: np.ndarray | None, n_states: int) -> float:
+def _occupancy_similarity(
+    gt_assign: np.ndarray | None, pred_assign: np.ndarray | None, n_states: int
+) -> float:
     if gt_assign is None or pred_assign is None or n_states < 2:
         return np.nan
     gt_hist = np.bincount(gt_assign, minlength=n_states).astype(np.float64)
@@ -396,7 +427,12 @@ def _transition_similarity(
     n_states: int,
     lag: int,
 ) -> float:
-    if lag < 1 or not gt_sequences or not pred_sequences or len(gt_sequences) != len(pred_sequences):
+    if (
+        lag < 1
+        or not gt_sequences
+        or not pred_sequences
+        or len(gt_sequences) != len(pred_sequences)
+    ):
         return np.nan
     gt_mat = np.zeros((n_states, n_states), dtype=np.float64)
     pred_mat = np.zeros((n_states, n_states), dtype=np.float64)
@@ -414,7 +450,9 @@ def _transition_similarity(
     return _hist_similarity(gt_mat.ravel(), pred_mat.ravel())
 
 
-def _window_fc_features(arr: np.ndarray, window: int, step: int) -> tuple[np.ndarray | None, list[int]]:
+def _window_fc_features(
+    arr: np.ndarray, window: int, step: int
+) -> tuple[np.ndarray | None, list[int]]:
     arr = np.asarray(arr, dtype=np.float64)
     if arr.ndim != 3 or arr.shape[2] < 2:
         return None, []
@@ -447,7 +485,9 @@ def _window_fc_features(arr: np.ndarray, window: int, step: int) -> tuple[np.nda
     return np.vstack(features), counts
 
 
-def _split_assignments(assign: np.ndarray | None, counts: list[int]) -> list[np.ndarray]:
+def _split_assignments(
+    assign: np.ndarray | None, counts: list[int]
+) -> list[np.ndarray]:
     if assign is None:
         return []
     out = []
@@ -459,7 +499,9 @@ def _split_assignments(assign: np.ndarray | None, counts: list[int]) -> list[np.
     return out
 
 
-def _latent_state_occupancy_score(gt_flat_raw: np.ndarray, pred_flat_raw: np.ndarray) -> float:
+def _latent_state_occupancy_score(
+    gt_flat_raw: np.ndarray, pred_flat_raw: np.ndarray
+) -> float:
     center, scale = _fit_reference_scaler(gt_flat_raw)
     gt_scaled = _apply_reference_scaler(gt_flat_raw, center, scale)
     pred_scaled = _apply_reference_scaler(pred_flat_raw, center, scale)
@@ -478,7 +520,9 @@ def _latent_state_occupancy_score(gt_flat_raw: np.ndarray, pred_flat_raw: np.nda
         pred_proj = pred_proj[idx]
     per_k = []
     for n_states in (6, 8, 10):
-        centers = _fit_kmeans_centers(gt_proj, n_states, max_fit_points=10000, random_state=n_states)
+        centers = _fit_kmeans_centers(
+            gt_proj, n_states, max_fit_points=10000, random_state=n_states
+        )
         gt_assign = _assign_to_centers(gt_proj, centers)
         pred_assign = _assign_to_centers(pred_proj, centers)
         per_k.append(_occupancy_similarity(gt_assign, pred_assign, n_states))
@@ -514,11 +558,19 @@ def _prepare_latent_state_reference(
         gt_proj_eval = gt_proj_all
     if pred_proj_all.shape[0] > 30000:
         rng = np.random.default_rng(1)
-        pred_proj_eval = pred_proj_all[rng.choice(pred_proj_all.shape[0], size=30000, replace=False)]
+        pred_proj_eval = pred_proj_all[
+            rng.choice(pred_proj_all.shape[0], size=30000, replace=False)
+        ]
     else:
         pred_proj_eval = pred_proj_all
-    gt_seq_proj = [_project_rows(_apply_reference_scaler(seq, center, scale), mean, basis) for seq in gt]
-    pred_seq_proj = [_project_rows(_apply_reference_scaler(seq, center, scale), mean, basis) for seq in pred]
+    gt_seq_proj = [
+        _project_rows(_apply_reference_scaler(seq, center, scale), mean, basis)
+        for seq in gt
+    ]
+    pred_seq_proj = [
+        _project_rows(_apply_reference_scaler(seq, center, scale), mean, basis)
+        for seq in pred
+    ]
     return {
         "gt_proj_fit": gt_proj_fit,
         "gt_proj_eval": gt_proj_eval,
@@ -545,15 +597,21 @@ def _latent_state_score_bundle(
         }
 
     def _occupancy_for_k(k: int) -> float:
-        centers = _fit_kmeans_centers(ref["gt_proj_fit"], k, max_fit_points=10000, random_state=k)
+        centers = _fit_kmeans_centers(
+            ref["gt_proj_fit"], k, max_fit_points=10000, random_state=k
+        )
         gt_assign = _assign_to_centers(ref["gt_proj_eval"], centers)
         pred_assign = _assign_to_centers(ref["pred_proj_eval"], centers)
         return _occupancy_similarity(gt_assign, pred_assign, k)
 
     def _transition_for_k(k: int, lag: int) -> float:
-        centers = _fit_kmeans_centers(ref["gt_proj_fit"], k, max_fit_points=10000, random_state=k)
+        centers = _fit_kmeans_centers(
+            ref["gt_proj_fit"], k, max_fit_points=10000, random_state=k
+        )
         gt_seq_assign = [_assign_to_centers(seq, centers) for seq in ref["gt_seq_proj"]]
-        pred_seq_assign = [_assign_to_centers(seq, centers) for seq in ref["pred_seq_proj"]]
+        pred_seq_assign = [
+            _assign_to_centers(seq, centers) for seq in ref["pred_seq_proj"]
+        ]
         return _transition_similarity(gt_seq_assign, pred_seq_assign, k, lag)
 
     return {
@@ -573,7 +631,12 @@ def _dfc_state_occupancy_score(gt: np.ndarray, pred: np.ndarray) -> float:
         pred_feat, _ = _window_fc_features(pred, window=window, step=step)
         if gt_feat is None or pred_feat is None:
             continue
-        centers = _fit_kmeans_centers(gt_feat, n_states, max_fit_points=3000, random_state=window + step + n_states)
+        centers = _fit_kmeans_centers(
+            gt_feat,
+            n_states,
+            max_fit_points=3000,
+            random_state=window + step + n_states,
+        )
         gt_assign = _assign_to_centers(gt_feat, centers)
         pred_assign = _assign_to_centers(pred_feat, centers)
         per_cfg.append(_occupancy_similarity(gt_assign, pred_assign, n_states))
@@ -597,7 +660,9 @@ def _dfc_state_transition_score(gt: np.ndarray, pred: np.ndarray) -> float:
     return _blend_scores(lag2, lag3, weights=(0.55, 0.45))
 
 
-def compute_additional_structural_metrics(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict[str, object]:
+def compute_additional_structural_metrics(
+    gt_arr: np.ndarray, pred_arr: np.ndarray
+) -> dict[str, object]:
     gt, pred = _align_arrays(gt_arr, pred_arr)
     gt_flat_raw = _pooled_rows(gt)
     pred_flat_raw = _pooled_rows(pred)
@@ -613,10 +678,26 @@ def compute_additional_structural_metrics(gt_arr: np.ndarray, pred_arr: np.ndarr
     gt_psd = _mean_region_psd(gt)
     pred_psd = _mean_region_psd(pred)
 
-    gt_cov_spec = _normalized_spectrum(np.linalg.eigvalsh(gt_cov)) if gt_cov is not None else np.asarray([])
-    pred_cov_spec = _normalized_spectrum(np.linalg.eigvalsh(pred_cov)) if pred_cov is not None else np.asarray([])
-    gt_prec_spec = _normalized_spectrum(np.linalg.eigvalsh(gt_prec)) if gt_prec is not None else np.asarray([])
-    pred_prec_spec = _normalized_spectrum(np.linalg.eigvalsh(pred_prec)) if pred_prec is not None else np.asarray([])
+    gt_cov_spec = (
+        _normalized_spectrum(np.linalg.eigvalsh(gt_cov))
+        if gt_cov is not None
+        else np.asarray([])
+    )
+    pred_cov_spec = (
+        _normalized_spectrum(np.linalg.eigvalsh(pred_cov))
+        if pred_cov is not None
+        else np.asarray([])
+    )
+    gt_prec_spec = (
+        _normalized_spectrum(np.linalg.eigvalsh(gt_prec))
+        if gt_prec is not None
+        else np.asarray([])
+    )
+    pred_prec_spec = (
+        _normalized_spectrum(np.linalg.eigvalsh(pred_prec))
+        if pred_prec is not None
+        else np.asarray([])
+    )
 
     partial_corr = _matrix_similarity(gt_pcorr, pred_pcorr)
     psd_shape = _blend_scores(
@@ -627,7 +708,11 @@ def compute_additional_structural_metrics(gt_arr: np.ndarray, pred_arr: np.ndarr
 
     dim_gt = _effective_dimension(gt_cov)
     dim_pred = _effective_dimension(pred_cov)
-    dimensionality = float(1.0 / (1.0 + abs(dim_gt - dim_pred) / max(dim_gt, 1e-6))) if np.isfinite(dim_gt) and np.isfinite(dim_pred) else np.nan
+    dimensionality = (
+        float(1.0 / (1.0 + abs(dim_gt - dim_pred) / max(dim_gt, 1e-6)))
+        if np.isfinite(dim_gt) and np.isfinite(dim_pred)
+        else np.nan
+    )
 
     cross_mi = _matrix_similarity(_mi_matrix(gt_flat), _mi_matrix(pred_flat))
     precision_spectrum = _spectrum_similarity(gt_prec_spec, pred_prec_spec)
@@ -636,11 +721,21 @@ def compute_additional_structural_metrics(gt_arr: np.ndarray, pred_arr: np.ndarr
 
     lag_scores = []
     for lag in (1, 2, 4):
-        lag_scores.append(_matrix_similarity(_lagged_covariance(gt_flat, lag), _lagged_covariance(pred_flat, lag)))
-    lagged_covariance = float(np.nanmean(lag_scores)) if np.isfinite(lag_scores).any() else np.nan
+        lag_scores.append(
+            _matrix_similarity(
+                _lagged_covariance(gt_flat, lag), _lagged_covariance(pred_flat, lag)
+            )
+        )
+    lagged_covariance = (
+        float(np.nanmean(lag_scores)) if np.isfinite(lag_scores).any() else np.nan
+    )
 
-    impulse_response = _matrix_similarity(_var1_coefficients(gt_flat), _var1_coefficients(pred_flat))
-    latent_state_scores = _latent_state_score_bundle(gt, pred, gt_flat_raw, pred_flat_raw)
+    impulse_response = _matrix_similarity(
+        _var1_coefficients(gt_flat), _var1_coefficients(pred_flat)
+    )
+    latent_state_scores = _latent_state_score_bundle(
+        gt, pred, gt_flat_raw, pred_flat_raw
+    )
 
     scores = {
         "PartialCorr_score01": partial_corr,

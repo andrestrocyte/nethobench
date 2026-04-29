@@ -28,7 +28,6 @@ from nethobench.analysis.sensitive_metric_candidates import (
     trajectory_path_features_v3,
 )
 
-
 ScoreFn = Callable[[np.ndarray, np.ndarray], dict]
 CorruptionFn = Callable[[np.ndarray, float, int], np.ndarray]
 
@@ -47,8 +46,14 @@ def _extract_score(result: dict) -> float:
     return _finite_float(value)
 
 
-def _weighted_mean_available(values: dict[str, float], weights: dict[str, float]) -> float:
-    valid = [(key, values[key], weights[key]) for key in values if np.isfinite(values[key]) and weights.get(key, 0.0) > 0]
+def _weighted_mean_available(
+    values: dict[str, float], weights: dict[str, float]
+) -> float:
+    valid = [
+        (key, values[key], weights[key])
+        for key in values
+        if np.isfinite(values[key]) and weights.get(key, 0.0) > 0
+    ]
     if not valid:
         return np.nan
     total_weight = float(np.sum([weight for _, _, weight in valid]))
@@ -77,13 +82,19 @@ def _metric_display_name(metric_key: str) -> str:
     return names.get(metric_key, metric_key)
 
 
-def _align_common_arrays(gt_arr: np.ndarray, pred_arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def _align_common_arrays(
+    gt_arr: np.ndarray, pred_arr: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     gt = np.asarray(gt_arr, dtype=np.float64)
     pred = np.asarray(pred_arr, dtype=np.float64)
     if gt.ndim != 3 or pred.ndim != 3:
-        raise ValueError(f"Expected 3D arrays [n_seq, T, n_reg], got {gt.shape} and {pred.shape}")
+        raise ValueError(
+            f"Expected 3D arrays [n_seq, T, n_reg], got {gt.shape} and {pred.shape}"
+        )
     if gt.shape[0] != pred.shape[0] or gt.shape[2] != pred.shape[2]:
-        raise ValueError(f"GT/pred sequence-region mismatch: {gt.shape} vs {pred.shape}")
+        raise ValueError(
+            f"GT/pred sequence-region mismatch: {gt.shape} vs {pred.shape}"
+        )
     gt_len = gt.shape[1]
     pred_len = pred.shape[1]
     if pred_len != gt_len and pred_len % gt_len == 0:
@@ -161,7 +172,9 @@ def _moment_feature_arrays(arr: np.ndarray) -> dict[str, np.ndarray]:
     }
 
 
-def _one_sided_spikes_corruption(data: np.ndarray, level: float, seed: int) -> np.ndarray:
+def _one_sided_spikes_corruption(
+    data: np.ndarray, level: float, seed: int
+) -> np.ndarray:
     level = float(level)
     out = np.asarray(data, dtype=np.float64).copy()
     if level <= 0:
@@ -181,14 +194,18 @@ def _one_sided_spikes_corruption(data: np.ndarray, level: float, seed: int) -> n
         if candidate_idx.size == 0:
             candidate_idx = valid_idx
         n_spikes = max(1, int(np.ceil(level * 0.20 * candidate_idx.size)))
-        chosen = rng.choice(candidate_idx, size=n_spikes, replace=n_spikes > candidate_idx.size)
+        chosen = rng.choice(
+            candidate_idx, size=n_spikes, replace=n_spikes > candidate_idx.size
+        )
         spike_mag = (0.75 + 0.75 * rng.random(n_spikes)) * level * iqr
         values[chosen] = values[chosen] + spike_mag
         flat[:, region_idx] = values
     return out
 
 
-def corruption_gain_scaling_blend(data: np.ndarray, level: float, seed: int) -> np.ndarray:
+def corruption_gain_scaling_blend(
+    data: np.ndarray, level: float, seed: int
+) -> np.ndarray:
     data = np.asarray(data, dtype=np.float64)
     if level <= 0:
         return data.copy()
@@ -277,7 +294,10 @@ def _final_moment_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
     for name in ["var", "skew", "kurt"]:
         gt_values = gt_feats[name].ravel()
         pred_values = pred_feats[name].ravel()
-        components[name] = (_safe_spearman01(gt_values, pred_values), _rmse_similarity(gt_values, pred_values))
+        components[name] = (
+            _safe_spearman01(gt_values, pred_values),
+            _rmse_similarity(gt_values, pred_values),
+        )
     score, per_stat = _score_from_components(
         components,
         {"var": 0.40, "skew": 0.30, "kurt": 0.30},
@@ -307,7 +327,11 @@ def _perfected_moment_score_legacy(gt_arr: np.ndarray, pred_arr: np.ndarray) -> 
         skew_p = float(stats.skew(p, bias=False))
         kurt_g = float(stats.kurtosis(g, fisher=True, bias=False))
         kurt_p = float(stats.kurtosis(p, fisher=True, bias=False))
-        dist = abs(np.log(var_p / var_g)) + 0.50 * abs(skew_p - skew_g) + 0.25 * abs(kurt_p - kurt_g)
+        dist = (
+            abs(np.log(var_p / var_g))
+            + 0.50 * abs(skew_p - skew_g)
+            + 0.25 * abs(kurt_p - kurt_g)
+        )
         scores.append(_score_from_distance(dist))
     arr = np.asarray(scores, dtype=np.float64)
     arr = arr[np.isfinite(arr)]
@@ -343,7 +367,9 @@ def _final_graph_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
         weight_score = _safe_spearman01(gt_edges[union_idx], pred_edges[union_idx])
     else:
         weight_score = np.nan
-    degree_score = _safe_spearman01(np.sum(np.abs(corr_gt), axis=1), np.sum(np.abs(corr_pred), axis=1))
+    degree_score = _safe_spearman01(
+        np.sum(np.abs(corr_gt), axis=1), np.sum(np.abs(corr_pred), axis=1)
+    )
     adj_gt = np.zeros_like(corr_gt, dtype=np.float64)
     adj_pred = np.zeros_like(corr_pred, dtype=np.float64)
     if idx_gt.size:
@@ -352,7 +378,9 @@ def _final_graph_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
         adj_pred[tri[0][idx_pred], tri[1][idx_pred]] = 1.0
     adj_gt = adj_gt + adj_gt.T
     adj_pred = adj_pred + adj_pred.T
-    cluster_score = _rmse_similarity(_local_clustering_from_adj(adj_gt), _local_clustering_from_adj(adj_pred))
+    cluster_score = _rmse_similarity(
+        _local_clustering_from_adj(adj_gt), _local_clustering_from_adj(adj_pred)
+    )
     score = _weighted_mean_available(
         {
             "jaccard": jaccard,
@@ -398,15 +426,23 @@ def _perfected_graph_score_legacy(gt_arr: np.ndarray, pred_arr: np.ndarray) -> d
     jaccard = float(len(edges_g & edges_p) / max(len(union), 1))
     deg_g = np.sum(np.abs(Cg), axis=0)
     deg_p = np.sum(np.abs(Cp), axis=0)
-    degree_score = _score_from_distance(float(np.mean(np.abs(deg_p - deg_g)) / (np.mean(np.abs(deg_g)) + EPS)))
+    degree_score = _score_from_distance(
+        float(np.mean(np.abs(deg_p - deg_g)) / (np.mean(np.abs(deg_g)) + EPS))
+    )
     clust_g = _binary_clustering(Ag)
     clust_p = _binary_clustering(Ap)
     clustering_score = _finite_float(1.0 - float(np.mean(np.abs(clust_p - clust_g))))
-    pieces = [value for value in [jaccard, degree_score, clustering_score] if np.isfinite(value)]
+    pieces = [
+        value
+        for value in [jaccard, degree_score, clustering_score]
+        if np.isfinite(value)
+    ]
     if not pieces:
         score = np.nan
     else:
-        score = _finite_float(float(np.exp(np.mean(np.log(np.clip(pieces, 1e-6, 1.0))))))
+        score = _finite_float(
+            float(np.exp(np.mean(np.log(np.clip(pieces, 1e-6, 1.0)))))
+        )
     return {
         "score": score,
         "jaccard": jaccard,

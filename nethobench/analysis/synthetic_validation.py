@@ -16,13 +16,14 @@ from nethobench.fidelity import compute_fidelity_scores
 from nethobench.neuro import _compute_scores_from_arrays
 from nethobench.analysis.score_definitions import NEURO_FAMILY_WEIGHTS
 
-
 FAMILY_COLUMNS = [f"family_{name}" for name in NEURO_FAMILY_WEIGHTS] + [
     "FINAL_COMPOSITE_SCORE",
     "ORACLE_VALIDATION_COMPOSITE_SCORE",
 ]
 
-ORACLE_VALIDATION_WEIGHTS = {f"family_{name}": weight for name, weight in NEURO_FAMILY_WEIGHTS.items()}
+ORACLE_VALIDATION_WEIGHTS = {
+    f"family_{name}": weight for name, weight in NEURO_FAMILY_WEIGHTS.items()
+}
 FIDELITY_COLUMNS = ["Error_score01", "MI_score01", "family_fidelity", "FIDELITY_SCORE"]
 
 
@@ -174,7 +175,9 @@ def _build_system(spec: SyntheticNeuralSpec) -> dict[str, np.ndarray]:
     base_decay = np.linspace(0.93, 0.68, latent_dim)
     cross = rng.normal(scale=0.10, size=(latent_dim, latent_dim))
     cross -= np.diag(np.diag(cross))
-    A = np.diag(base_decay) + spec.coupling_strength * cross / np.sqrt(max(latent_dim, 1))
+    A = np.diag(base_decay) + spec.coupling_strength * cross / np.sqrt(
+        max(latent_dim, 1)
+    )
     eig = np.max(np.abs(np.linalg.eigvals(A)))
     if np.isfinite(eig) and eig > 0.97:
         A *= 0.97 / float(eig)
@@ -212,12 +215,16 @@ def _build_system(spec: SyntheticNeuralSpec) -> dict[str, np.ndarray]:
         biases = biases + 0.45 * level * pattern
     elif perturbation in {"temporal_tau_frequency", "temporal_combo"}:
         alphas = np.clip(alphas - 0.25 * level, 0.55, 0.98)
-        oscillation_frequency = oscillation_frequency * (1.0 + level * np.linspace(0.7, 1.1, latent_dim))
+        oscillation_frequency = oscillation_frequency * (
+            1.0 + level * np.linspace(0.7, 1.1, latent_dim)
+        )
         oscillator_weights = oscillator_weights * (1.0 - 0.65 * level)
         A = A.copy()
         np.fill_diagonal(A, np.clip(np.diag(A) - 0.22 * level, 0.28, 0.99))
     if perturbation in {"temporal_phase_desync", "temporal_combo"}:
-        latent_phases = latent_phases + (1.4 * level * rng.uniform(-np.pi, np.pi, size=latent_dim))
+        latent_phases = latent_phases + (
+            1.4 * level * rng.uniform(-np.pi, np.pi, size=latent_dim)
+        )
         oscillation_frequency = oscillation_frequency * np.clip(
             1.0 + (0.55 * level * rng.normal(size=latent_dim)),
             0.30,
@@ -253,7 +260,9 @@ def _build_system(spec: SyntheticNeuralSpec) -> dict[str, np.ndarray]:
     if perturbation in {"geometry_rank_truncation", "geometry_combo"}:
         keep = np.ones(latent_dim, dtype=np.float64)
         if latent_dim > 1:
-            keep[1:] = np.maximum(1.0 - (level * np.linspace(0.85, 1.20, latent_dim - 1)), 0.02)
+            keep[1:] = np.maximum(
+                1.0 - (level * np.linspace(0.85, 1.20, latent_dim - 1)), 0.02
+            )
         latent_transform = np.diag(keep) @ latent_transform
         latent_warp_strength = max(latent_warp_strength, 0.85 * level)
 
@@ -296,18 +305,31 @@ def generate_synthetic_neural_dataset(
             osc = (
                 spec.oscillator_amplitude
                 * system["oscillator_weights"]
-                * np.sin((2.0 * np.pi * system["oscillation_frequency"] * t) + system["latent_phases"])
+                * np.sin(
+                    (2.0 * np.pi * system["oscillation_frequency"] * t)
+                    + system["latent_phases"]
+                )
             )
-            z = system["A"] @ z + osc + rng.normal(scale=spec.latent_noise_scale, size=latent_dim)
+            z = (
+                system["A"] @ z
+                + osc
+                + rng.normal(scale=spec.latent_noise_scale, size=latent_dim)
+            )
             z_eff = system["latent_transform"] @ z
             if system["latent_warp_strength"] > 0 and latent_dim >= 2:
                 z_eff = z_eff.copy()
-                z_eff[1] = z_eff[1] + (system["latent_warp_strength"] * ((z_eff[0] ** 2) - 1.0))
+                z_eff[1] = z_eff[1] + (
+                    system["latent_warp_strength"] * ((z_eff[0] ** 2) - 1.0)
+                )
             drive = system["W"] @ z_eff + system["biases"]
             activity = np.log1p(np.exp(drive))
             activity = system["gains"] * activity
-            calcium = (system["alphas"] * calcium) + ((1.0 - system["alphas"]) * activity)
-            calcium = calcium + rng.normal(scale=system["observation_noise"], size=n_regions)
+            calcium = (system["alphas"] * calcium) + (
+                (1.0 - system["alphas"]) * activity
+            )
+            calcium = calcium + rng.normal(
+                scale=system["observation_noise"], size=n_regions
+            )
             seq_trace[t] = calcium
         data[seq_idx] = seq_trace[burn:]
 
@@ -439,12 +461,16 @@ def _build_selectivity_table(
             "target_family": perturbation.target_family,
         }
         for score_col in score_columns:
-            row[score_col] = _relative_drop(oracle_means.get(score_col, np.nan), score_means.get(score_col, np.nan))
+            row[score_col] = _relative_drop(
+                oracle_means.get(score_col, np.nan), score_means.get(score_col, np.nan)
+            )
         rows.append(row)
     return pd.DataFrame(rows)
 
 
-def _build_oracle_summary(scores_df: pd.DataFrame, score_columns: list[str]) -> pd.DataFrame:
+def _build_oracle_summary(
+    scores_df: pd.DataFrame, score_columns: list[str]
+) -> pd.DataFrame:
     sub = scores_df[scores_df["comparison_kind"] == "oracle"].copy()
     rows = []
     for column in score_columns:
@@ -493,13 +519,30 @@ def _empty_selectivity_frame(score_columns: list[str]) -> pd.DataFrame:
 
 
 def _empty_dose_frame(score_columns: list[str]) -> pd.DataFrame:
-    return pd.DataFrame(columns=["perturbation_name", "target_family", "level", "score_name", "mean_score"])
+    return pd.DataFrame(
+        columns=[
+            "perturbation_name",
+            "target_family",
+            "level",
+            "score_name",
+            "mean_score",
+        ]
+    )
 
 
-def _plot_family_ceiling_floor(scores_df: pd.DataFrame, output_path: Path, *, perturbation_defs: tuple[PerturbationSpec, ...]) -> None:
-    oracle_means = scores_df[scores_df["comparison_kind"] == "oracle"][FAMILY_COLUMNS].mean(numeric_only=True)
+def _plot_family_ceiling_floor(
+    scores_df: pd.DataFrame,
+    output_path: Path,
+    *,
+    perturbation_defs: tuple[PerturbationSpec, ...],
+) -> None:
+    oracle_means = scores_df[scores_df["comparison_kind"] == "oracle"][
+        FAMILY_COLUMNS
+    ].mean(numeric_only=True)
     perturb_only = scores_df[scores_df["comparison_kind"] == "perturbation"]
-    labels = [col.replace("family_", "").replace("_", " ").title() for col in FAMILY_COLUMNS]
+    labels = [
+        col.replace("family_", "").replace("_", " ").title() for col in FAMILY_COLUMNS
+    ]
     n_cols = 3
     n_rows = int(np.ceil(len(FAMILY_COLUMNS) / n_cols))
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(16, 4.0 * n_rows), sharey=True)
@@ -510,7 +553,11 @@ def _plot_family_ceiling_floor(scores_df: pd.DataFrame, output_path: Path, *, pe
         for perturbation in perturbation_defs:
             sub = perturb_only[
                 (perturb_only["perturbation_name"] == perturbation.name)
-                & (np.isclose(perturb_only["perturbation_level"], max(perturbation.levels)))
+                & (
+                    np.isclose(
+                        perturb_only["perturbation_level"], max(perturbation.levels)
+                    )
+                )
             ]
             values.append(float(sub[family_col].mean()))
             names.append(perturbation.name.replace("_", "\n"))
@@ -521,7 +568,7 @@ def _plot_family_ceiling_floor(scores_df: pd.DataFrame, output_path: Path, *, pe
         ax.set_xticklabels(names, rotation=35, ha="right")
         ax.set_ylim(0.0, 1.0)
         ax.grid(axis="y", alpha=0.25)
-    for ax in axes[len(FAMILY_COLUMNS):]:
+    for ax in axes[len(FAMILY_COLUMNS) :]:
         ax.axis("off")
     fig.suptitle("Oracle ceilings versus targeted synthetic mismatches", y=1.02)
     fig.tight_layout()
@@ -540,10 +587,15 @@ def _plot_selectivity_heatmap(
     fig_width = max(8.5, 0.48 * len(score_columns))
     fig, ax = plt.subplots(figsize=(fig_width, 4.5))
     vmax = np.nanmax(matrix) if np.isfinite(matrix).any() else 0.30
-    im = ax.imshow(matrix, cmap="viridis", aspect="auto", vmin=0.0, vmax=max(0.30, float(vmax)))
+    im = ax.imshow(
+        matrix, cmap="viridis", aspect="auto", vmin=0.0, vmax=max(0.30, float(vmax))
+    )
     ax.set_xticks(np.arange(len(score_columns)))
     ax.set_xticklabels(
-        [col.replace("family_", "").replace("_score01", "").replace("_", " ") for col in score_columns],
+        [
+            col.replace("family_", "").replace("_score01", "").replace("_", " ")
+            for col in score_columns
+        ],
         rotation=30,
         ha="right",
     )
@@ -553,7 +605,15 @@ def _plot_selectivity_heatmap(
         for col_idx in range(matrix.shape[1]):
             val = matrix[row_idx, col_idx]
             if np.isfinite(val):
-                ax.text(col_idx, row_idx, f"{val:.2f}", ha="center", va="center", color="white", fontsize=9)
+                ax.text(
+                    col_idx,
+                    row_idx,
+                    f"{val:.2f}",
+                    ha="center",
+                    va="center",
+                    color="white",
+                    fontsize=9,
+                )
     fig.colorbar(im, ax=ax, shrink=0.85, label="relative drop from oracle")
     ax.set_title(title)
     fig.tight_layout()
@@ -561,17 +621,43 @@ def _plot_selectivity_heatmap(
     plt.close(fig)
 
 
-def _plot_dose_response(dose_df: pd.DataFrame, output_path: Path, *, perturbation_defs: tuple[PerturbationSpec, ...]) -> None:
-    fig, axes = plt.subplots(len(perturbation_defs), 1, figsize=(10, 3.0 * len(perturbation_defs)), sharex=False)
+def _plot_dose_response(
+    dose_df: pd.DataFrame,
+    output_path: Path,
+    *,
+    perturbation_defs: tuple[PerturbationSpec, ...],
+) -> None:
+    fig, axes = plt.subplots(
+        len(perturbation_defs),
+        1,
+        figsize=(10, 3.0 * len(perturbation_defs)),
+        sharex=False,
+    )
     if len(perturbation_defs) == 1:
         axes = [axes]
     for ax, perturbation in zip(axes, perturbation_defs):
         sub = dose_df[dose_df["perturbation_name"] == perturbation.name]
         target = perturbation.target_family
         target_df = sub[sub["score_name"] == target].sort_values("level")
-        composite_df = sub[sub["score_name"] == "FINAL_COMPOSITE_SCORE"].sort_values("level")
-        ax.plot(target_df["level"], target_df["mean_score"], marker="o", linewidth=2.6, color="#1f77b4", label=target.replace("family_", "target: "))
-        ax.plot(composite_df["level"], composite_df["mean_score"], marker="s", linewidth=2.0, color="#d62728", label="final composite")
+        composite_df = sub[sub["score_name"] == "FINAL_COMPOSITE_SCORE"].sort_values(
+            "level"
+        )
+        ax.plot(
+            target_df["level"],
+            target_df["mean_score"],
+            marker="o",
+            linewidth=2.6,
+            color="#1f77b4",
+            label=target.replace("family_", "target: "),
+        )
+        ax.plot(
+            composite_df["level"],
+            composite_df["mean_score"],
+            marker="s",
+            linewidth=2.0,
+            color="#d62728",
+            label="final composite",
+        )
         ax.set_title(perturbation.name)
         ax.set_ylabel("mean score")
         ax.set_ylim(0.0, 1.0)
@@ -602,36 +688,73 @@ def run_synthetic_neuro_validation(
         path.mkdir(parents=True, exist_ok=True)
 
     perturbation_defs = tuple(perturbations)
-    target_lookup = {perturbation.name: perturbation.target_family for perturbation in perturbation_defs}
+    target_lookup = {
+        perturbation.name: perturbation.target_family
+        for perturbation in perturbation_defs
+    }
 
     reference = generate_synthetic_neural_dataset(spec, sample_seed=101)
     if save_datasets:
-        dataset_to_sequence_frame(reference.array, reference.region_names).to_csv(datasets_dir / "synthetic_ground_truth.csv", index=False)
+        dataset_to_sequence_frame(reference.array, reference.region_names).to_csv(
+            datasets_dir / "synthetic_ground_truth.csv", index=False
+        )
 
     rows: list[dict[str, object]] = []
     for rep_idx in range(oracle_replicates):
         oracle_seed = 501 + rep_idx
         oracle = generate_synthetic_neural_dataset(spec, sample_seed=oracle_seed)
         if save_datasets and rep_idx == 0:
-            dataset_to_sequence_frame(oracle.array, oracle.region_names).to_csv(datasets_dir / "synthetic_oracle_prediction.csv", index=False)
-        scores = _quiet_scores_from_arrays(reference.array, oracle.array, region_names=reference.region_names)
-        scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(scores)
-        scores.update(_quiet_fidelity_from_arrays(reference.array, oracle.array, region_names=reference.region_names))
-        row = _score_row_metadata(spec, "oracle", oracle_seed, target_lookup=target_lookup)
+            dataset_to_sequence_frame(oracle.array, oracle.region_names).to_csv(
+                datasets_dir / "synthetic_oracle_prediction.csv", index=False
+            )
+        scores = _quiet_scores_from_arrays(
+            reference.array, oracle.array, region_names=reference.region_names
+        )
+        scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(
+            scores
+        )
+        scores.update(
+            _quiet_fidelity_from_arrays(
+                reference.array, oracle.array, region_names=reference.region_names
+            )
+        )
+        row = _score_row_metadata(
+            spec, "oracle", oracle_seed, target_lookup=target_lookup
+        )
         row.update(scores)
         rows.append(row)
 
     for perturbation in perturbation_defs:
         for level in perturbation.levels:
-            perturbed_spec = replace(spec, perturbation_name=perturbation.name, perturbation_level=float(level))
-            perturbed = generate_synthetic_neural_dataset(perturbed_spec, sample_seed=701)
+            perturbed_spec = replace(
+                spec,
+                perturbation_name=perturbation.name,
+                perturbation_level=float(level),
+            )
+            perturbed = generate_synthetic_neural_dataset(
+                perturbed_spec, sample_seed=701
+            )
             if save_datasets and level == max(perturbation.levels):
                 out_name = f"{perturbation.name}-level-{int(level * 100):03d}.csv"
-                dataset_to_sequence_frame(perturbed.array, perturbed.region_names).to_csv(datasets_dir / out_name, index=False)
-            scores = _quiet_scores_from_arrays(reference.array, perturbed.array, region_names=reference.region_names)
-            scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(scores)
-            scores.update(_quiet_fidelity_from_arrays(reference.array, perturbed.array, region_names=reference.region_names))
-            row = _score_row_metadata(perturbed_spec, "perturbation", 701, target_lookup=target_lookup)
+                dataset_to_sequence_frame(
+                    perturbed.array, perturbed.region_names
+                ).to_csv(datasets_dir / out_name, index=False)
+            scores = _quiet_scores_from_arrays(
+                reference.array, perturbed.array, region_names=reference.region_names
+            )
+            scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(
+                scores
+            )
+            scores.update(
+                _quiet_fidelity_from_arrays(
+                    reference.array,
+                    perturbed.array,
+                    region_names=reference.region_names,
+                )
+            )
+            row = _score_row_metadata(
+                perturbed_spec, "perturbation", 701, target_lookup=target_lookup
+            )
             row.update(scores)
             rows.append(row)
 
@@ -641,12 +764,24 @@ def run_synthetic_neuro_validation(
     metric_oracle_summary = _build_oracle_summary(scores_df, metric_columns)
     fidelity_oracle_summary = _build_oracle_summary(scores_df, FIDELITY_COLUMNS)
     if perturbation_defs:
-        family_selectivity_df = _build_selectivity_table(scores_df, FAMILY_COLUMNS, perturbation_defs)
-        metric_selectivity_df = _build_selectivity_table(scores_df, metric_columns, perturbation_defs)
-        fidelity_selectivity_df = _build_selectivity_table(scores_df, FIDELITY_COLUMNS, perturbation_defs)
-        family_dose_df = _build_dose_response(scores_df, FAMILY_COLUMNS, perturbation_defs)
-        metric_dose_df = _build_dose_response(scores_df, metric_columns, perturbation_defs)
-        fidelity_dose_df = _build_dose_response(scores_df, FIDELITY_COLUMNS, perturbation_defs)
+        family_selectivity_df = _build_selectivity_table(
+            scores_df, FAMILY_COLUMNS, perturbation_defs
+        )
+        metric_selectivity_df = _build_selectivity_table(
+            scores_df, metric_columns, perturbation_defs
+        )
+        fidelity_selectivity_df = _build_selectivity_table(
+            scores_df, FIDELITY_COLUMNS, perturbation_defs
+        )
+        family_dose_df = _build_dose_response(
+            scores_df, FAMILY_COLUMNS, perturbation_defs
+        )
+        metric_dose_df = _build_dose_response(
+            scores_df, metric_columns, perturbation_defs
+        )
+        fidelity_dose_df = _build_dose_response(
+            scores_df, FIDELITY_COLUMNS, perturbation_defs
+        )
     else:
         family_selectivity_df = _empty_selectivity_frame(FAMILY_COLUMNS)
         metric_selectivity_df = _empty_selectivity_frame(metric_columns)
@@ -690,7 +825,9 @@ def run_synthetic_neuro_validation(
     metric_selectivity_plot = figures_dir / "metric_selectivity_heatmap.png"
     dose_plot = figures_dir / "dose_response_curves.png"
     if perturbation_defs:
-        _plot_family_ceiling_floor(scores_df, ceiling_plot, perturbation_defs=perturbation_defs)
+        _plot_family_ceiling_floor(
+            scores_df, ceiling_plot, perturbation_defs=perturbation_defs
+        )
         _plot_selectivity_heatmap(
             family_selectivity_df,
             family_selectivity_plot,
@@ -703,7 +840,9 @@ def run_synthetic_neuro_validation(
             score_columns=metric_columns,
             title="Metric selectivity heatmap",
         )
-        _plot_dose_response(family_dose_df, dose_plot, perturbation_defs=perturbation_defs)
+        _plot_dose_response(
+            family_dose_df, dose_plot, perturbation_defs=perturbation_defs
+        )
 
     return {
         "output_root": output_root,

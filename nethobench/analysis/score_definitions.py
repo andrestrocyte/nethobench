@@ -6,7 +6,6 @@ from typing import Mapping
 import numpy as np
 import pandas as pd
 
-
 NEURO_FAMILY_METRICS: "OrderedDict[str, OrderedDict[str, float]]" = OrderedDict(
     [
         (
@@ -85,7 +84,9 @@ def weighted_mean_available(
     values: Mapping[str, float],
     weights: Mapping[str, float],
 ) -> float:
-    keys = [k for k, v in values.items() if np.isfinite(v) and weights.get(k, 0.0) > 0.0]
+    keys = [
+        k for k, v in values.items() if np.isfinite(v) and weights.get(k, 0.0) > 0.0
+    ]
     if not keys:
         return np.nan
     denom = float(np.sum([weights[k] for k in keys]))
@@ -97,8 +98,13 @@ def weighted_mean_available(
 def compute_neuro_family_scores(metric_scores: Mapping[str, float]) -> dict[str, float]:
     families: dict[str, float] = {}
     for family_name, metric_weights in NEURO_FAMILY_METRICS.items():
-        values = {metric: float(metric_scores.get(metric, np.nan)) for metric in metric_weights}
-        families[f"family_{family_name}"] = weighted_mean_available(values, metric_weights)
+        values = {
+            metric: float(metric_scores.get(metric, np.nan))
+            for metric in metric_weights
+        }
+        families[f"family_{family_name}"] = weighted_mean_available(
+            values, metric_weights
+        )
     return families
 
 
@@ -141,7 +147,9 @@ def build_neuro_families_df(metric_scores: Mapping[str, float]) -> pd.DataFrame:
 
 
 def compute_fidelity_composite(metric_scores: Mapping[str, float]) -> float:
-    values = {metric: float(metric_scores.get(metric, np.nan)) for metric in FIDELITY_METRICS}
+    values = {
+        metric: float(metric_scores.get(metric, np.nan)) for metric in FIDELITY_METRICS
+    }
     return weighted_mean_available(values, FIDELITY_METRICS)
 
 

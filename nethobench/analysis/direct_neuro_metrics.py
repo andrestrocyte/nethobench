@@ -11,7 +11,9 @@ from nethobench.analysis.refined_neuro_metric_replacements import (
 )
 
 
-def compute_moment_score01(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict[str, object]:
+def compute_moment_score01(
+    gt_arr: np.ndarray, pred_arr: np.ndarray
+) -> dict[str, object]:
     description = "Variance, skewness, and kurtosis agreement."
     result = _perfected_moment_score_legacy(gt_arr, pred_arr)
     score = _extract_score(result)
@@ -24,7 +26,9 @@ def compute_moment_score01(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict[str
     }
 
 
-def compute_graph_score01(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict[str, object]:
+def compute_graph_score01(
+    gt_arr: np.ndarray, pred_arr: np.ndarray
+) -> dict[str, object]:
     description = "Top-edge topology, weighted degree, and clustering agreement."
     result = _perfected_graph_score_legacy(gt_arr, pred_arr)
     score = _extract_score(result)
@@ -40,7 +44,9 @@ def compute_graph_score01(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict[str,
     }
 
 
-def compute_manifold_score01(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict[str, object]:
+def compute_manifold_score01(
+    gt_arr: np.ndarray, pred_arr: np.ndarray
+) -> dict[str, object]:
     description = (
         "Persistent-homology lifetime agreement stabilized by local-neighborhood geometry. "
         "It combines a topology term with a local geometry term in a fixed GT latent space."
@@ -55,7 +61,9 @@ def compute_manifold_score01(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict[s
     }
 
 
-def compute_trajectory_score01(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict[str, object]:
+def compute_trajectory_score01(
+    gt_arr: np.ndarray, pred_arr: np.ndarray
+) -> dict[str, object]:
     description = (
         "Pooled latent occupancy and velocity-distribution agreement stabilized by latent path features. "
         "It scores occupancy, speed, turning, and sequence-level path structure in a shared GT PCA space."

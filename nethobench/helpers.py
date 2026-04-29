@@ -6,6 +6,7 @@ import io
 
 from typing import Optional
 
+
 def load_df(path: Path):
     if str(path).endswith(".csv"):
         return pd.read_csv(path, index_col=None, header=0, sep=",")
@@ -13,7 +14,7 @@ def load_df(path: Path):
         return pd.read_parquet(path)
     else:
         raise Exception(f"Only parquet and csv files allowed")
-    
+
 
 def load_gt_and_preds(gt_dir: Path, inf_dir: Path):
 
@@ -22,10 +23,11 @@ def load_gt_and_preds(gt_dir: Path, inf_dir: Path):
     diff1 = set(list(gt_df.columns)).difference(set(list(inf_df.columns)))
     diff2 = set(list(inf_df.columns)).difference(set(list(gt_df.columns)))
 
-    assert len(diff1) == 0 and len(diff2) == 0, f"Unequal cols found: in gt but not preds: {diff1}, in preds but not gt: {diff2}"
+    assert (
+        len(diff1) == 0 and len(diff2) == 0
+    ), f"Unequal cols found: in gt but not preds: {diff1}, in preds but not gt: {diff2}"
 
     return gt_df, inf_df
-
 
 
 def _load_sequences(
@@ -38,7 +40,9 @@ def _load_sequences(
 
     if {sequence_key, time_key}.issubset(df.columns):
         df = df.sort_values([sequence_key, time_key]).reset_index(drop=True)
-        region_cols = [column for column in df.columns if column not in {sequence_key, time_key}]
+        region_cols = [
+            column for column in df.columns if column not in {sequence_key, time_key}
+        ]
         if not region_cols:
             raise ValueError(f"No region columns found in {csv_path}")
         seq_lengths = df.groupby(sequence_key).size()
@@ -49,12 +53,18 @@ def _load_sequences(
             )
         n_seq = int(seq_lengths.size)
         n_time = int(seq_lengths.iloc[0])
-        arr = df[region_cols].to_numpy(dtype=np.float64).reshape(n_seq, n_time, len(region_cols))
+        arr = (
+            df[region_cols]
+            .to_numpy(dtype=np.float64)
+            .reshape(n_seq, n_time, len(region_cols))
+        )
         return arr, region_cols
 
     df = pd.read_csv(csv_path, index_col=0)
     if df.index.dtype.kind not in {"i", "u"}:
-        raise ValueError(f"Prediction CSV {csv_path} must have integral sequence ids in the index.")
+        raise ValueError(
+            f"Prediction CSV {csv_path} must have integral sequence ids in the index."
+        )
     counts = df.index.value_counts()
     if counts.nunique() != 1:
         raise ValueError("Prediction sequences must all have the same length.")
@@ -74,7 +84,11 @@ def _load_and_align(
     gt_arr, gt_regions = _load_sequences(ground_truth_csv)
 
     if neuro_cols:
-        overlap = [region for region in neuro_cols if region in gt_regions and region in pred_regions]
+        overlap = [
+            region
+            for region in neuro_cols
+            if region in gt_regions and region in pred_regions
+        ]
     else:
         overlap = [region for region in gt_regions if region in pred_regions]
     if not overlap:
@@ -91,11 +105,11 @@ def _load_and_align(
     return gt_arr, pred_arr, overlap
 
 
-
 def _quiet_call(func, *args, **kwargs):
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
         return func(*args, **kwargs)
+
 
 def _timestamped_outdir(base: Path | None = None, prefix: str = "ethobench") -> Path:
     base = Path(base) if base is not None else Path.cwd() / "outputs"
