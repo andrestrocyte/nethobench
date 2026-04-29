@@ -303,7 +303,7 @@ def _run_etho(args: argparse.Namespace) -> None:
     if args.json_out:
         out = Path(args.json_out)
     else:
-        out = Path(os.path.join("outputs", f"{args.inf_dir.split(os.sep)[0]}-etho-scores"))
+        out = Path(os.path.join("outputs", f"{args.inf_dir.split(os.sep)[-1].split('.')[0]}-etho-scores"))
     
     out.mkdir(parents=True, exist_ok=True)
     payload = {
