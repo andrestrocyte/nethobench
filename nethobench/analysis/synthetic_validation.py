@@ -12,9 +12,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from ..fidelity import compute_fidelity_scores
-from ..neuro import _compute_scores_from_arrays
-from .score_definitions import NEURO_FAMILY_WEIGHTS
+from nethobench.fidelity import compute_fidelity_scores
+from nethobench.neuro import _compute_scores_from_arrays
+from nethobench.analysis.score_definitions import NEURO_FAMILY_WEIGHTS
 
 
 FAMILY_COLUMNS = [f"family_{name}" for name in NEURO_FAMILY_WEIGHTS] + [

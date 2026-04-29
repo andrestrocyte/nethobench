@@ -1,8 +1,8 @@
-from .cross import compute_cross_scores, run_cross_full_analysis
-from .etho import compute_etho_scores, run_etho_full_analysis
-from .fidelity import compute_fidelity_scores
-from .neuro import compute_neuro_scores, run_neuro_full_analysis
-from .synthetic import (
+from nethobench.cross import compute_cross_scores, run_cross_full_analysis
+from nethobench.etho import compute_etho_scores, run_etho_full_analysis
+from nethobench.fidelity import compute_fidelity_scores
+from nethobench.neuro import compute_neuro_scores, run_neuro_full_analysis
+from nethobench.synthetic import (
     DEFAULT_BIOPHYSICAL_PERTURBATIONS,
     DEFAULT_PERTURBATIONS,
     BiophysicalSyntheticNeuralSpec,

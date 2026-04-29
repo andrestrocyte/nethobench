@@ -8,7 +8,7 @@ import pandas as pd
 from scipy import stats
 from scipy.stats import kurtosis, skew, spearmanr
 
-from .sensitive_metric_candidates import (
+from nethobench.analysis.sensitive_metric_candidates import (
     EPS,
     _align_arrays,
     _finite_rows,

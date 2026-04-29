@@ -4,18 +4,18 @@ import numpy as np
 import pandas as pd
 from scipy.stats import entropy
 
-from .score_definitions import (
+from nethobench.analysis.score_definitions import (
     build_neuro_families_df,
     build_neuro_metrics_df,
     compute_neuro_composite,
 )
-from .direct_neuro_metrics import (
+from nethobench.analysis.direct_neuro_metrics import (
     compute_moment_score01,
     compute_graph_score01,
     compute_manifold_score01,
     compute_trajectory_score01,
 )
-from .additional_neuro_metrics import compute_additional_structural_metrics
+from nethobench.analysis.additional_neuro_metrics import compute_additional_structural_metrics
 
 EPS = 1e-12
 

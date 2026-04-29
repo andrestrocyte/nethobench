@@ -10,8 +10,8 @@ from sklearn.cross_decomposition import CCA
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 
-from .neuro import _compute_scores_from_arrays
-from .etho import (
+from nethobench.neuro import _compute_scores_from_arrays
+from nethobench.etho import (
     position_kl_score,
     quadrant_score,
     stationary_score,
@@ -384,7 +384,7 @@ def run_cross_full_analysis(
     Execute the full cross-modal analysis natively, saving JSON metrics and rendering plots.
     """
     try:
-        from .analysis.cross_reporting import generate_full_cross_report
+        from nethobench.analysis.cross_reporting import generate_full_cross_report
     except ImportError:
         def generate_full_cross_report(*args, **kwargs):
             pass # Failsafe if reporting module is missing

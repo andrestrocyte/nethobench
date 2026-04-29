@@ -8,7 +8,7 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
-from .synthetic_validation import (
+from nethobench.analysis.synthetic_validation import (
     FAMILY_COLUMNS,
     FIDELITY_COLUMNS,
     PerturbationSpec,
