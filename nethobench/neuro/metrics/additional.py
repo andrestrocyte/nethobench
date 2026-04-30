@@ -44,7 +44,6 @@ def _apply_reference_scaler(
 ) -> np.ndarray:
     data = np.asarray(data, dtype=np.float64)
     out = (data - center) / scale
-    out[~np.isfinite(out)] = 0.0
     return out
 
 
@@ -64,7 +63,6 @@ def _covariance(flat: np.ndarray) -> np.ndarray | None:
     cov = np.asarray(cov, dtype=np.float64)
     if cov.ndim != 2 or cov.shape[0] < 2:
         return None
-    cov[~np.isfinite(cov)] = 0.0
     return cov
 
 
@@ -86,7 +84,6 @@ def _partial_corr_from_precision(prec: np.ndarray) -> np.ndarray | None:
     denom = np.outer(diag, diag)
     pcorr = -prec / denom
     np.fill_diagonal(pcorr, 1.0)
-    pcorr[~np.isfinite(pcorr)] = 0.0
     return np.clip(pcorr, -1.0, 1.0)
 
 
@@ -201,7 +198,6 @@ def _lagged_covariance(flat: np.ndarray, lag: int) -> np.ndarray | None:
     y = y - np.mean(y, axis=0, keepdims=True)
     cov = (x.T @ y) / max(x.shape[0] - 1, 1)
     cov = np.asarray(cov, dtype=np.float64)
-    cov[~np.isfinite(cov)] = 0.0
     return cov
 
 
@@ -217,7 +213,6 @@ def _var1_coefficients(flat: np.ndarray, ridge: float = 1e-2) -> np.ndarray | No
     except np.linalg.LinAlgError:
         coeff = np.linalg.pinv(xtx + reg) @ (x.T @ y)
     coeff = np.asarray(coeff.T, dtype=np.float64)
-    coeff[~np.isfinite(coeff)] = 0.0
     return coeff
 
 
@@ -277,7 +272,6 @@ def _project_rows(
     centered = flat - mean
     proj = centered @ basis
     proj = np.asarray(proj, dtype=np.float64)
-    proj[~np.isfinite(proj)] = 0.0
     return proj
 
 
@@ -309,7 +303,6 @@ def _fit_kmeans_centers(
     )
     model.fit(fit_features)
     centers = np.asarray(model.cluster_centers_, dtype=np.float64)
-    centers[~np.isfinite(centers)] = 0.0
     return centers
 
 
@@ -324,7 +317,6 @@ def _assign_to_centers(
     feat_sq = np.sum(features * features, axis=1, keepdims=True)
     ctr_sq = np.sum(centers * centers, axis=1)[None, :]
     d2 = feat_sq + ctr_sq - 2.0 * (features @ centers.T)
-    d2[~np.isfinite(d2)] = np.inf
     return np.argmin(d2, axis=1).astype(int)
 
 

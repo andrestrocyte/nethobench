@@ -260,10 +260,10 @@ def _lead_lag_peak(
                 cors.append(np.corrcoef(a, bb)[0, 1])
         seq_cors.append(np.asarray(cors, dtype=np.float64))
     if not seq_cors:
-        return 0
+        return np.nan
     cors = np.nanmean(np.vstack(seq_cors), axis=0)
     if not np.isfinite(cors).any():
-        return 0
+        return np.nan
     idx = int(np.nanargmax(np.abs(cors)))
     return int(lags[idx])
 

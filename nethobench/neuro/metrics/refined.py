@@ -161,7 +161,6 @@ def _corrcoef_from_flat(data: np.ndarray) -> np.ndarray | None:
         return None
     corr = np.corrcoef(flat, rowvar=False)
     corr = np.asarray(corr, dtype=np.float64)
-    corr[~np.isfinite(corr)] = 0.0
     np.fill_diagonal(corr, 0.0)
     return corr
 
