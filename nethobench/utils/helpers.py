@@ -6,6 +6,11 @@ import contextlib
 import io
 from typing import Optional
 
+from nethobench.utils.validation import (
+    validate_dataframe_schema,
+    validate_alignment_overlap,
+    validate_loaded_neuro_arrays,
+)
 
 
 def _clip01(x: float, eps: float = 1e-6) -> float:
@@ -97,9 +102,9 @@ def _load_and_align(
     # 1. Load tabular data
     gt_df = pd.read_csv(ground_truth_csv)
     pred_df = pd.read_csv(predictions_csv)
-    
+
     seq_key, time_key = "sequenceId", "itemPosition"
-    
+
     # Safely format prediction dataframe (matching existing logic)
     if time_key not in pred_df.columns and pred_df.index.name != seq_key:
         pred_df = pd.read_csv(predictions_csv, index_col=0)
@@ -108,10 +113,14 @@ def _load_and_align(
         # Create an itemPosition counter per sequence
         pred_df[time_key] = pred_df.groupby(seq_key).cumcount()
 
+    # --- Validation: Schema & Index Integrity ---
+    validate_dataframe_schema(gt_df, seq_key=seq_key, time_key=time_key)
+    validate_dataframe_schema(pred_df, seq_key=seq_key, time_key=time_key)
+
     # 2. Find overlapping regions
     gt_regions = [c for c in gt_df.columns if c not in {seq_key, time_key}]
     pred_regions = [c for c in pred_df.columns if c not in {seq_key, time_key}]
-    
+
     if neuro_cols:
         overlap = [r for r in neuro_cols if r in gt_regions and r in pred_regions]
     else:
@@ -128,14 +137,16 @@ def _load_and_align(
         suffixes=("_gt", "_inf"),
         how="inner",
     )
-    
-    if merged.empty:
-        raise ValueError("No overlapping sequence/time rows after inner join merge.")
+
+    # --- Validation: Alignment & Overlap Guards ---
+    validate_alignment_overlap(
+        gt_df, pred_df, merged, seq_key=seq_key, time_key=time_key
+    )
 
     # 4. Reconstruct the 3D Arrays
     gt_seqs, pred_seqs = [], []
     grouped = merged.groupby(seq_key)
-    
+
     # CRITICAL: Find minimum sequence length to guarantee uniform 3D stacking
     min_seq_len = grouped.size().min()
 
@@ -143,11 +154,17 @@ def _load_and_align(
         # Extract suffixed columns and truncate to uniform length
         gt_cols = [f"{c}_gt" for c in overlap]
         inf_cols = [f"{c}_inf" for c in overlap]
-        
+
         gt_seqs.append(seq_df[gt_cols].iloc[:min_seq_len].to_numpy(dtype=np.float64))
         pred_seqs.append(seq_df[inf_cols].iloc[:min_seq_len].to_numpy(dtype=np.float64))
 
-    return np.stack(gt_seqs, axis=0), np.stack(pred_seqs, axis=0), overlap
+    gt_arr = np.stack(gt_seqs, axis=0)
+    pred_arr = np.stack(pred_seqs, axis=0)
+
+    # --- Validation: Data Quality & Mathematical Validity ---
+    validate_loaded_neuro_arrays(gt_arr, pred_arr, overlap)
+
+    return gt_arr, pred_arr, overlap
 
 
 def _quiet_call(func, *args, **kwargs):

@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from nethobench.utils.helpers import _clip01, _geometric_mean_scores
 from nethobench.utils.calculation import _merge_aligned
+from nethobench.utils.validation import validate_multimodal_data
 from nethobench.neuro.metrics.composites import load_and_run_neuro_full_analysis
 from nethobench.etho.metrics import (
     position_kl_score,
@@ -39,6 +40,7 @@ def compute_cross_scores(
     sample_df = pd.read_csv(ground_truth_csv)
     cfg = _load_config(config, sample_df=sample_df)
     aligned = _merge_aligned(ground_truth_csv, predictions_csv, cfg)
+    validate_multimodal_data(aligned, cfg)
     neuro_cols = cfg.get("neuro_cols")
     if not neuro_cols:
         raise ValueError("Config must include neuro_cols for cross-scores.")

@@ -6,6 +6,11 @@ import io
 import tempfile
 from typing import Mapping
 
+from nethobench.utils.validation import (
+    validate_dataframe_schema,
+    validate_alignment_overlap,
+)
+
 
 EPS = 1e-8
 
@@ -15,6 +20,11 @@ def _merge_aligned(gt, pred, cfg: dict) -> pd.DataFrame:
     time_key = cfg.get("time_key", "itemPosition")
     gt_df = gt if isinstance(gt, pd.DataFrame) else pd.read_csv(gt)
     pred_df = pred if isinstance(pred, pd.DataFrame) else pd.read_csv(pred)
+
+    # --- Validation: Schema & Index Integrity ---
+    validate_dataframe_schema(gt_df, seq_key=seq_key, time_key=time_key)
+    validate_dataframe_schema(pred_df, seq_key=seq_key, time_key=time_key)
+
     for col in [seq_key, time_key]:
         if col not in gt_df.columns or col not in pred_df.columns:
             raise ValueError(f"Missing alignment column {col} in GT or predictions.")
@@ -25,8 +35,12 @@ def _merge_aligned(gt, pred, cfg: dict) -> pd.DataFrame:
         suffixes=("_gt", "_inf"),
         how="inner",
     )
-    if merged.empty:
-        raise ValueError("No overlapping sequence/time rows after merge.")
+
+    # --- Validation: Alignment & Overlap Guards ---
+    validate_alignment_overlap(
+        gt_df, pred_df, merged, seq_key=seq_key, time_key=time_key
+    )
+
     return merged
 
 
