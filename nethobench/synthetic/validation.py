@@ -12,15 +12,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from nethobench.fidelity import compute_fidelity_scores
-from nethobench.analysis.neuro_analysis import load_and_run_neuro_full_analysis
-from nethobench.analysis.score_definitions import NEURO_FAMILY_WEIGHTS
-from nethobench.helpers import (
+from nethobench.neuro.fidelity import compute_fidelity_scores
+from nethobench.neuro.pipeline import load_and_run_neuro_full_analysis
+from nethobench.neuro.metrics.definitions import NEURO_FAMILY_WEIGHTS
+from nethobench.utils.helpers import (
     get_region_names,
     generate_orthogonal_matrix,
     get_module_assignments
 )
-from nethobench.calculation import (
+from nethobench.utils.calculation import (
     dataset_to_sequence_frame,
     quiet_scores_from_arrays,
     quiet_fidelity_from_arrays,

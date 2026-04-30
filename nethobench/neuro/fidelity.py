@@ -5,8 +5,8 @@ from typing import Dict, Optional
 
 import numpy as np
 
-from nethobench.analysis.score_definitions import compute_fidelity_composite
-from nethobench.analysis.composite_scores import compute_composite_scores
+from nethobench.neuro.metrics.definitions import compute_fidelity_composite
+from nethobench.neuro.metrics.composites import compute_composite_scores
 
 
 def compute_fidelity_scores(

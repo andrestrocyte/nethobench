@@ -5,7 +5,7 @@ from typing import Mapping
 
 import numpy as np
 import pandas as pd
-from nethobench.calculation import weighted_mean_available
+from nethobench.utils.calculation import weighted_mean_available
 
 NEURO_FAMILY_METRICS: "OrderedDict[str, OrderedDict[str, float]]" = OrderedDict(
     [

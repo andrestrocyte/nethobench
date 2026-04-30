@@ -46,6 +46,7 @@ def weighted_mean_available(
 
 
 
+
 def _robust_scale(values: np.ndarray) -> float:
     values = np.asarray(values, dtype=np.float64)
     values = values[np.isfinite(values)]
@@ -131,6 +132,7 @@ def quiet_fidelity_from_arrays(
 
         with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
             return compute_fidelity_scores(pred_path, gt_path, neuro_cols=region_names)
+
 
 
 

@@ -6,7 +6,7 @@ from typing import Callable
 import numpy as np
 from scipy import signal
 from sklearn.decomposition import PCA
-from nethobench.calculation import _align_arrays, _robust_scale, _corr_score, EPS
+from nethobench.utils.calculation import _align_arrays, _robust_scale, _corr_score, EPS
 try:
     from ripser import ripser
 except Exception:  # pragma: no cover - optional dependency during development

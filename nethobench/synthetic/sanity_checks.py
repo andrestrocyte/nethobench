@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from nethobench.neuro import compute_neuro_scores
+from nethobench.neuro.pipeline import compute_neuro_scores
 
 NOISE_RE = re.compile(r"\.noise_(\d+(?:\.\d+)?)\.csv$")
 
@@ -475,7 +475,7 @@ def run(
         "",
         "## Key Acceptance Criteria",
         "| Criterion | Target | Result Source |",
-        "|---|---:|---|",
+        "|---|---|---|",
         "| Composite monotonicity under provided GT noise | Spearman <= -0.70 | `diagnostics.json` -> `monotonicity.provided_gt_noise.composite_score.spearman` |",
         "| Composite adjacent monotonicity | >= 0.80 | `diagnostics.json` -> `adjacent_ok_frac` |",
         "| Dynamic range (max noise - baseline) | <= -0.10 | `diagnostics.json` -> `range_delta` |",

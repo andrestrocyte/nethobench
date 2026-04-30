@@ -6,7 +6,7 @@ from scipy.linalg import subspace_angles
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.covariance import LedoitWolf
 from sklearn.feature_selection import mutual_info_regression
-from nethobench.calculation import _align_arrays, _rmse_similarity, weighted_mean_available, _corr_score
+from nethobench.utils.calculation import _align_arrays, _rmse_similarity, weighted_mean_available, _corr_score
 EPS = 1e-9
 
 
@@ -46,8 +46,6 @@ def _apply_reference_scaler(
     out = (data - center) / scale
     out[~np.isfinite(out)] = 0.0
     return out
-
-
 
 
 

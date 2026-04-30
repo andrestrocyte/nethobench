@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from nethobench.analysis.synthetic_validation import (
+from nethobench.synthetic.validation import (
     DEFAULT_PERTURBATIONS,
     PerturbationSpec,
     SyntheticDataset,
@@ -9,7 +7,7 @@ from nethobench.analysis.synthetic_validation import (
     generate_synthetic_neural_dataset,
     run_synthetic_neuro_validation,
 )
-from nethobench.analysis.synthetic_validation_biophysical import (
+from nethobench.synthetic.biophysical import (
     DEFAULT_BIOPHYSICAL_PERTURBATIONS,
     BiophysicalSyntheticNeuralSpec,
     generate_biophysical_synthetic_bundle,

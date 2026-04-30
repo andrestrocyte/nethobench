@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from nethobench.analysis.refined_neuro_metric_replacements import (
+from nethobench.neuro.metrics.refined import (
     _extract_score,
     _final_manifold_score,
     _final_trajectory_score,

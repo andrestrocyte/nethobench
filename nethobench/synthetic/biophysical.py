@@ -8,7 +8,7 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
-from nethobench.analysis.synthetic_validation import (
+from nethobench.synthetic.validation import (
     FAMILY_COLUMNS,
     FIDELITY_COLUMNS,
     PerturbationSpec,
@@ -23,13 +23,13 @@ from nethobench.analysis.synthetic_validation import (
     _plot_selectivity_heatmap,
     _score_row_metadata,
 )
-from nethobench.helpers import (
+from nethobench.utils.helpers import (
     get_region_names,
     generate_orthogonal_matrix,
     get_module_assignments
 )
 
-from nethobench.calculation import (
+from nethobench.utils.calculation import (
     dataset_to_sequence_frame,
     quiet_scores_from_arrays,
     quiet_fidelity_from_arrays,
