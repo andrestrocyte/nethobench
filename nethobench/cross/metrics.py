@@ -11,7 +11,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from nethobench.utils.helpers import _clip01, _geometric_mean_scores
 from nethobench.utils.calculation import _merge_aligned
-from nethobench.neuro.pipeline import load_and_run_neuro_full_analysis
+from nethobench.neuro.metrics.composites import load_and_run_neuro_full_analysis
 from nethobench.etho.metrics import (
     position_kl_score,
     quadrant_score,

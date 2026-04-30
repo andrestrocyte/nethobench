@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from nethobench.neuro.fidelity import compute_fidelity_scores
-from nethobench.neuro.pipeline import load_and_run_neuro_full_analysis
+from nethobench.neuro.metrics.composites import load_and_run_neuro_full_analysis
 from nethobench.neuro.metrics.definitions import NEURO_FAMILY_WEIGHTS
 from nethobench.utils.helpers import (
     get_region_names,
@@ -21,11 +21,10 @@ from nethobench.utils.helpers import (
     get_module_assignments
 )
 from nethobench.utils.calculation import (
-    dataset_to_sequence_frame,
-    quiet_scores_from_arrays,
-    quiet_fidelity_from_arrays,
+    dataset_to_sequence_frame
 )
 
+from nethobench.neuro.fidelity import compute_fidelity_scores
 
 FAMILY_COLUMNS = [f"family_{name}" for name in NEURO_FAMILY_WEIGHTS] + [
     "FINAL_COMPOSITE_SCORE",
@@ -664,14 +663,14 @@ def run_synthetic_neuro_validation(
             dataset_to_sequence_frame(oracle.array, oracle.region_names).to_csv(
                 datasets_dir / "synthetic_oracle_prediction.csv", index=False
             )
-        scores = quiet_scores_from_arrays(
+        scores = load_and_run_neuro_full_analysis(
             reference.array, oracle.array, region_names=reference.region_names
         )
         scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(
             scores
         )
         scores.update(
-            quiet_fidelity_from_arrays(
+            compute_fidelity_scores(
                 reference.array, oracle.array, region_names=reference.region_names
             )
         )
@@ -696,14 +695,14 @@ def run_synthetic_neuro_validation(
                 dataset_to_sequence_frame(
                     perturbed.array, perturbed.region_names
                 ).to_csv(datasets_dir / out_name, index=False)
-            scores = _quiet_scores_from_arrays(
+            scores = _load_and_run_neuro_full_analysis(
                 reference.array, perturbed.array, region_names=reference.region_names
             )
             scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(
                 scores
             )
             scores.update(
-                quiet_fidelity_from_arrays(
+                compute_fidelity_scores(
                     reference.array,
                     perturbed.array,
                     region_names=reference.region_names,

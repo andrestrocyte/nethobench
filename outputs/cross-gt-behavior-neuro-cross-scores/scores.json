@@ -23,7 +23,10 @@
     "family_state_dynamics": 0.6391581944978619,
     "composite_score": 0.5495728185663803,
     "FINAL_COMPOSITE_SCORE": 0.5495728185663803,
-    "FINAL_NEURO_COMPOSITE_SCORE": 0.5495728185663803
+    "FINAL_NEURO_COMPOSITE_SCORE": 0.5495728185663803,
+    "Error_score01": 0.29588457030369353,
+    "MI_score01": 0.17224441691895628,
+    "family_fidelity": 0.2526105166190355
   },
   "behavior_scores": {
     "position_kl_score": 0.981810239027191,

@@ -109,32 +109,6 @@ def _align_arrays(
 
 
 
-def quiet_fidelity_from_arrays(
-    gt_arr: np.ndarray, pred_arr: np.ndarray, *, region_names: list[str]
-) -> dict[str, float]:
-    """Computes fidelity scores headlessly by suppressing stdout/stderr via temp files."""
-    sink = io.StringIO()
-    with tempfile.TemporaryDirectory(prefix="nethobench-synth-fidelity-") as tmpdir:
-        tmpdir_path = Path(tmpdir)
-        gt_path = tmpdir_path / "gt.csv"
-        pred_path = tmpdir_path / "pred.csv"
-
-        dataset_to_sequence_frame(gt_arr, region_names).to_csv(gt_path, index=False)
-        dataset_to_sequence_frame(pred_arr, region_names).to_csv(pred_path, index=False)
-
-        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-            return compute_fidelity_scores(pred_path, gt_path, neuro_cols=region_names)
-
-
-
-
-def quiet_scores_from_arrays(
-    gt_arr: np.ndarray, pred_arr: np.ndarray, *, region_names: list[str]
-) -> dict[str, float]:
-    """Computes neuro scores headlessly by suppressing stdout/stderr."""
-    sink = io.StringIO()
-    with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-        return load_and_run_neuro_full_analysis(gt_arr, pred_arr, region_names=region_names)
 
 
 

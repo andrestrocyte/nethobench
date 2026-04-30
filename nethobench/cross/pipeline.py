@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from nethobench.utils.helpers import _clip01, _geometric_mean_scores
 from nethobench.utils.calculation import _merge_aligned
-from nethobench.neuro.pipeline import load_and_run_neuro_full_analysis
+from nethobench.neuro.metrics.composites import load_and_run_neuro_full_analysis
 from nethobench.etho.metrics import (
     position_kl_score,
     quadrant_score,
@@ -47,7 +47,7 @@ def compute_cross_scores(
     gt_neuro = _arrays_from_aligned(aligned, neuro_cols, "gt", cfg)
     pr_neuro = _arrays_from_aligned(aligned, neuro_cols, "inf", cfg)
     neuro_scores = load_and_run_neuro_full_analysis(
-        gt_neuro, pr_neuro, region_names=neuro_cols
+        gt_neuro, pr_neuro
     )
 
     # --- Behavior axis (reuse ethobench metrics on merged df) ---
@@ -187,3 +187,4 @@ def run_cross_full_analysis(
     generate_full_cross_report(scores, outdir)
 
     return outdir
+
