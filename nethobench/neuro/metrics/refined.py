@@ -12,18 +12,18 @@ from nethobench.neuro.metrics.sensitive import (
     _finite_rows,
     _safe_corrcoef,
     _score_from_distance,
-    autocorr_weighted_rmse_power_v6,
-    bandpower_band_fraction_v2,
+    autocorr_weighted_rmse_power,
+    bandpower_band_fraction,
     corruption_region_permute_blend,
     corruption_region_shift_desync,
     corruption_time_shuffle_blend,
-    crosscorr_lagged_matrix_v4,
-    crosscorr_topedge_profiles_v5,
-    manifold_ph_knn_profile_v5,
-    manifold_ph_stratified_lifetime_v7,
-    pca_reconstruction_product_v6,
-    trajectory_occupancy_velocity_v4,
-    trajectory_path_features_v3,
+    crosscorr_lagged_matrix,
+    crosscorr_topedge_profiles,
+    manifold_ph_knn_profile,
+    manifold_ph_stratified_lifetime,
+    pca_reconstruction_product,
+    trajectory_occupancy_velocity,
+    trajectory_path_features,
 )
 
 ScoreFn = Callable[[np.ndarray, np.ndarray], dict]
@@ -474,8 +474,8 @@ def _wrap_population_metric(
 
 
 def _final_crosscorr_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
-    lagged = _extract_score(crosscorr_lagged_matrix_v4(gt_arr, pred_arr))
-    topedge = _extract_score(crosscorr_topedge_profiles_v5(gt_arr, pred_arr))
+    lagged = _extract_score(crosscorr_lagged_matrix(gt_arr, pred_arr))
+    topedge = _extract_score(crosscorr_topedge_profiles(gt_arr, pred_arr))
     return {
         "score": weighted_mean_available(
             {"lagged": lagged, "topedge": topedge},
@@ -485,8 +485,8 @@ def _final_crosscorr_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
 
 
 def _final_trajectory_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
-    occupancy = _extract_score(trajectory_occupancy_velocity_v4(gt_arr, pred_arr))
-    path = _extract_score(trajectory_path_features_v3(gt_arr, pred_arr))
+    occupancy = _extract_score(trajectory_occupancy_velocity(gt_arr, pred_arr))
+    path = _extract_score(trajectory_path_features(gt_arr, pred_arr))
     return {
         "score": weighted_mean_available(
             {"occupancy": occupancy, "path": path},
@@ -496,8 +496,8 @@ def _final_trajectory_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
 
 
 def _final_manifold_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
-    topology = _extract_score(manifold_ph_stratified_lifetime_v7(gt_arr, pred_arr))
-    local = _extract_score(manifold_ph_knn_profile_v5(gt_arr, pred_arr))
+    topology = _extract_score(manifold_ph_stratified_lifetime(gt_arr, pred_arr))
+    local = _extract_score(manifold_ph_knn_profile(gt_arr, pred_arr))
     return {
         "score": weighted_mean_available(
             {"topology": topology, "local": local},
@@ -517,17 +517,17 @@ def compute_pca_replacement(
         "It compares how well prediction variance is captured by the GT PCA basis "
         "and expands the dynamic range by squaring the agreement score."
     )
-    score = _extract_score(pca_reconstruction_product_v6(gt_arr, pred_arr))
+    score = _extract_score(pca_reconstruction_product(gt_arr, pred_arr))
     pca_simple = _wrap_population_metric(
         score_key="PCA_score01",
         mean_key="PCA_mean",
         score=score,
         description=description,
-        candidate_name="pca_reconstruction_product_v6",
+        candidate_name="pca_reconstruction_product",
     )
     pca_corr_df = _build_corruption_df(
         gt_arr,
-        pca_reconstruction_product_v6,
+        pca_reconstruction_product,
         corruption_region_permute_blend,
         score_key="PCA_score01",
         family_label="region_permute_blend",
@@ -641,19 +641,19 @@ def compute_autocorr_replacement(
         "Weighted early-lag autocorrelation agreement with extra dynamic-range "
         "sensitivity from squaring the baseline agreement score."
     )
-    score = _extract_score(autocorr_weighted_rmse_power_v6(gt_arr, pred_arr))
+    score = _extract_score(autocorr_weighted_rmse_power(gt_arr, pred_arr))
     distance = _distance_from_score(score)
     auto_sensitive = _wrap_population_metric(
         score_key="AUTO_score01",
         mean_key="AUTO_mean",
         score=score,
         description=description,
-        candidate_name="autocorr_weighted_rmse_power_v6",
+        candidate_name="autocorr_weighted_rmse_power",
         extra_arrays={"d_core_sr": np.asarray([distance], dtype=np.float64)},
     )
     auto_corr_df = _build_corruption_df(
         gt_arr,
-        autocorr_weighted_rmse_power_v6,
+        autocorr_weighted_rmse_power,
         corruption_time_shuffle_blend,
         score_key="AUTO_score01",
         family_label="time_shuffle_blend",
@@ -728,17 +728,17 @@ def compute_bandpower_replacement(
         "The GT mean spectrum is split into equal-power bands and the score compares "
         "how prediction redistributes power across those bands."
     )
-    score = _extract_score(bandpower_band_fraction_v2(gt_arr, pred_arr))
+    score = _extract_score(bandpower_band_fraction(gt_arr, pred_arr))
     bandpower_simple = _wrap_population_metric(
         score_key="BP_score01",
         mean_key="BP_mean",
         score=score,
         description=description,
-        candidate_name="bandpower_band_fraction_v2",
+        candidate_name="bandpower_band_fraction",
     )
     bp_corr_df = _build_corruption_df(
         gt_arr,
-        bandpower_band_fraction_v2,
+        bandpower_band_fraction,
         corruption_time_shuffle_blend,
         score_key="BP_score01",
         family_label="time_shuffle_blend",

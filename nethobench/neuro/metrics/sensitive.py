@@ -433,7 +433,7 @@ def _iter_region_series(arr: Array3D):
         yield arr[:, :, region].reshape(-1)
 
 
-def trajectory_path_features_v3(gt: Array3D, pred: Array3D) -> dict:
+def trajectory_path_features(gt: Array3D, pred: Array3D) -> dict:
     gt, pred = _align_arrays(gt, pred)
     k_max = min(4, gt.shape[-1])
     Xg = gt.reshape(-1, gt.shape[-1])
@@ -480,7 +480,7 @@ def trajectory_path_features_v3(gt: Array3D, pred: Array3D) -> dict:
     return {"score": _score_from_distance(distance)}
 
 
-def trajectory_occupancy_velocity_v4(gt: Array3D, pred: Array3D) -> dict:
+def trajectory_occupancy_velocity(gt: Array3D, pred: Array3D) -> dict:
     gt, pred = _align_arrays(gt, pred)
     Xg = gt.reshape(-1, gt.shape[-1])
     Xp = pred.reshape(-1, pred.shape[-1])
@@ -518,7 +518,7 @@ def trajectory_occupancy_velocity_v4(gt: Array3D, pred: Array3D) -> dict:
     return {"score": float(np.nanmean(occ_scores + [speed_score, turn_score]))}
 
 
-def bandpower_band_fraction_v2(gt: Array3D, pred: Array3D) -> dict:
+def bandpower_band_fraction(gt: Array3D, pred: Array3D) -> dict:
     gt, pred = _align_arrays(gt, pred)
     specs_g = []
     specs_p = []
@@ -546,7 +546,7 @@ def bandpower_band_fraction_v2(gt: Array3D, pred: Array3D) -> dict:
     return {"score": float(np.clip(score, 0.0, 1.0))}
 
 
-def pca_reconstruction_transfer_v4(gt: Array3D, pred: Array3D) -> dict:
+def pca_reconstruction_transfer(gt: Array3D, pred: Array3D) -> dict:
     gt, pred = _align_arrays(gt, pred)
     Xg = gt.reshape(-1, gt.shape[-1])
     Xp = pred.reshape(-1, pred.shape[-1])
@@ -577,14 +577,14 @@ def pca_reconstruction_transfer_v4(gt: Array3D, pred: Array3D) -> dict:
     return {"score": float(np.clip(0.5 * rec_score + 0.5 * var_score, 0.0, 1.0))}
 
 
-def pca_reconstruction_product_v6(gt: Array3D, pred: Array3D) -> dict:
-    base = pca_reconstruction_transfer_v4(gt, pred).get("score", np.nan)
+def pca_reconstruction_product(gt: Array3D, pred: Array3D) -> dict:
+    base = pca_reconstruction_transfer(gt, pred).get("score", np.nan)
     if not np.isfinite(base):
         return {"score": np.nan}
     return {"score": float(np.clip(base**2, 0.0, 1.0))}
 
 
-def autocorr_weighted_rmse_v4(gt: Array3D, pred: Array3D) -> dict:
+def autocorr_weighted_rmse(gt: Array3D, pred: Array3D) -> dict:
     gt, pred = _align_arrays(gt, pred)
     max_lag = min(48, gt.shape[1] // 6)
     weights = 1.0 / np.sqrt(np.arange(1, max_lag + 1, dtype=np.float64))
@@ -613,14 +613,14 @@ def autocorr_weighted_rmse_v4(gt: Array3D, pred: Array3D) -> dict:
     return {"score": float(np.nanmean(region_scores)) if region_scores else np.nan}
 
 
-def autocorr_weighted_rmse_power_v6(gt: Array3D, pred: Array3D) -> dict:
-    base = autocorr_weighted_rmse_v4(gt, pred).get("score", np.nan)
+def autocorr_weighted_rmse_power(gt: Array3D, pred: Array3D) -> dict:
+    base = autocorr_weighted_rmse(gt, pred).get("score", np.nan)
     if not np.isfinite(base):
         return {"score": np.nan}
     return {"score": float(np.clip(base**2, 0.0, 1.0))}
 
 
-def crosscorr_lagged_matrix_v4(gt: Array3D, pred: Array3D) -> dict:
+def crosscorr_lagged_matrix(gt: Array3D, pred: Array3D) -> dict:
     gt, pred = _align_arrays(gt, pred)
     Cg0 = _safe_corrcoef(gt.reshape(-1, gt.shape[-1]))
     Cp0 = _safe_corrcoef(pred.reshape(-1, pred.shape[-1]))
@@ -641,7 +641,7 @@ def crosscorr_lagged_matrix_v4(gt: Array3D, pred: Array3D) -> dict:
     return {"score": float(np.nanmean([score0, score1]))}
 
 
-def crosscorr_topedge_profiles_v5(gt: Array3D, pred: Array3D) -> dict:
+def crosscorr_topedge_profiles(gt: Array3D, pred: Array3D) -> dict:
     gt, pred = _align_arrays(gt, pred)
     Cg0 = _safe_corrcoef(gt.reshape(-1, gt.shape[-1]))
     if Cg0 is None:
@@ -690,7 +690,7 @@ def crosscorr_topedge_profiles_v5(gt: Array3D, pred: Array3D) -> dict:
     return {"score": float(np.nanmean(scores)) if scores else np.nan}
 
 
-def manifold_ph_lifetime_profile_v1(gt: Array3D, pred: Array3D) -> dict:
+def manifold_ph_lifetime_profile(gt: Array3D, pred: Array3D) -> dict:
     Zg, Zp = _pooled_latent_clouds(gt, pred, k_max=3, n_points=96, seed=0)
     if Zg is None or Zp is None:
         return {"score": np.nan}
@@ -703,11 +703,11 @@ def manifold_ph_lifetime_profile_v1(gt: Array3D, pred: Array3D) -> dict:
     return {"score": float(np.nanmean([score_h0, score_h1]))}
 
 
-def manifold_ph_knn_profile_v5(gt: Array3D, pred: Array3D) -> dict:
+def manifold_ph_knn_profile(gt: Array3D, pred: Array3D) -> dict:
     Zg, Zp = _pooled_latent_clouds(gt, pred, k_max=3, n_points=128, seed=3)
     if Zg is None or Zp is None:
         return {"score": np.nan}
-    score_life = manifold_ph_lifetime_profile_v1(gt, pred).get("score", np.nan)
+    score_life = manifold_ph_lifetime_profile(gt, pred).get("score", np.nan)
     knn_g = _knn_distance_profile(Zg, k=5)
     knn_p = _knn_distance_profile(Zp, k=5)
     score_knn = _score_from_distance(
@@ -718,7 +718,7 @@ def manifold_ph_knn_profile_v5(gt: Array3D, pred: Array3D) -> dict:
     return {"score": float(np.sqrt(score_life * score_knn))}
 
 
-def manifold_ph_stratified_lifetime_v7(gt: Array3D, pred: Array3D) -> dict:
+def manifold_ph_stratified_lifetime(gt: Array3D, pred: Array3D) -> dict:
     Zg, Zp = _stratified_latent_clouds(
         gt, pred, k_max=3, points_per_seq=2, max_sequences=48, seed=5
     )
