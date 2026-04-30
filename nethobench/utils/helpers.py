@@ -88,35 +88,66 @@ def _load_sequences(
     arr = df.to_numpy(dtype=np.float64).reshape(n_seq, n_time, len(region_cols))
     return arr, region_cols
 
-
 def _load_and_align(
     predictions_csv: Path,
     ground_truth_csv: Path,
     neuro_cols: Optional[list[str]] = None,
 ) -> tuple[np.ndarray, np.ndarray, list[str]]:
-    pred_arr, pred_regions = _load_sequences(predictions_csv)
-    gt_arr, gt_regions = _load_sequences(ground_truth_csv)
+    
+    # 1. Load tabular data
+    gt_df = pd.read_csv(ground_truth_csv)
+    pred_df = pd.read_csv(predictions_csv)
+    
+    seq_key, time_key = "sequenceId", "itemPosition"
+    
+    # Safely format prediction dataframe (matching existing logic)
+    if time_key not in pred_df.columns and pred_df.index.name != seq_key:
+        pred_df = pd.read_csv(predictions_csv, index_col=0)
+        pred_df.index.name = seq_key
+        pred_df = pred_df.reset_index()
+        # Create an itemPosition counter per sequence
+        pred_df[time_key] = pred_df.groupby(seq_key).cumcount()
 
+    # 2. Find overlapping regions
+    gt_regions = [c for c in gt_df.columns if c not in {seq_key, time_key}]
+    pred_regions = [c for c in pred_df.columns if c not in {seq_key, time_key}]
+    
     if neuro_cols:
-        overlap = [
-            region
-            for region in neuro_cols
-            if region in gt_regions and region in pred_regions
-        ]
+        overlap = [r for r in neuro_cols if r in gt_regions and r in pred_regions]
     else:
-        overlap = [region for region in gt_regions if region in pred_regions]
+        overlap = [r for r in gt_regions if r in pred_regions]
+
     if not overlap:
         raise ValueError("No overlapping neural regions between GT and predictions.")
 
-    gt_idx = [gt_regions.index(region) for region in overlap]
-    pred_idx = [pred_regions.index(region) for region in overlap]
-    gt_arr = gt_arr[..., gt_idx]
-    pred_arr = pred_arr[..., pred_idx]
+    # 3. Apply the Inner Join logic
+    merged = pd.merge(
+        gt_df.sort_values([seq_key, time_key]),
+        pred_df.sort_values([seq_key, time_key]),
+        on=[seq_key, time_key],
+        suffixes=("_gt", "_inf"),
+        how="inner",
+    )
+    
+    if merged.empty:
+        raise ValueError("No overlapping sequence/time rows after inner join merge.")
 
-    max_len = min(gt_arr.shape[1], pred_arr.shape[1])
-    gt_arr = gt_arr[:, :max_len, :]
-    pred_arr = pred_arr[:, :max_len, :]
-    return gt_arr, pred_arr, overlap
+    # 4. Reconstruct the 3D Arrays
+    gt_seqs, pred_seqs = [], []
+    grouped = merged.groupby(seq_key)
+    
+    # CRITICAL: Find minimum sequence length to guarantee uniform 3D stacking
+    min_seq_len = grouped.size().min()
+
+    for _, seq_df in grouped:
+        # Extract suffixed columns and truncate to uniform length
+        gt_cols = [f"{c}_gt" for c in overlap]
+        inf_cols = [f"{c}_inf" for c in overlap]
+        
+        gt_seqs.append(seq_df[gt_cols].iloc[:min_seq_len].to_numpy(dtype=np.float64))
+        pred_seqs.append(seq_df[inf_cols].iloc[:min_seq_len].to_numpy(dtype=np.float64))
+
+    return np.stack(gt_seqs, axis=0), np.stack(pred_seqs, axis=0), overlap
 
 
 def _quiet_call(func, *args, **kwargs):
