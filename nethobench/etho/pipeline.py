@@ -45,13 +45,7 @@ def compute_etho_scores(
                 "Must provide either paired_df, or both gt_dir and inf_dir."
             )
         gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
-        paired_df = pd.merge(
-            gt_df.sort_values(["sequenceId", "itemPosition"]),
-            inf_df.sort_values(["sequenceId", "itemPosition"]),
-            on=["sequenceId", "itemPosition"],
-            suffixes=("_gt", "_inf"),
-            how="inner",
-        )
+        paired_df = _merge_aligned(gt_df, inf_df, {})
 
     pos_res = position_kl_score(paired_df)
     stat_res = stationary_score(paired_df)
@@ -178,13 +172,7 @@ def run_etho_full_analysis(
 
     # 1. Load Data
     gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
-    paired_df = pd.merge(
-        gt_df.sort_values(["sequenceId", "itemPosition"]),
-        inf_df.sort_values(["sequenceId", "itemPosition"]),
-        on=["sequenceId", "itemPosition"],
-        suffixes=("_gt", "_inf"),
-        how="inner",
-    )
+    paired_df = _merge_aligned(gt_df, inf_df, {})
 
     # 2. Extract Additional Features for the Report
     coord_pairs = []

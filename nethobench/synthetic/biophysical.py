@@ -1,40 +1,21 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, replace
-import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
 import numpy as np
-import pandas as pd
 
 from nethobench.synthetic.validation import (
-    FAMILY_COLUMNS,
-    FIDELITY_COLUMNS,
     PerturbationSpec,
     SyntheticDataset,
-    _build_dose_response,
-    _build_oracle_summary,
-    _build_selectivity_table,
-    _metric_score_columns,
-    _oracle_validation_composite,
-    _plot_dose_response,
-    _plot_family_ceiling_floor,
-    _plot_selectivity_heatmap,
-    _score_row_metadata,
+    run_validation_pipeline,
 )
 from nethobench.utils.helpers import (
     get_region_names,
     generate_orthogonal_matrix,
     get_module_assignments
 )
-
-from nethobench.utils.calculation import (
-    dataset_to_sequence_frame
-)
-
-from nethobench.neuro.fidelity import compute_fidelity_scores
-from nethobench.neuro.metrics.composites import load_and_run_neuro_full_analysis
 
 
 @dataclass(frozen=True)
@@ -423,231 +404,16 @@ def run_biophysical_synthetic_neuro_validation(
     perturbations: Iterable[PerturbationSpec] = DEFAULT_BIOPHYSICAL_PERTURBATIONS,
     save_datasets: bool = True,
 ) -> dict[str, object]:
-    spec = spec or BiophysicalSyntheticNeuralSpec()
-    output_root = Path(output_root)
-    output_root.mkdir(parents=True, exist_ok=True)
-    tables_dir = output_root / "tables"
-    figures_dir = output_root / "figures"
-    datasets_dir = output_root / "datasets"
-    for path in [tables_dir, figures_dir, datasets_dir]:
-        path.mkdir(parents=True, exist_ok=True)
-
-    perturbation_defs = tuple(perturbations)
-    target_lookup = {
-        perturbation.name: perturbation.target_family
-        for perturbation in perturbation_defs
-    }
-
-    reference = generate_biophysical_synthetic_dataset(spec, sample_seed=101)
-    if save_datasets:
-        dataset_to_sequence_frame(reference.array, reference.region_names).to_csv(
-            datasets_dir / "biophysical_ground_truth.csv", index=False
-        )
-
-    rows: list[dict[str, object]] = []
-    for rep_idx in range(oracle_replicates):
-        oracle_seed = 701 + rep_idx
-        oracle = generate_biophysical_synthetic_dataset(spec, sample_seed=oracle_seed)
-        if save_datasets and rep_idx == 0:
-            dataset_to_sequence_frame(oracle.array, oracle.region_names).to_csv(
-                datasets_dir / "biophysical_oracle_prediction.csv", index=False
-            )
-        scores = load_and_run_neuro_full_analysis(
-            reference.array, oracle.array, region_names=reference.region_names
-        )
-        scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(
-            scores
-        )
-        scores.update(
-            compute_fidelity_scores(
-                reference.array, oracle.array, region_names=reference.region_names
-            )
-        )
-        row = _score_row_metadata(
-            spec, "oracle", oracle_seed, target_lookup=target_lookup
-        )
-        row.update(scores)
-        rows.append(row)
-
-    for perturbation in perturbation_defs:
-        for level in perturbation.levels:
-            perturbed_spec = replace(
-                spec,
-                perturbation_name=perturbation.name,
-                perturbation_level=float(level),
-            )
-            perturbed = generate_biophysical_synthetic_dataset(
-                perturbed_spec, sample_seed=1701
-            )
-            if save_datasets and level == max(perturbation.levels):
-                out_name = f"{perturbation.name}-level-{int(level * 100):03d}.csv"
-                dataset_to_sequence_frame(
-                    perturbed.array, perturbed.region_names
-                ).to_csv(datasets_dir / out_name, index=False)
-            scores = load_and_run_neuro_full_analysis(
-                reference.array, perturbed.array, region_names=reference.region_names
-            )
-            scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(
-                scores
-            )
-            scores.update(
-                compute_fidelity_scores(
-                    reference.array,
-                    perturbed.array,
-                    region_names=reference.region_names,
-                )
-            )
-            row = _score_row_metadata(
-                perturbed_spec, "perturbation", 1701, target_lookup=target_lookup
-            )
-            row.update(scores)
-            rows.append(row)
-
-    scores_df = pd.DataFrame(rows)
-    metric_columns = _metric_score_columns(scores_df)
-    family_oracle_summary = _build_oracle_summary(scores_df, FAMILY_COLUMNS)
-    metric_oracle_summary = _build_oracle_summary(scores_df, metric_columns)
-    fidelity_oracle_summary = _build_oracle_summary(scores_df, FIDELITY_COLUMNS)
-    if perturbation_defs:
-        family_selectivity_df = _build_selectivity_table(
-            scores_df, FAMILY_COLUMNS, perturbation_defs
-        )
-        metric_selectivity_df = _build_selectivity_table(
-            scores_df, metric_columns, perturbation_defs
-        )
-        fidelity_selectivity_df = _build_selectivity_table(
-            scores_df, FIDELITY_COLUMNS, perturbation_defs
-        )
-        family_dose_df = _build_dose_response(
-            scores_df, FAMILY_COLUMNS, perturbation_defs
-        )
-        metric_dose_df = _build_dose_response(
-            scores_df, metric_columns, perturbation_defs
-        )
-        fidelity_dose_df = _build_dose_response(
-            scores_df, FIDELITY_COLUMNS, perturbation_defs
-        )
-    else:
-        family_selectivity_df = pd.DataFrame(
-            columns=["perturbation_name", "target_family", *FAMILY_COLUMNS]
-        )
-        metric_selectivity_df = pd.DataFrame(
-            columns=["perturbation_name", "target_family", *metric_columns]
-        )
-        fidelity_selectivity_df = pd.DataFrame(
-            columns=["perturbation_name", "target_family", *FIDELITY_COLUMNS]
-        )
-        family_dose_df = pd.DataFrame(
-            columns=[
-                "perturbation_name",
-                "target_family",
-                "level",
-                "score_name",
-                "mean_score",
-            ]
-        )
-        metric_dose_df = pd.DataFrame(
-            columns=[
-                "perturbation_name",
-                "target_family",
-                "level",
-                "score_name",
-                "mean_score",
-            ]
-        )
-        fidelity_dose_df = pd.DataFrame(
-            columns=[
-                "perturbation_name",
-                "target_family",
-                "level",
-                "score_name",
-                "mean_score",
-            ]
-        )
-
-    metadata = {
-        "generator_spec": asdict(spec),
-        "reference_summary": reference.summary,
-        "oracle_replicates": int(oracle_replicates),
-        "perturbations": [asdict(p) for p in perturbation_defs],
-    }
-
-    scores_path = tables_dir / "biophysical_scores.csv"
-    family_oracle_summary_path = tables_dir / "biophysical_family_oracle_summary.csv"
-    metric_oracle_summary_path = tables_dir / "biophysical_metric_oracle_summary.csv"
-    fidelity_oracle_summary_path = (
-        tables_dir / "biophysical_fidelity_oracle_summary.csv"
+    return run_validation_pipeline(
+        spec=spec or BiophysicalSyntheticNeuralSpec(),
+        generator_fn=generate_biophysical_synthetic_dataset,
+        output_root=output_root,
+        oracle_replicates=oracle_replicates,
+        perturbations=perturbations,
+        save_datasets=save_datasets,
+        prefix="biophysical",
+        oracle_seed_base=701,
+        perturbation_seed=1701,
+        family_selectivity_title="Biophysical synthetic family selectivity",
+        metric_selectivity_title="Biophysical synthetic metric selectivity",
     )
-    family_selectivity_path = tables_dir / "biophysical_family_selectivity.csv"
-    metric_selectivity_path = tables_dir / "biophysical_metric_selectivity.csv"
-    fidelity_selectivity_path = tables_dir / "biophysical_fidelity_selectivity.csv"
-    family_dose_response_path = tables_dir / "biophysical_family_dose_response.csv"
-    metric_dose_response_path = tables_dir / "biophysical_metric_dose_response.csv"
-    fidelity_dose_response_path = tables_dir / "biophysical_fidelity_dose_response.csv"
-    metadata_path = output_root / "biophysical_metadata.json"
-
-    scores_df.to_csv(scores_path, index=False)
-    family_oracle_summary.to_csv(family_oracle_summary_path, index=False)
-    metric_oracle_summary.to_csv(metric_oracle_summary_path, index=False)
-    fidelity_oracle_summary.to_csv(fidelity_oracle_summary_path, index=False)
-    family_selectivity_df.to_csv(family_selectivity_path, index=False)
-    metric_selectivity_df.to_csv(metric_selectivity_path, index=False)
-    fidelity_selectivity_df.to_csv(fidelity_selectivity_path, index=False)
-    family_dose_df.to_csv(family_dose_response_path, index=False)
-    metric_dose_df.to_csv(metric_dose_response_path, index=False)
-    fidelity_dose_df.to_csv(fidelity_dose_response_path, index=False)
-    metadata_path.write_text(json.dumps(metadata, indent=2))
-
-    ceiling_plot = figures_dir / "biophysical_family_ceiling_floor.png"
-    family_selectivity_plot = figures_dir / "biophysical_family_selectivity.png"
-    metric_selectivity_plot = figures_dir / "biophysical_metric_selectivity.png"
-    dose_plot = figures_dir / "biophysical_dose_response.png"
-
-    if perturbation_defs:
-        _plot_family_ceiling_floor(
-            scores_df, ceiling_plot, perturbation_defs=perturbation_defs
-        )
-        _plot_selectivity_heatmap(
-            family_selectivity_df,
-            family_selectivity_plot,
-            score_columns=FAMILY_COLUMNS,
-            title="Biophysical synthetic family selectivity",
-        )
-        _plot_selectivity_heatmap(
-            metric_selectivity_df,
-            metric_selectivity_plot,
-            score_columns=metric_columns,
-            title="Biophysical synthetic metric selectivity",
-        )
-        _plot_dose_response(
-            family_dose_df, dose_plot, perturbation_defs=perturbation_defs
-        )
-
-    return {
-        "output_root": str(output_root),
-        "scores_path": str(scores_path),
-        "family_oracle_summary_path": str(family_oracle_summary_path),
-        "metric_oracle_summary_path": str(metric_oracle_summary_path),
-        "fidelity_oracle_summary_path": str(fidelity_oracle_summary_path),
-        "family_selectivity_path": str(family_selectivity_path),
-        "metric_selectivity_path": str(metric_selectivity_path),
-        "fidelity_selectivity_path": str(fidelity_selectivity_path),
-        "family_dose_response_path": str(family_dose_response_path),
-        "metric_dose_response_path": str(metric_dose_response_path),
-        "fidelity_dose_response_path": str(fidelity_dose_response_path),
-        "ceiling_plot": str(ceiling_plot),
-        "family_selectivity_plot": str(family_selectivity_plot),
-        "metric_selectivity_plot": str(metric_selectivity_plot),
-        "dose_plot": str(dose_plot),
-        "scores_df": scores_df,
-        "family_oracle_summary": family_oracle_summary,
-        "metric_oracle_summary": metric_oracle_summary,
-        "fidelity_oracle_summary": fidelity_oracle_summary,
-        "family_selectivity_df": family_selectivity_df,
-        "metric_selectivity_df": metric_selectivity_df,
-        "fidelity_selectivity_df": fidelity_selectivity_df,
-        "family_dose_df": family_dose_df,
-        "metric_dose_df": metric_dose_df,
-        "fidelity_dose_df": fidelity_dose_df,
-        "metadata_path": str(metadata_path),
-    }

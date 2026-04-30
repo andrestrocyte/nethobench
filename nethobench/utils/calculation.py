@@ -10,17 +10,17 @@ from typing import Mapping
 EPS = 1e-8
 
 
-def _merge_aligned(gt_path: Path, pred_path: Path, cfg: dict) -> pd.DataFrame:
+def _merge_aligned(gt, pred, cfg: dict) -> pd.DataFrame:
     seq_key = cfg.get("sequence_key", "sequenceId")
     time_key = cfg.get("time_key", "itemPosition")
-    gt = pd.read_csv(gt_path)
-    pred = pd.read_csv(pred_path)
+    gt_df = gt if isinstance(gt, pd.DataFrame) else pd.read_csv(gt)
+    pred_df = pred if isinstance(pred, pd.DataFrame) else pd.read_csv(pred)
     for col in [seq_key, time_key]:
-        if col not in gt.columns or col not in pred.columns:
+        if col not in gt_df.columns or col not in pred_df.columns:
             raise ValueError(f"Missing alignment column {col} in GT or predictions.")
     merged = pd.merge(
-        gt.sort_values([seq_key, time_key]),
-        pred.sort_values([seq_key, time_key]),
+        gt_df.sort_values([seq_key, time_key]),
+        pred_df.sort_values([seq_key, time_key]),
         on=[seq_key, time_key],
         suffixes=("_gt", "_inf"),
         how="inner",

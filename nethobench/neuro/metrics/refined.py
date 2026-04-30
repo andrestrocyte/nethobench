@@ -9,7 +9,6 @@ from scipy import stats
 from scipy.stats import kurtosis, skew, spearmanr
 from nethobench.utils.calculation import _align_arrays, weighted_mean_available, EPS
 from nethobench.neuro.metrics.sensitive import (
-    _align_arrays,
     _finite_rows,
     _safe_corrcoef,
     _score_from_distance,

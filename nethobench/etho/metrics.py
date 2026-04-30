@@ -23,6 +23,28 @@ def _calc_sym_kl(p: np.ndarray, q: np.ndarray) -> float:
     return 0.5 * (np.sum(p * np.log(p / q)) + np.sum(q * np.log(q / p)))
 
 
+def _build_features(df: pd.DataFrame, label: str, *, fallback_empty: bool = False) -> np.ndarray:
+    try:
+        center = df[[f"CENTER_X_{label}", f"CENTER_Y_{label}"]].to_numpy()
+        vel = np.diff(center, axis=0)
+        vel_pad = np.vstack([vel[:1], vel]) if len(vel) else np.zeros_like(center)
+        nose = df[[f"NOSE_X_{label}", f"NOSE_Y_{label}"]].to_numpy()
+        tail = df[[f"TAIL_BASE_X_{label}", f"TAIL_BASE_Y_{label}"]].to_numpy()
+        axis_vec = nose - tail
+        ears = df[
+            [
+                f"LEFT_EAR_X_{label}",
+                f"LEFT_EAR_Y_{label}",
+                f"RIGHT_EAR_X_{label}",
+                f"RIGHT_EAR_Y_{label}",
+            ]
+        ].to_numpy()
+        ear_span = np.linalg.norm(ears[:, :2] - ears[:, 2:], axis=1, keepdims=True)
+        return np.hstack([vel_pad, axis_vec, ear_span])
+    except KeyError:
+        return np.empty((0, 5) if fallback_empty else (len(df), 5))
+
+
 # ---------------------------------------------------------
 # Core Behavioral Metrics
 # ---------------------------------------------------------
@@ -73,80 +95,25 @@ def stationary_score(
     return global_score, seq_scores, seq_weights
 
 
-def velocity_distribution_score(
-    paired_df: pd.DataFrame,
+def _kinematic_distribution_score(
+    paired_df: pd.DataFrame, derivative_order: int
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
     if paired_df.empty:
         return np.nan, {}, {}
 
-    speeds = {"gt": {}, "inf": {}}
+    values = {"gt": {}, "inf": {}}
     all_vals = []
 
     for label in ("gt", "inf"):
         x_col, y_col = f"CENTER_X_{label}", f"CENTER_Y_{label}"
         for seq, seq_df in paired_df.sort_values("itemPosition").groupby("sequenceId"):
             coords = seq_df[[x_col, y_col]].to_numpy()
-            vel = np.diff(coords, axis=0)
-            speed = np.linalg.norm(vel, axis=1)
-            if len(speed) > 0:
-                speeds[label][seq] = speed
-                all_vals.extend(speed)
-
-    if not all_vals:
-        return np.nan, {}, {}
-
-    lo, hi = min(all_vals), max(all_vals)
-    if lo == hi:
-        return np.nan, {}, {}
-
-    bins = np.linspace(lo, hi, 60)
-    seq_scores = {}
-    seq_weights = {}
-
-    global_gt = (
-        np.concatenate(list(speeds["gt"].values())) if speeds["gt"] else np.array([])
-    )
-    global_inf = (
-        np.concatenate(list(speeds["inf"].values())) if speeds["inf"] else np.array([])
-    )
-
-    if global_gt.size < 10 or global_inf.size < 10:
-        return np.nan, {}, {}
-
-    Pg, _ = np.histogram(global_gt, bins=bins, density=True)
-    Pi, _ = np.histogram(global_inf, bins=bins, density=True)
-    global_kl = _calc_sym_kl(Pg, Pi)
-    global_score = 1.0 / (1.0 + global_kl)
-
-    valid_seqs = set(speeds["gt"].keys()) & set(speeds["inf"].keys())
-    for seq in valid_seqs:
-        pg_seq, _ = np.histogram(speeds["gt"][seq], bins=bins, density=True)
-        pi_seq, _ = np.histogram(speeds["inf"][seq], bins=bins, density=True)
-        kl = _calc_sym_kl(pg_seq, pi_seq)
-        seq_scores[str(seq)] = 1.0 / (1.0 + kl)
-        seq_weights[str(seq)] = len(speeds["gt"][seq])
-
-    return global_score, seq_scores, seq_weights
-
-
-def acceleration_distribution_score(
-    paired_df: pd.DataFrame,
-) -> Tuple[float, Dict[str, float], Dict[str, int]]:
-    if paired_df.empty:
-        return np.nan, {}, {}
-
-    accs = {"gt": {}, "inf": {}}
-    all_vals = []
-
-    for label in ("gt", "inf"):
-        x_col, y_col = f"CENTER_X_{label}", f"CENTER_Y_{label}"
-        for seq, seq_df in paired_df.sort_values("itemPosition").groupby("sequenceId"):
-            coords = seq_df[[x_col, y_col]].to_numpy()
-            vel = np.diff(coords, axis=0)
-            acc = np.diff(vel, axis=0)
-            mag = np.linalg.norm(acc, axis=1)
+            deriv = coords
+            for _ in range(derivative_order):
+                deriv = np.diff(deriv, axis=0)
+            mag = np.linalg.norm(deriv, axis=1)
             if len(mag) > 0:
-                accs[label][seq] = mag
+                values[label][seq] = mag
                 all_vals.extend(mag)
 
     if not all_vals:
@@ -161,10 +128,10 @@ def acceleration_distribution_score(
     seq_weights = {}
 
     global_gt = (
-        np.concatenate(list(accs["gt"].values())) if accs["gt"] else np.array([])
+        np.concatenate(list(values["gt"].values())) if values["gt"] else np.array([])
     )
     global_inf = (
-        np.concatenate(list(accs["inf"].values())) if accs["inf"] else np.array([])
+        np.concatenate(list(values["inf"].values())) if values["inf"] else np.array([])
     )
 
     if global_gt.size < 10 or global_inf.size < 10:
@@ -175,15 +142,27 @@ def acceleration_distribution_score(
     global_kl = _calc_sym_kl(Pg, Pi)
     global_score = 1.0 / (1.0 + global_kl)
 
-    valid_seqs = set(accs["gt"].keys()) & set(accs["inf"].keys())
+    valid_seqs = set(values["gt"].keys()) & set(values["inf"].keys())
     for seq in valid_seqs:
-        pg_seq, _ = np.histogram(accs["gt"][seq], bins=bins, density=True)
-        pi_seq, _ = np.histogram(accs["inf"][seq], bins=bins, density=True)
+        pg_seq, _ = np.histogram(values["gt"][seq], bins=bins, density=True)
+        pi_seq, _ = np.histogram(values["inf"][seq], bins=bins, density=True)
         kl = _calc_sym_kl(pg_seq, pi_seq)
         seq_scores[str(seq)] = 1.0 / (1.0 + kl)
-        seq_weights[str(seq)] = len(accs["gt"][seq])
+        seq_weights[str(seq)] = len(values["gt"][seq])
 
     return global_score, seq_scores, seq_weights
+
+
+def velocity_distribution_score(
+    paired_df: pd.DataFrame,
+) -> Tuple[float, Dict[str, float], Dict[str, int]]:
+    return _kinematic_distribution_score(paired_df, derivative_order=1)
+
+
+def acceleration_distribution_score(
+    paired_df: pd.DataFrame,
+) -> Tuple[float, Dict[str, float], Dict[str, int]]:
+    return _kinematic_distribution_score(paired_df, derivative_order=2)
 
 
 def direction_score(
@@ -338,6 +317,33 @@ def position_kl_score(
     return global_score, seq_scores, seq_weights
 
 
+def _cluster_and_score_kl(
+    cluster_df: pd.DataFrame, k: int
+) -> Tuple[float, Dict[str, float], Dict[str, int]]:
+    counts = cluster_df.groupby(["label", "cluster"]).size().unstack(fill_value=0)
+    if not {"gt", "inf"}.issubset(counts.index):
+        return np.nan, {}, {}
+
+    probs = counts.div(counts.sum(axis=1), axis=0)
+    p = probs.loc["gt"].to_numpy()
+    q = probs.loc["inf"].to_numpy()
+    global_score = 1.0 / (1.0 + _calc_sym_kl(p, q))
+
+    seq_scores = {}
+    seq_weights = {}
+    for seq, seq_df in cluster_df.groupby("sequenceId"):
+        sc = seq_df.groupby(["label", "cluster"]).size().unstack(fill_value=0)
+        sc = sc.reindex(columns=range(k), fill_value=0)
+        if "gt" in sc.index and "inf" in sc.index:
+            sp = sc.loc["gt"].to_numpy()
+            sq = sc.loc["inf"].to_numpy()
+            kl = _calc_sym_kl(sp, sq)
+            seq_scores[str(seq)] = 1.0 / (1.0 + kl)
+            seq_weights[str(seq)] = int(sc.loc["gt"].sum())
+
+    return global_score, seq_scores, seq_weights
+
+
 def trajectory_shape_score(
     paired_df: pd.DataFrame, k: int = 6
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
@@ -388,29 +394,7 @@ def trajectory_shape_score(
     cluster_df = pd.DataFrame(
         {"label": labels, "cluster": clusters, "sequenceId": seq_map}
     )
-
-    counts = cluster_df.groupby(["label", "cluster"]).size().unstack(fill_value=0)
-    if not {"gt", "inf"}.issubset(counts.index):
-        return np.nan, {}, {}
-
-    probs = counts.div(counts.sum(axis=1), axis=0)
-    p = probs.loc["gt"].to_numpy()
-    q = probs.loc["inf"].to_numpy()
-    global_score = 1.0 / (1.0 + _calc_sym_kl(p, q))
-
-    seq_scores = {}
-    seq_weights = {}
-    for seq, seq_df in cluster_df.groupby("sequenceId"):
-        sc = seq_df.groupby(["label", "cluster"]).size().unstack(fill_value=0)
-        sc = sc.reindex(columns=range(k), fill_value=0)
-        if "gt" in sc.index and "inf" in sc.index:
-            sp = sc.loc["gt"].to_numpy()
-            sq = sc.loc["inf"].to_numpy()
-            kl = _calc_sym_kl(sp, sq)
-            seq_scores[str(seq)] = 1.0 / (1.0 + kl)
-            seq_weights[str(seq)] = int(sc.loc["gt"].sum())
-
-    return global_score, seq_scores, seq_weights
+    return _cluster_and_score_kl(cluster_df, k)
 
 
 def syllable_score(
@@ -452,30 +436,8 @@ def syllable_score(
 
     km = KMeans(n_clusters=k, n_init=10, random_state=0)
     clusters = km.fit_predict(X)
-    df = pd.DataFrame({"label": labels, "cluster": clusters, "sequenceId": seq_map})
-
-    counts = df.groupby(["label", "cluster"]).size().unstack(fill_value=0)
-    if not {"gt", "inf"}.issubset(counts.index):
-        return np.nan, {}, {}
-
-    probs = counts.div(counts.sum(axis=1), axis=0)
-    p = probs.loc["gt"].to_numpy()
-    q = probs.loc["inf"].to_numpy()
-    global_score = 1.0 / (1.0 + _calc_sym_kl(p, q))
-
-    seq_scores = {}
-    seq_weights = {}
-    for seq, seq_df in df.groupby("sequenceId"):
-        sc = seq_df.groupby(["label", "cluster"]).size().unstack(fill_value=0)
-        sc = sc.reindex(columns=range(k), fill_value=0)
-        if "gt" in sc.index and "inf" in sc.index:
-            sp = sc.loc["gt"].to_numpy()
-            sq = sc.loc["inf"].to_numpy()
-            kl = _calc_sym_kl(sp, sq)
-            seq_scores[str(seq)] = 1.0 / (1.0 + kl)
-            seq_weights[str(seq)] = int(sc.loc["gt"].sum())
-
-    return global_score, seq_scores, seq_weights
+    cluster_df = pd.DataFrame({"label": labels, "cluster": clusters, "sequenceId": seq_map})
+    return _cluster_and_score_kl(cluster_df, k)
 
 
 # ---------------------------------------------------------
@@ -609,31 +571,10 @@ def manifold_alignment_metrics(paired_df: pd.DataFrame) -> Dict[str, float]:
     except ImportError:
         return {"procrustes_sim": np.nan, "mmd_sim": np.nan}
 
-    def build_features(df, label):
-        try:
-            center = df[[f"CENTER_X_{label}", f"CENTER_Y_{label}"]].to_numpy()
-            vel = np.diff(center, axis=0)
-            vel_pad = np.vstack([vel[:1], vel]) if len(vel) else np.zeros_like(center)
-            nose = df[[f"NOSE_X_{label}", f"NOSE_Y_{label}"]].to_numpy()
-            tail = df[[f"TAIL_BASE_X_{label}", f"TAIL_BASE_Y_{label}"]].to_numpy()
-            axis_vec = nose - tail
-            ears = df[
-                [
-                    f"LEFT_EAR_X_{label}",
-                    f"LEFT_EAR_Y_{label}",
-                    f"RIGHT_EAR_X_{label}",
-                    f"RIGHT_EAR_Y_{label}",
-                ]
-            ].to_numpy()
-            ear_span = np.linalg.norm(ears[:, :2] - ears[:, 2:], axis=1, keepdims=True)
-            return np.hstack([vel_pad, axis_vec, ear_span])
-        except KeyError:
-            return np.empty((len(df), 5))
-
     gt_feats_all, inf_feats_all = [], []
     for seq, seq_df in paired_df.sort_values("itemPosition").groupby("sequenceId"):
-        gt_f = build_features(seq_df, "gt")
-        inf_f = build_features(seq_df, "inf")
+        gt_f = _build_features(seq_df, "gt")
+        inf_f = _build_features(seq_df, "inf")
         mask = ~np.isnan(gt_f).any(axis=1) & ~np.isnan(inf_f).any(axis=1)
         if mask.any():
             gt_feats_all.append(gt_f[mask])
@@ -699,35 +640,10 @@ def get_chunked_embeddings(
 
             reducer = PCA(n_components=2)
 
-        def build_features(df, label):
-            try:
-                center = df[[f"CENTER_X_{label}", f"CENTER_Y_{label}"]].to_numpy()
-                vel = np.diff(center, axis=0)
-                vel_pad = (
-                    np.vstack([vel[:1], vel]) if len(vel) else np.zeros_like(center)
-                )
-                nose = df[[f"NOSE_X_{label}", f"NOSE_Y_{label}"]].to_numpy()
-                tail = df[[f"TAIL_BASE_X_{label}", f"TAIL_BASE_Y_{label}"]].to_numpy()
-                axis_vec = nose - tail
-                ears = df[
-                    [
-                        f"LEFT_EAR_X_{label}",
-                        f"LEFT_EAR_Y_{label}",
-                        f"RIGHT_EAR_X_{label}",
-                        f"RIGHT_EAR_Y_{label}",
-                    ]
-                ].to_numpy()
-                ear_span = np.linalg.norm(
-                    ears[:, :2] - ears[:, 2:], axis=1, keepdims=True
-                )
-                return np.hstack([vel_pad, axis_vec, ear_span])
-            except KeyError:
-                return np.empty((0, 5))
-
         chunks, labels, seq_ids = [], [], []
         for seq, seq_df in paired_df.sort_values("itemPosition").groupby("sequenceId"):
-            gt_feats = build_features(seq_df, "gt")
-            inf_feats = build_features(seq_df, "inf")
+            gt_feats = _build_features(seq_df, "gt", fallback_empty=True)
+            inf_feats = _build_features(seq_df, "inf", fallback_empty=True)
             if len(gt_feats) < chunk_size or len(inf_feats) < chunk_size:
                 continue
             mask_gt = ~np.isnan(gt_feats).any(axis=1)

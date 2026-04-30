@@ -24,8 +24,6 @@ from nethobench.utils.calculation import (
     dataset_to_sequence_frame
 )
 
-from nethobench.neuro.fidelity import compute_fidelity_scores
-
 FAMILY_COLUMNS = [f"family_{name}" for name in NEURO_FAMILY_WEIGHTS] + [
     "FINAL_COMPOSITE_SCORE",
     "ORACLE_VALIDATION_COMPOSITE_SCORE",
@@ -626,15 +624,20 @@ def _plot_dose_response(
     plt.close(fig)
 
 
-def run_synthetic_neuro_validation(
+def run_validation_pipeline(
     *,
+    spec,
+    generator_fn,
     output_root: Path,
-    spec: SyntheticNeuralSpec | None = None,
-    oracle_replicates: int = 3,
-    perturbations: Iterable[PerturbationSpec] = DEFAULT_PERTURBATIONS,
-    save_datasets: bool = True,
+    oracle_replicates: int,
+    perturbations: Iterable[PerturbationSpec],
+    save_datasets: bool,
+    prefix: str,
+    oracle_seed_base: int,
+    perturbation_seed: int,
+    family_selectivity_title: str,
+    metric_selectivity_title: str,
 ) -> dict[str, object]:
-    spec = spec or SyntheticNeuralSpec()
     output_root = Path(output_root)
     output_root.mkdir(parents=True, exist_ok=True)
     tables_dir = output_root / "tables"
@@ -649,19 +652,19 @@ def run_synthetic_neuro_validation(
         for perturbation in perturbation_defs
     }
 
-    reference = generate_synthetic_neural_dataset(spec, sample_seed=101)
+    reference = generator_fn(spec, sample_seed=101)
     if save_datasets:
         dataset_to_sequence_frame(reference.array, reference.region_names).to_csv(
-            datasets_dir / "synthetic_ground_truth.csv", index=False
+            datasets_dir / f"{prefix}_ground_truth.csv", index=False
         )
 
     rows: list[dict[str, object]] = []
     for rep_idx in range(oracle_replicates):
-        oracle_seed = 501 + rep_idx
-        oracle = generate_synthetic_neural_dataset(spec, sample_seed=oracle_seed)
+        oracle_seed = oracle_seed_base + rep_idx
+        oracle = generator_fn(spec, sample_seed=oracle_seed)
         if save_datasets and rep_idx == 0:
             dataset_to_sequence_frame(oracle.array, oracle.region_names).to_csv(
-                datasets_dir / "synthetic_oracle_prediction.csv", index=False
+                datasets_dir / f"{prefix}_oracle_prediction.csv", index=False
             )
         scores = load_and_run_neuro_full_analysis(
             reference.array, oracle.array, region_names=reference.region_names
@@ -687,15 +690,13 @@ def run_synthetic_neuro_validation(
                 perturbation_name=perturbation.name,
                 perturbation_level=float(level),
             )
-            perturbed = generate_synthetic_neural_dataset(
-                perturbed_spec, sample_seed=701
-            )
+            perturbed = generator_fn(perturbed_spec, sample_seed=perturbation_seed)
             if save_datasets and level == max(perturbation.levels):
                 out_name = f"{perturbation.name}-level-{int(level * 100):03d}.csv"
                 dataset_to_sequence_frame(
                     perturbed.array, perturbed.region_names
                 ).to_csv(datasets_dir / out_name, index=False)
-            scores = _load_and_run_neuro_full_analysis(
+            scores = load_and_run_neuro_full_analysis(
                 reference.array, perturbed.array, region_names=reference.region_names
             )
             scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(
@@ -709,7 +710,7 @@ def run_synthetic_neuro_validation(
                 )
             )
             row = _score_row_metadata(
-                perturbed_spec, "perturbation", 701, target_lookup=target_lookup
+                perturbed_spec, "perturbation", perturbation_seed, target_lookup=target_lookup
             )
             row.update(scores)
             rows.append(row)
@@ -753,17 +754,17 @@ def run_synthetic_neuro_validation(
         "n_oracle_replicates": int(oracle_replicates),
     }
 
-    scores_path = tables_dir / "synthetic_score_runs.csv"
-    family_oracle_path = tables_dir / "synthetic_family_oracle_summary.csv"
-    metric_oracle_path = tables_dir / "synthetic_metric_oracle_summary.csv"
-    fidelity_oracle_path = tables_dir / "synthetic_fidelity_oracle_summary.csv"
-    family_selectivity_path = tables_dir / "synthetic_family_selectivity.csv"
-    metric_selectivity_path = tables_dir / "synthetic_metric_selectivity.csv"
-    fidelity_selectivity_path = tables_dir / "synthetic_fidelity_selectivity.csv"
-    family_dose_path = tables_dir / "synthetic_family_dose_response.csv"
-    metric_dose_path = tables_dir / "synthetic_metric_dose_response.csv"
-    fidelity_dose_path = tables_dir / "synthetic_fidelity_dose_response.csv"
-    metadata_path = output_root / "synthetic_validation_metadata.json"
+    scores_path = tables_dir / f"{prefix}_score_runs.csv"
+    family_oracle_path = tables_dir / f"{prefix}_family_oracle_summary.csv"
+    metric_oracle_path = tables_dir / f"{prefix}_metric_oracle_summary.csv"
+    fidelity_oracle_path = tables_dir / f"{prefix}_fidelity_oracle_summary.csv"
+    family_selectivity_path = tables_dir / f"{prefix}_family_selectivity.csv"
+    metric_selectivity_path = tables_dir / f"{prefix}_metric_selectivity.csv"
+    fidelity_selectivity_path = tables_dir / f"{prefix}_fidelity_selectivity.csv"
+    family_dose_path = tables_dir / f"{prefix}_family_dose_response.csv"
+    metric_dose_path = tables_dir / f"{prefix}_metric_dose_response.csv"
+    fidelity_dose_path = tables_dir / f"{prefix}_fidelity_dose_response.csv"
+    metadata_path = output_root / f"{prefix}_validation_metadata.json"
     scores_df.to_csv(scores_path, index=False)
     family_oracle_summary.to_csv(family_oracle_path, index=False)
     metric_oracle_summary.to_csv(metric_oracle_path, index=False)
@@ -776,10 +777,10 @@ def run_synthetic_neuro_validation(
     fidelity_dose_df.to_csv(fidelity_dose_path, index=False)
     metadata_path.write_text(json.dumps(metadata, indent=2))
 
-    ceiling_plot = figures_dir / "family_ceiling_floor.png"
-    family_selectivity_plot = figures_dir / "family_selectivity_heatmap.png"
-    metric_selectivity_plot = figures_dir / "metric_selectivity_heatmap.png"
-    dose_plot = figures_dir / "dose_response_curves.png"
+    ceiling_plot = figures_dir / f"{prefix}_family_ceiling_floor.png"
+    family_selectivity_plot = figures_dir / f"{prefix}_family_selectivity.png"
+    metric_selectivity_plot = figures_dir / f"{prefix}_metric_selectivity.png"
+    dose_plot = figures_dir / f"{prefix}_dose_response.png"
     if perturbation_defs:
         _plot_family_ceiling_floor(
             scores_df, ceiling_plot, perturbation_defs=perturbation_defs
@@ -788,13 +789,13 @@ def run_synthetic_neuro_validation(
             family_selectivity_df,
             family_selectivity_plot,
             score_columns=FAMILY_COLUMNS,
-            title="Family selectivity heatmap",
+            title=family_selectivity_title,
         )
         _plot_selectivity_heatmap(
             metric_selectivity_df,
             metric_selectivity_plot,
             score_columns=metric_columns,
-            title="Metric selectivity heatmap",
+            title=metric_selectivity_title,
         )
         _plot_dose_response(
             family_dose_df, dose_plot, perturbation_defs=perturbation_defs
@@ -828,3 +829,26 @@ def run_synthetic_neuro_validation(
         "metric_dose_df": metric_dose_df,
         "fidelity_dose_df": fidelity_dose_df,
     }
+
+
+def run_synthetic_neuro_validation(
+    *,
+    output_root: Path,
+    spec: SyntheticNeuralSpec | None = None,
+    oracle_replicates: int = 3,
+    perturbations: Iterable[PerturbationSpec] = DEFAULT_PERTURBATIONS,
+    save_datasets: bool = True,
+) -> dict[str, object]:
+    return run_validation_pipeline(
+        spec=spec or SyntheticNeuralSpec(),
+        generator_fn=generate_synthetic_neural_dataset,
+        output_root=output_root,
+        oracle_replicates=oracle_replicates,
+        perturbations=perturbations,
+        save_datasets=save_datasets,
+        prefix="synthetic",
+        oracle_seed_base=501,
+        perturbation_seed=701,
+        family_selectivity_title="Family selectivity heatmap",
+        metric_selectivity_title="Metric selectivity heatmap",
+    )
