@@ -10,28 +10,28 @@ import numpy as np
 
 from nethobench.cross.pipeline import compute_cross_scores, run_cross_full_analysis
 from nethobench.cli.utils import (
-    _prompt_for_file,
-    _prompt_for_config,
-    _quiet_call,
-    _print_scores,
-    _print_composite,
+    prompt_for_file,
+    prompt_for_config,
+    quiet_call,
+    print_scores,
+    print_composite,
 )
 
 logger = logging.getLogger(__name__)
 
 
 def _run_cross(args: argparse.Namespace) -> None:
-    gt = _prompt_for_file("ground-truth", "gt_", args.gt)
-    preds = _prompt_for_file("inference", "inference_", args.preds)
-    cfg_path = _prompt_for_config(args.config)
-    scores = _quiet_call(compute_cross_scores, preds, gt, cfg_path)
-    _print_scores("Neuro scores", scores["neuro_scores"])
-    _print_scores("Behavior scores", scores["behavior_scores"])
-    _print_scores("Cross-modal scores", scores["cross_scores"])
-    _print_composite("Composite neuro", scores.get("neuro_composite", float("nan")))
-    _print_composite("Composite etho", scores.get("etho_composite", float("nan")))
-    _print_composite("Composite cross", scores.get("cross_composite", float("nan")))
-    _print_composite("Final composite", scores.get("composite", float("nan")))
+    gt = prompt_for_file("ground-truth", "gt_", args.gt)
+    preds = prompt_for_file("inference", "inference_", args.preds)
+    cfg_path = prompt_for_config(args.config)
+    scores = quiet_call(compute_cross_scores, preds, gt, cfg_path)
+    print_scores("Neuro scores", scores["neuro_scores"])
+    print_scores("Behavior scores", scores["behavior_scores"])
+    print_scores("Cross-modal scores", scores["cross_scores"])
+    print_composite("Composite neuro", scores.get("neuro_composite", float("nan")))
+    print_composite("Composite etho", scores.get("etho_composite", float("nan")))
+    print_composite("Composite cross", scores.get("cross_composite", float("nan")))
+    print_composite("Final composite", scores.get("composite", float("nan")))
 
     if args.json_out is not None:
         out = Path(args.json_out)
@@ -49,10 +49,10 @@ def _run_cross(args: argparse.Namespace) -> None:
 
 
 def _run_cross_full(args: argparse.Namespace) -> None:
-    gt = _prompt_for_file("ground-truth", "gt_", args.gt)
-    preds = _prompt_for_file("inference", "inference_", args.preds)
-    cfg_path = _prompt_for_config(args.config)
-    outdir = _quiet_call(
+    gt = prompt_for_file("ground-truth", "gt_", args.gt)
+    preds = prompt_for_file("inference", "inference_", args.preds)
+    cfg_path = prompt_for_config(args.config)
+    outdir = quiet_call(
         run_cross_full_analysis, preds, gt, cfg_path, output_root=args.output_root
     )
     logger.info(f"Cross-modal full analysis executed. Outputs under {outdir}")

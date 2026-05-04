@@ -9,18 +9,18 @@ from nethobench.cli.neuro_cli import add_neuro_subparsers
 from nethobench.cli.etho_cli import add_etho_subparsers
 from nethobench.cli.cross_cli import add_cross_subparsers
 from nethobench.cli.utils import (
-    _find_candidates,
-    _prompt_for_file,
-    _prompt_for_config,
-    _score_to_color,
-    _render_score_bar,
-    _print_scores,
-    _print_composite,
-    _default_json_output,
-    _default_output_dir,
-    _save_json_payload,
+    find_candidates,
+    prompt_for_file,
+    prompt_for_config,
+    score_to_color,
+    render_score_bar,
+    print_scores,
+    print_composite,
+    default_json_output,
+    default_output_dir,
+    save_json_payload,
 )
-from nethobench.utils.helpers import _quiet_call
+from nethobench.utils.helpers import quiet_call
 
 
 def _build_parser() -> argparse.ArgumentParser:

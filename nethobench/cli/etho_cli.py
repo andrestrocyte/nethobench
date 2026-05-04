@@ -9,16 +9,16 @@ from pathlib import Path
 import numpy as np
 
 from nethobench.etho.pipeline import compute_etho_scores, run_etho_full_analysis
-from nethobench.cli.utils import _prompt_for_file, _quiet_call, _print_scores
+from nethobench.cli.utils import prompt_for_file, quiet_call, print_scores
 
 logger = logging.getLogger(__name__)
 
 
 def _run_etho(args: argparse.Namespace) -> None:
-    scores, seq_scores, seq_means, seq_stds = _quiet_call(
+    scores, seq_scores, seq_means, seq_stds = quiet_call(
         compute_etho_scores, Path(args.gt_dir), Path(args.inf_dir)
     )
-    _print_scores("Behavior scores", scores)
+    print_scores("Behavior scores", scores)
     if args.json_out:
         out = Path(args.json_out)
     else:
@@ -42,7 +42,7 @@ def _run_etho(args: argparse.Namespace) -> None:
 
 
 def _run_etho_full(args: argparse.Namespace) -> None:
-    outdir = _quiet_call(
+    outdir = quiet_call(
         run_etho_full_analysis,
         Path(args.gt_dir),
         Path(args.inf_dir),

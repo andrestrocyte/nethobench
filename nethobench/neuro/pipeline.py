@@ -7,7 +7,7 @@ from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
-from nethobench.utils.helpers import _load_and_align, _timestamped_outdir
+from nethobench.utils.helpers import load_and_align, timestamped_outdir
 from nethobench.neuro.metrics.composites import calculate_neuro_composites
 from nethobench.neuro.reporting import generate_full_neuro_report
 
@@ -27,7 +27,7 @@ def compute_neuro_scores(
 
     # 1. Use the existing helper to load CSVs and reshape them into 3D tensors
     # shape: [n_sequences, n_timesteps, n_regions]
-    gt_arr, pred_arr, overlap = _load_and_align(
+    gt_arr, pred_arr, overlap = load_and_align(
         Path(predictions_csv),
         Path(ground_truth_csv),
         neuro_cols=neuro_cols,
@@ -45,8 +45,8 @@ def run_neuro_full_analysis(
     Execute the active neuro notebook headlessly, save figures, and export notebook-derived scores.
     """
     preds_path = Path(predictions_csv)
-    outdir = _timestamped_outdir(output_root, prefix=preds_path.stem)
-    gt_arr, pred_arr, region_names = _load_and_align(preds_path, Path(ground_truth_csv))
+    outdir = timestamped_outdir(output_root, prefix=preds_path.stem)
+    gt_arr, pred_arr, region_names = load_and_align(preds_path, Path(ground_truth_csv))
 
     scores = calculate_neuro_composites(gt_arr, pred_arr)
 

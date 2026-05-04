@@ -8,11 +8,11 @@ import pandas as pd
 from sklearn.cluster import KMeans
 from nethobench.utils.helpers import (
     load_gt_and_preds,
-    _timestamped_outdir,
-    _clip01,
-    _geometric_mean_scores,
+    timestamped_outdir,
+    clip_fn,
+    geometric_mean_scores,
 )
-from nethobench.utils.calculation import _merge_aligned
+from nethobench.utils.calculation import merge_aligned
 from nethobench.utils.evaluation_constants import (
     MAX_POINTS_MANIFOLD_ALIGNMENT,
     STATIONARY_THRESHOLD_PERCENTILE,

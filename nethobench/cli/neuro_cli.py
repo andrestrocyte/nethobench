@@ -7,32 +7,32 @@ from pathlib import Path
 from nethobench.neuro.pipeline import compute_neuro_scores, run_neuro_full_analysis
 from nethobench.neuro.fidelity import compute_fidelity_scores
 from nethobench.cli.utils import (
-    _prompt_for_file,
-    _quiet_call,
-    _print_scores,
-    _save_json_payload,
+    prompt_for_file,
+    quiet_call,
+    print_scores,
+    save_json_payload,
 )
 
 logger = logging.getLogger(__name__)
 
 
 def _run_neuro(args: argparse.Namespace) -> None:
-    gt = _prompt_for_file("ground-truth", "gt_", args.gt)
-    preds = _prompt_for_file("inference", "inference_", args.preds)
-    scores = _quiet_call(compute_neuro_scores, preds, gt)
-    _print_scores("Neuro scores", scores)
-    out = _save_json_payload(
+    gt = prompt_for_file("ground-truth", "gt_", args.gt)
+    preds = prompt_for_file("inference", "inference_", args.preds)
+    scores = quiet_call(compute_neuro_scores, preds, gt)
+    print_scores("Neuro scores", scores)
+    out = save_json_payload(
         {"scores": scores}, requested=args.json_out, command="neuro-scores", preds=preds
     )
     logger.info(f"Saved scores to {out}")
 
 
 def _run_fidelity(args: argparse.Namespace) -> None:
-    gt = _prompt_for_file("ground-truth", "gt_", args.gt)
-    preds = _prompt_for_file("inference", "inference_", args.preds)
-    scores = _quiet_call(compute_fidelity_scores, preds, gt)
-    _print_scores("Fidelity scores", scores)
-    out = _save_json_payload(
+    gt = prompt_for_file("ground-truth", "gt_", args.gt)
+    preds = prompt_for_file("inference", "inference_", args.preds)
+    scores = quiet_call(compute_fidelity_scores, preds, gt)
+    print_scores("Fidelity scores", scores)
+    out = save_json_payload(
         {"scores": scores},
         requested=args.json_out,
         command="fidelity-scores",
@@ -42,9 +42,9 @@ def _run_fidelity(args: argparse.Namespace) -> None:
 
 
 def _run_neuro_full(args: argparse.Namespace) -> None:
-    gt = _prompt_for_file("ground-truth", "gt_", args.gt)
-    preds = _prompt_for_file("inference", "inference_", args.preds)
-    out = _quiet_call(run_neuro_full_analysis, preds, gt, output_root=args.output_root)
+    gt = prompt_for_file("ground-truth", "gt_", args.gt)
+    preds = prompt_for_file("inference", "inference_", args.preds)
+    out = quiet_call(run_neuro_full_analysis, preds, gt, output_root=args.output_root)
 
 
 def add_neuro_subparsers(subparsers) -> None:

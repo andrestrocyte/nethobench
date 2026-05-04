@@ -14,7 +14,7 @@ from __future__ import annotations
 # Minimum sequence length for cross-modal lead-lag metrics.
 MIN_SAMPLES_CORR_WINDOW: int = 33
 
-# Minimum number of finite items before _iqr_robust falls back to std.
+# Minimum number of finite items before iqr_robust falls back to std.
 MIN_ITEMS_IQR_ROBUST_FALLBACK: int = 10
 
 # Minimum array size for lead-lag correlation calculations.

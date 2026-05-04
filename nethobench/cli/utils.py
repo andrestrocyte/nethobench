@@ -8,17 +8,17 @@ from typing import Optional
 
 import numpy as np
 
-from nethobench.utils.helpers import _quiet_call
+from nethobench.utils.helpers import quiet_call
 
 logger = logging.getLogger(__name__)
 
 
-def _find_candidates(prefix: str) -> list[Path]:
+def find_candidates(prefix: str) -> list[Path]:
     cwd = Path.cwd()
     return sorted(path for path in cwd.glob(f"{prefix}*") if path.is_file())
 
 
-def _prompt_for_file(label: str, prefix: str, provided: Optional[str]) -> Path:
+def prompt_for_file(label: str, prefix: str, provided: Optional[str]) -> Path:
     if provided:
         path = Path(provided).expanduser()
         if not path.is_absolute():
@@ -27,7 +27,7 @@ def _prompt_for_file(label: str, prefix: str, provided: Optional[str]) -> Path:
             raise FileNotFoundError(f"{label} file '{path}' does not exist.")
         return path
 
-    candidates = _find_candidates(prefix)
+    candidates = find_candidates(prefix)
     if candidates:
         logger.info(f"Detected {label.lower()} candidates in {Path.cwd()}:")
         for idx, candidate in enumerate(candidates, start=1):
@@ -65,7 +65,7 @@ def _prompt_for_file(label: str, prefix: str, provided: Optional[str]) -> Path:
         logger.warning(f"{selection} does not exist. Try again.")
 
 
-def _prompt_for_config(provided: Optional[str]) -> Optional[Path]:
+def prompt_for_config(provided: Optional[str]) -> Optional[Path]:
     if provided:
         return Path(provided)
     jsons = sorted(Path.cwd().glob("*.json"))
@@ -91,7 +91,7 @@ def _prompt_for_config(provided: Optional[str]) -> Optional[Path]:
     return None
 
 
-def _score_to_color(value: float) -> str:
+def score_to_color(value: float) -> str:
     try:
         v = float(value)
     except Exception:
@@ -103,7 +103,7 @@ def _score_to_color(value: float) -> str:
     return "\033[31m"
 
 
-def _render_score_bar(value: float, width: int = 16) -> str:
+def render_score_bar(value: float, width: int = 16) -> str:
     try:
         v = float(value)
     except Exception:
@@ -119,40 +119,40 @@ def _render_score_bar(value: float, width: int = 16) -> str:
             chars.append("▶")
         else:
             chars.append("─")
-    color = _score_to_color(v)
+    color = score_to_color(v)
     reset = "\033[0m"
     return f"{color}{icon} 0 {''.join(chars)} 1{reset}"
 
 
-def _print_scores(label: str, scores: dict[str, float]) -> None:
+def print_scores(label: str, scores: dict[str, float]) -> None:
     logger.info(f"\n{label}:")
     for key, value in scores.items():
-        logger.info(f"  {key:24s}: {value:.3f} {_render_score_bar(value)}")
+        logger.info(f"  {key:24s}: {value:.3f} {render_score_bar(value)}")
 
 
-def _print_composite(label: str, value: float) -> None:
+def print_composite(label: str, value: float) -> None:
     if value == value:
-        logger.info(f"{label:18s}: {value:.3f} {_render_score_bar(value)}")
+        logger.info(f"{label:18s}: {value:.3f} {render_score_bar(value)}")
     else:
         logger.info(f"{label:18s}: NaN")
 
 
-def _default_json_output(command: str, preds: Path) -> Path:
+def default_json_output(command: str, preds: Path) -> Path:
     outdir = Path.cwd() / "outputs" / f"{preds.stem}-{command}"
     outdir.mkdir(parents=True, exist_ok=True)
     return outdir / "scores.json"
 
 
-def _default_output_dir(command: str) -> Path:
+def default_output_dir(command: str) -> Path:
     outdir = Path.cwd() / "outputs" / f"{command}"
     outdir.mkdir(parents=True, exist_ok=True)
     return outdir
 
 
-def _save_json_payload(
+def save_json_payload(
     payload: dict, *, requested: Optional[str], command: str, preds: Path
 ) -> Path:
-    out = Path(requested) if requested else _default_json_output(command, preds)
+    out = Path(requested) if requested else default_json_output(command, preds)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2))
     return out

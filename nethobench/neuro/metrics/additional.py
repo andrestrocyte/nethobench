@@ -6,7 +6,7 @@ from scipy.linalg import subspace_angles
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.covariance import LedoitWolf
 from sklearn.feature_selection import mutual_info_regression
-from nethobench.utils.calculation import _align_arrays, _rmse_similarity, weighted_mean_available, _corr_score
+from nethobench.utils.calculation import align_arrays, rmse_similarity, weighted_mean_available, correlation_score
 from nethobench.utils.evaluation_constants import (
     PCA_VARIANCE_THRESHOLD,
     MI_MAX_POINTS,
@@ -123,8 +123,8 @@ def _spectrum_similarity(x: np.ndarray, y: np.ndarray) -> float:
     x = x[:n]
     y = y[:n]
     return weighted_mean_available(
-        dict(enumerate([_corr_score(np.log(x + EPS), np.log(y + EPS)),
-        _rmse_similarity(x, y)])),
+        dict(enumerate([correlation_score(np.log(x + EPS), np.log(y + EPS)),
+        rmse_similarity(x, y)])),
         weights={0: WEIGHT_SPECTRUM_CORR, 1: WEIGHT_SPECTRUM_RMSE},
     )
 
@@ -135,8 +135,8 @@ def _matrix_similarity(gt_mat: np.ndarray | None, pred_mat: np.ndarray | None) -
     gt_vec = _upper_tri(gt_mat)
     pred_vec = _upper_tri(pred_mat)
     return weighted_mean_available(
-        dict(enumerate([_corr_score(gt_vec, pred_vec),
-        _rmse_similarity(gt_vec, pred_vec)])),
+        dict(enumerate([correlation_score(gt_vec, pred_vec),
+        rmse_similarity(gt_vec, pred_vec)])),
         weights={0: WEIGHT_MATRIX_CORR, 1: WEIGHT_MATRIX_RMSE},
     )
 
@@ -351,8 +351,8 @@ def _hist_similarity(gt_hist: np.ndarray, pred_hist: np.ndarray) -> float:
     overlap = float(np.sum(np.minimum(gt_hist, pred_hist)))
     return weighted_mean_available(
         dict(enumerate([overlap,
-        _corr_score(gt_hist, pred_hist),
-        _rmse_similarity(gt_hist, pred_hist)])),
+        correlation_score(gt_hist, pred_hist),
+        rmse_similarity(gt_hist, pred_hist)])),
         weights={0: WEIGHT_HIST_OVERLAP, 1: WEIGHT_HIST_CORR, 2: WEIGHT_HIST_RMSE},
     )
 
@@ -608,7 +608,7 @@ def _dfc_state_transition_score(gt: np.ndarray, pred: np.ndarray) -> float:
 def compute_additional_structural_metrics(
     gt_arr: np.ndarray, pred_arr: np.ndarray
 ) -> dict[str, object]:
-    gt, pred = _align_arrays(gt_arr, pred_arr)
+    gt, pred = align_arrays(gt_arr, pred_arr)
     gt_flat_raw = _pooled_rows(gt)
     pred_flat_raw = _pooled_rows(pred)
     gt_flat = _standardize_columns(gt_flat_raw)
@@ -646,8 +646,8 @@ def compute_additional_structural_metrics(
 
     partial_corr = _matrix_similarity(gt_pcorr, pred_pcorr)
     psd_shape = weighted_mean_available(
-        dict(enumerate([_corr_score(np.log(gt_psd + EPS), np.log(pred_psd + EPS)),
-        _rmse_similarity(gt_psd, pred_psd)])),
+        dict(enumerate([correlation_score(np.log(gt_psd + EPS), np.log(pred_psd + EPS)),
+        rmse_similarity(gt_psd, pred_psd)])),
         weights={0: WEIGHT_SPECTRUM_CORR, 1: WEIGHT_SPECTRUM_RMSE},
     )
 

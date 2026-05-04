@@ -10,11 +10,11 @@ from scipy import stats
 from scipy.stats import kurtosis, skew, spearmanr
 
 logger = logging.getLogger(__name__)
-from nethobench.utils.calculation import _align_arrays, weighted_mean_available, EPS
+from nethobench.utils.calculation import align_arrays, weighted_mean_available, EPS
 from nethobench.neuro.metrics.sensitive import (
-    _finite_rows,
-    _safe_corrcoef,
-    _score_from_distance,
+    finite_rows,
+    safe_corrcoef,
+    score_from_distance,
     autocorr_weighted_rmse_power,
     bandpower_band_fraction,
     corruption_region_permute_blend,
@@ -55,7 +55,7 @@ def _finite_float(value: float) -> float:
     return float(value) if np.isfinite(value) else np.nan
 
 
-def _extract_score(result: dict) -> float:
+def extract_score(result: dict) -> float:
     if not isinstance(result, dict):
         return np.nan
     value = result.get("score", np.nan)
@@ -238,7 +238,7 @@ def _binary_clustering(adj: np.ndarray) -> np.ndarray:
 
 
 def _final_moment_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
-    gt, pred = _align_arrays(gt_arr, pred_arr)
+    gt, pred = align_arrays(gt_arr, pred_arr)
     gt_feats = _moment_feature_arrays(gt)
     pred_feats = _moment_feature_arrays(pred)
     components = {}
@@ -247,7 +247,7 @@ def _final_moment_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
         pred_values = pred_feats[name].ravel()
         components[name] = (
             _safe_spearman01(gt_values, pred_values),
-            _rmse_similarity(gt_values, pred_values),
+            rmse_similarity(gt_values, pred_values),
         )
     score, per_stat = _score_from_components(
         components,
@@ -261,8 +261,8 @@ def _final_moment_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
     }
 
 
-def _perfected_moment_score_legacy(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
-    gt, pred = _align_arrays(gt_arr, pred_arr)
+def perfected_moment_score_legacy(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
+    gt, pred = align_arrays(gt_arr, pred_arr)
     scores = []
     for region in range(gt.shape[-1]):
         g = gt[:, :, region].reshape(-1)
@@ -283,14 +283,14 @@ def _perfected_moment_score_legacy(gt_arr: np.ndarray, pred_arr: np.ndarray) -> 
             + 0.50 * abs(skew_p - skew_g)
             + 0.25 * abs(kurt_p - kurt_g)
         )
-        scores.append(_score_from_distance(dist))
+        scores.append(score_from_distance(dist))
     arr = np.asarray(scores, dtype=np.float64)
     arr = arr[np.isfinite(arr)]
     return {"score": float(np.mean(arr)) if arr.size else np.nan}
 
 
 def _final_graph_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
-    gt, pred = _align_arrays(gt_arr, pred_arr)
+    gt, pred = align_arrays(gt_arr, pred_arr)
     corr_gt = _corrcoef_from_flat(gt)
     corr_pred = _corrcoef_from_flat(pred)
     if corr_gt is None or corr_pred is None or corr_gt.shape != corr_pred.shape:
@@ -329,7 +329,7 @@ def _final_graph_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
         adj_pred[tri[0][idx_pred], tri[1][idx_pred]] = 1.0
     adj_gt = adj_gt + adj_gt.T
     adj_pred = adj_pred + adj_pred.T
-    cluster_score = _rmse_similarity(
+    cluster_score = rmse_similarity(
         _local_clustering_from_adj(adj_gt), _local_clustering_from_adj(adj_pred)
     )
     score = weighted_mean_available(
@@ -355,13 +355,13 @@ def _final_graph_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
     }
 
 
-def _perfected_graph_score_legacy(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
-    gt, pred = _align_arrays(gt_arr, pred_arr)
+def perfected_graph_score_legacy(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
+    gt, pred = align_arrays(gt_arr, pred_arr)
     Xg = gt.reshape(-1, gt.shape[-1])
     Xp = pred.reshape(-1, pred.shape[-1])
-    Xg, Xp = _finite_rows(Xg, Xp)
-    Cg = _safe_corrcoef(Xg)
-    Cp = _safe_corrcoef(Xp)
+    Xg, Xp = finite_rows(Xg, Xp)
+    Cg = safe_corrcoef(Xg)
+    Cp = safe_corrcoef(Xp)
     if Cg is None or Cp is None:
         return {
             "score": np.nan,
@@ -377,7 +377,7 @@ def _perfected_graph_score_legacy(gt_arr: np.ndarray, pred_arr: np.ndarray) -> d
     jaccard = float(len(edges_g & edges_p) / max(len(union), 1))
     deg_g = np.sum(np.abs(Cg), axis=0)
     deg_p = np.sum(np.abs(Cp), axis=0)
-    degree_score = _score_from_distance(
+    degree_score = score_from_distance(
         float(np.mean(np.abs(deg_p - deg_g)) / (np.mean(np.abs(deg_g)) + EPS))
     )
     clust_g = _binary_clustering(Ag)
@@ -415,7 +415,7 @@ def _build_corruption_df(
     rows = []
     for level in levels:
         corrupted = corruption_fn(gt_arr, float(level), seed=seed)
-        score = _extract_score(score_fn(gt_arr, corrupted))
+        score = extract_score(score_fn(gt_arr, corrupted))
         rows.append(
             {
                 "family": family_label if level > 0 else "baseline",
@@ -492,8 +492,8 @@ def _wrap_population_metric(
 
 
 def _final_crosscorr_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
-    lagged = _extract_score(crosscorr_lagged_matrix(gt_arr, pred_arr))
-    topedge = _extract_score(crosscorr_topedge_profiles(gt_arr, pred_arr))
+    lagged = extract_score(crosscorr_lagged_matrix(gt_arr, pred_arr))
+    topedge = extract_score(crosscorr_topedge_profiles(gt_arr, pred_arr))
     return {
         "score": weighted_mean_available(
             {"lagged": lagged, "topedge": topedge},
@@ -502,9 +502,9 @@ def _final_crosscorr_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
     }
 
 
-def _final_trajectory_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
-    occupancy = _extract_score(trajectory_occupancy_velocity(gt_arr, pred_arr))
-    path = _extract_score(trajectory_path_features(gt_arr, pred_arr))
+def final_trajectory_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
+    occupancy = extract_score(trajectory_occupancy_velocity(gt_arr, pred_arr))
+    path = extract_score(trajectory_path_features(gt_arr, pred_arr))
     return {
         "score": weighted_mean_available(
             {"occupancy": occupancy, "path": path},
@@ -513,9 +513,9 @@ def _final_trajectory_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
     }
 
 
-def _final_manifold_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
-    topology = _extract_score(manifold_ph_stratified_lifetime(gt_arr, pred_arr))
-    local = _extract_score(manifold_ph_knn_profile(gt_arr, pred_arr))
+def final_manifold_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
+    topology = extract_score(manifold_ph_stratified_lifetime(gt_arr, pred_arr))
+    local = extract_score(manifold_ph_knn_profile(gt_arr, pred_arr))
     return {
         "score": weighted_mean_available(
             {"topology": topology, "local": local},
@@ -535,7 +535,7 @@ def compute_pca_replacement(
         "It compares how well prediction variance is captured by the GT PCA basis "
         "and expands the dynamic range by squaring the agreement score."
     )
-    score = _extract_score(pca_reconstruction_product(gt_arr, pred_arr))
+    score = extract_score(pca_reconstruction_product(gt_arr, pred_arr))
     pca_simple = _wrap_population_metric(
         score_key="PCA_score",
         mean_key="PCA_mean",
@@ -573,8 +573,8 @@ def compute_moment_replacement(
     enable_plots: bool = True,
 ) -> tuple[dict, pd.DataFrame]:
     description = "Variance, skewness, and kurtosis agreement."
-    result = _perfected_moment_score_legacy(gt_arr, pred_arr)
-    score = _extract_score(result)
+    result = perfected_moment_score_legacy(gt_arr, pred_arr)
+    score = extract_score(result)
     mom_simple = _wrap_population_metric(
         score_key="MOM_score",
         mean_key="MOM_mean",
@@ -584,7 +584,7 @@ def compute_moment_replacement(
     )
     mom_corr_df = _build_corruption_df(
         gt_arr,
-        _perfected_moment_score_legacy,
+        perfected_moment_score_legacy,
         corruption_gain_scaling_blend,
         score_key="MOM_score",
         family_label="gain_scaling_blend",
@@ -612,8 +612,8 @@ def compute_graph_replacement(
     enable_plots: bool = True,
 ) -> tuple[dict, pd.DataFrame]:
     description = "Top-edge topology, weighted degree, and clustering agreement."
-    result = _perfected_graph_score_legacy(gt_arr, pred_arr)
-    score = _extract_score(result)
+    result = perfected_graph_score_legacy(gt_arr, pred_arr)
+    score = extract_score(result)
     graph_simple = _wrap_population_metric(
         score_key="GRAPH_score",
         mean_key="GRAPH_mean",
@@ -628,7 +628,7 @@ def compute_graph_replacement(
     )
     graph_corr_df = _build_corruption_df(
         gt_arr,
-        _perfected_graph_score_legacy,
+        perfected_graph_score_legacy,
         corruption_region_permute_blend,
         score_key="GRAPH_score",
         family_label="region_permute_blend",
@@ -659,7 +659,7 @@ def compute_autocorr_replacement(
         "Weighted early-lag autocorrelation agreement with extra dynamic-range "
         "sensitivity from squaring the baseline agreement score."
     )
-    score = _extract_score(autocorr_weighted_rmse_power(gt_arr, pred_arr))
+    score = extract_score(autocorr_weighted_rmse_power(gt_arr, pred_arr))
     distance = _distance_from_score(score)
     auto_sensitive = _wrap_population_metric(
         score_key="AUTO_score",
@@ -702,7 +702,7 @@ def compute_crosscorr_replacement(
         "Population lagged correlation-matrix agreement stabilized by strong-edge profile agreement. "
         "It combines lag-0/lag-1 coupling structure with a top-edge cross-correlation profile term."
     )
-    score = _extract_score(_final_crosscorr_score(gt_arr, pred_arr))
+    score = extract_score(_final_crosscorr_score(gt_arr, pred_arr))
     distance = _distance_from_score(score)
     cc_sensitive = _wrap_population_metric(
         score_key="CC_score",
@@ -746,7 +746,7 @@ def compute_bandpower_replacement(
         "The GT mean spectrum is split into equal-power bands and the score compares "
         "how prediction redistributes power across those bands."
     )
-    score = _extract_score(bandpower_band_fraction(gt_arr, pred_arr))
+    score = extract_score(bandpower_band_fraction(gt_arr, pred_arr))
     bandpower_simple = _wrap_population_metric(
         score_key="BP_score",
         mean_key="BP_mean",
@@ -787,7 +787,7 @@ def compute_trajectory_replacement(
         "Pooled latent occupancy and velocity-distribution agreement stabilized by latent path features. "
         "It scores occupancy, speed, turning, and sequence-level path structure in a shared GT PCA space."
     )
-    score = _extract_score(_final_trajectory_score(gt_arr, pred_arr))
+    score = extract_score(final_trajectory_score(gt_arr, pred_arr))
     trajectory_dist_simple = _wrap_population_metric(
         score_key="TRJDIST_score",
         mean_key="TRJDIST_seq_mean",
@@ -797,7 +797,7 @@ def compute_trajectory_replacement(
     )
     trjdist_corr_df = _build_corruption_df(
         gt_arr,
-        _final_trajectory_score,
+        final_trajectory_score,
         corruption_time_shuffle_blend,
         score_key="TRJDIST_score",
         family_label="time_shuffle_blend",
@@ -829,7 +829,7 @@ def compute_manifold_replacement(
         "Persistent-homology lifetime agreement stabilized by local-neighborhood geometry. "
         "It combines a stratified PH topology term with a local k-nearest-neighbor geometry term."
     )
-    score = _extract_score(_final_manifold_score(gt_arr, pred_arr))
+    score = extract_score(final_manifold_score(gt_arr, pred_arr))
     mani_simple = _wrap_population_metric(
         score_key="MANI_score",
         mean_key="MANI_mean",
@@ -839,7 +839,7 @@ def compute_manifold_replacement(
     )
     mani_corr_df = _build_corruption_df(
         gt_arr,
-        _final_manifold_score,
+        final_manifold_score,
         corruption_region_permute_blend,
         score_key="MANI_score",
         family_label="region_permute_blend",

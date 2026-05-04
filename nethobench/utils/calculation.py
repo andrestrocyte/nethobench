@@ -20,7 +20,7 @@ from nethobench.utils.evaluation_constants import (
 EPS = 1e-8
 
 
-def _merge_aligned(gt, pred, cfg: dict) -> pd.DataFrame:
+def merge_aligned(gt, pred, cfg: dict) -> pd.DataFrame:
     seq_key = cfg.get("sequence_key", "sequenceId")
     time_key = cfg.get("time_key", "itemPosition")
     gt_df = gt if isinstance(gt, pd.DataFrame) else pd.read_csv(gt)
@@ -66,7 +66,7 @@ def weighted_mean_available(
 
 
 
-def _robust_scale(values: np.ndarray) -> float:
+def robust_scale(values: np.ndarray) -> float:
     values = np.asarray(values, dtype=np.float64)
     values = values[np.isfinite(values)]
     if values.size < 2:
@@ -82,7 +82,7 @@ def _robust_scale(values: np.ndarray) -> float:
     return scale + EPS
 
 
-def _corr_score(a: np.ndarray, b: np.ndarray) -> float:
+def correlation_score(a: np.ndarray, b: np.ndarray) -> float:
     a = np.asarray(a, dtype=np.float64)
     b = np.asarray(b, dtype=np.float64)
     mask = np.isfinite(a) & np.isfinite(b)
@@ -95,7 +95,7 @@ def _corr_score(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.clip((np.corrcoef(aa, bb)[0, 1] + 1.0) / 2.0, 0.0, 1.0))
 
 
-def _rmse_similarity(x: np.ndarray, y: np.ndarray) -> float:
+def rmse_similarity(x: np.ndarray, y: np.ndarray) -> float:
     x = np.asarray(x, dtype=np.float64).ravel()
     y = np.asarray(y, dtype=np.float64).ravel()
     mask = np.isfinite(x) & np.isfinite(y)
@@ -110,7 +110,7 @@ def _rmse_similarity(x: np.ndarray, y: np.ndarray) -> float:
     return float(1.0 / (1.0 + err / scale))
 
 
-def _align_arrays(
+def align_arrays(
     gt_arr: np.ndarray, pred_arr: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
     gt = np.asarray(gt_arr, dtype=np.float64)
@@ -144,7 +144,7 @@ def dataset_to_sequence_frame(arr: np.ndarray, region_names: list[str]) -> pd.Da
     return df
 
 
-def _iqr_robust(x: np.ndarray) -> float:
+def iqr_robust(x: np.ndarray) -> float:
     x = np.asarray(x, dtype=np.float64)
     x = x[np.isfinite(x)]
     if x.size < MIN_ITEMS_IQR_ROBUST_FALLBACK:

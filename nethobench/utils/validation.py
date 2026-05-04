@@ -277,7 +277,7 @@ def validate_multimodal_data(
     Run the full validation suite on an *already-merged* multimodal DataFrame.
 
     This is intended for cross-modal pipelines that work with the suffixed
-    ``_gt`` / ``_inf`` columns produced by ``_merge_aligned``.
+    ``_gt`` / ``_inf`` columns produced by ``merge_aligned``.
     """
     seq_key = cfg.get("sequence_key", "sequenceId")
     time_key = cfg.get("time_key", "itemPosition")
@@ -342,7 +342,7 @@ def validate_loaded_neuro_arrays(
     max_nan_ratio: float = 0.10,
 ) -> None:
     """
-    Validate 3-D neuro arrays right after ``_load_and_align``.
+    Validate 3-D neuro arrays right after ``load_and_align``.
     """
     for arr, label in ((gt_arr, "GT"), (pred_arr, "Pred")):
         validate_array_quality(

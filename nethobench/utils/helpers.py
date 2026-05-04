@@ -13,16 +13,16 @@ from nethobench.utils.validation import (
 )
 
 
-def _clip01(x: float, eps: float = 1e-6) -> float:
+def clip_fn(x: float, eps: float = 1e-6) -> float:
     return float(np.clip(x, eps, 1.0 - eps))
 
 
-def _geometric_mean_scores(values: list[float]) -> float:
+def geometric_mean_scores(values: list[float]) -> float:
     arr = np.asarray(values, dtype=np.float64)
     arr = arr[np.isfinite(arr)]
     if arr.size == 0:
         return np.nan
-    arr = np.asarray([_clip01(v) for v in arr], dtype=np.float64)
+    arr = np.asarray([clip_fn(v) for v in arr], dtype=np.float64)
     return float(np.exp(np.mean(np.log(arr))))
 
 
@@ -93,7 +93,7 @@ def _load_sequences(
     arr = df.to_numpy(dtype=np.float64).reshape(n_seq, n_time, len(region_cols))
     return arr, region_cols
 
-def _load_and_align(
+def load_and_align(
     predictions_csv: Path,
     ground_truth_csv: Path,
     neuro_cols: Optional[list[str]] = None,
@@ -167,13 +167,13 @@ def _load_and_align(
     return gt_arr, pred_arr, overlap
 
 
-def _quiet_call(func, *args, **kwargs):
+def quiet_call(func, *args, **kwargs):
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
         return func(*args, **kwargs)
 
 
-def _timestamped_outdir(base: Path | None = None, prefix: str = "ethobench") -> Path:
+def timestamped_outdir(base: Path | None = None, prefix: str = "ethobench") -> Path:
     base = Path(base) if base is not None else Path.cwd() / "outputs"
     outdir = base / f"{prefix}"
     outdir.mkdir(parents=True, exist_ok=True)

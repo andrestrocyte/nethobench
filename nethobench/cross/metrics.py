@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 from sklearn.cross_decomposition import CCA
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
-from nethobench.utils.helpers import _clip01, _geometric_mean_scores
-from nethobench.utils.calculation import _merge_aligned
+from nethobench.utils.helpers import clip_fn, geometric_mean_scores
+from nethobench.utils.calculation import merge_aligned
 from nethobench.utils.evaluation_constants import (
     LEAD_LAG_MIN_ARRAY_SIZE,
     LEAD_LAG_DEFAULT_MAX_LAG,
@@ -29,7 +29,7 @@ from nethobench.etho.metrics import (
 
 
 
-def _load_config(
+def load_config(
     config: Union[Path, dict, None], sample_df: pd.DataFrame | None = None
 ) -> dict:
     if isinstance(config, dict):
@@ -77,7 +77,7 @@ def _infer_config(df: pd.DataFrame) -> dict:
 
 
 
-def _arrays_from_aligned(
+def arrays_from_aligned(
     aligned: pd.DataFrame, cols: list[str], suffix: str, cfg: dict
 ) -> np.ndarray:
     seq_key = cfg.get("sequence_key", "sequenceId")
@@ -92,7 +92,7 @@ def _arrays_from_aligned(
     return np.stack(seq_arrays, axis=0)
 
 
-def _behavior_feature_matrix(
+def behavior_feature_matrix(
     aligned: pd.DataFrame, cfg: dict, suffix: str
 ) -> np.ndarray:
     seq_key = cfg.get("sequence_key", "sequenceId")
@@ -123,7 +123,7 @@ def _behavior_feature_matrix(
     return np.vstack(feats)
 
 
-def _behavior_feature_sequences(
+def behavior_feature_sequences(
     aligned: pd.DataFrame, cfg: dict, suffix: str
 ) -> list[np.ndarray]:
     seq_key = cfg.get("sequence_key", "sequenceId")
@@ -153,21 +153,21 @@ def _behavior_feature_sequences(
     return out
 
 
-def _neural_feature_matrix(
+def neural_feature_matrix(
     aligned: pd.DataFrame, neuro_cols: list[str], suffix: str, cfg: dict
 ) -> np.ndarray:
-    arr = _arrays_from_aligned(aligned, neuro_cols, suffix, cfg)
+    arr = arrays_from_aligned(aligned, neuro_cols, suffix, cfg)
     return arr.reshape(-1, arr.shape[-1])
 
 
-def _neural_feature_sequences(
+def neural_feature_sequences(
     aligned: pd.DataFrame, neuro_cols: list[str], suffix: str, cfg: dict
 ) -> list[np.ndarray]:
-    arr = _arrays_from_aligned(aligned, neuro_cols, suffix, cfg)
+    arr = arrays_from_aligned(aligned, neuro_cols, suffix, cfg)
     return [arr[i] for i in range(arr.shape[0])]
 
 
-def _cca_mean(X: np.ndarray, Y: np.ndarray, n_components: int = 5) -> float:
+def cca_mean(X: np.ndarray, Y: np.ndarray, n_components: int = 5) -> float:
     scaler_x = StandardScaler()
     scaler_y = StandardScaler()
     Xs = scaler_x.fit_transform(X)
@@ -191,7 +191,7 @@ def _stack_sequences(sequences: list[np.ndarray]) -> np.ndarray:
     return np.vstack(sequences)
 
 
-def _predictive_r2(
+def predictive_r2(
     X_sequences: list[np.ndarray],
     Y_sequences: list[np.ndarray],
     test_frac: float = 0.2,
@@ -230,7 +230,7 @@ def _predictive_r2(
     return float(r2)
 
 
-def _lead_lag_peak(
+def lead_lag_peak(
     neural_sequences: list[np.ndarray],
     behavior_sequences: list[np.ndarray],
     max_lag: int = LEAD_LAG_DEFAULT_MAX_LAG,
@@ -272,7 +272,7 @@ def _lead_lag_peak(
     return int(lags[idx])
 
 
-def _speed_from_behavior(
+def speed_from_behavior(
     aligned: pd.DataFrame, cfg: dict, suffix: str
 ) -> Tuple[list[np.ndarray], list[int]]:
     seq_key = cfg.get("sequence_key", "sequenceId")

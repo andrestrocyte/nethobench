@@ -7,11 +7,11 @@ import numpy as np
 import pandas as pd
 from nethobench.utils.helpers import (
     load_gt_and_preds,
-    _timestamped_outdir,
-    _clip01,
-    _geometric_mean_scores,
+    timestamped_outdir,
+    clip_fn,
+    geometric_mean_scores,
 )
-from nethobench.utils.calculation import _merge_aligned
+from nethobench.utils.calculation import merge_aligned
 from nethobench.etho.metrics import (
     stationary_score,
     velocity_distribution_score,
@@ -45,7 +45,7 @@ def compute_etho_scores(
                 "Must provide either paired_df, or both gt_dir and inf_dir."
             )
         gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
-        paired_df = _merge_aligned(gt_df, inf_df, {})
+        paired_df = merge_aligned(gt_df, inf_df, {})
 
     pos_res = position_kl_score(paired_df)
     stat_res = stationary_score(paired_df)
@@ -84,7 +84,7 @@ def compute_etho_scores(
         for k, v in scores.items()
         if k not in ["procrustes_similarity", "mmd_similarity", "dtw_similarity_score"]
     }
-    scores["composite_score"] = _geometric_mean_scores(list(core_scores.values()))
+    scores["composite_score"] = geometric_mean_scores(list(core_scores.values()))
 
     all_seq_dicts = {
         "position_kl_score": pos_res[1],
@@ -168,11 +168,11 @@ def run_etho_full_analysis(
         def generate_full_etho_report(*args, **kwargs):
             pass  # Failsafe if reporting module has not been fully implemented yet
 
-    outdir = _timestamped_outdir(output_root, prefix="etho-analysis")
+    outdir = timestamped_outdir(output_root, prefix="etho-analysis")
 
     # 1. Load Data
     gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
-    paired_df = _merge_aligned(gt_df, inf_df, {})
+    paired_df = merge_aligned(gt_df, inf_df, {})
 
     # 2. Extract Additional Features for the Report
     coord_pairs = []

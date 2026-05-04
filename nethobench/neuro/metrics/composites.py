@@ -24,8 +24,8 @@ from nethobench.neuro.metrics.direct import (
 from nethobench.neuro.metrics.additional import (
     compute_additional_structural_metrics,
 )
-from nethobench.utils.calculation import _iqr_robust
-from nethobench.utils.helpers import _load_and_align
+from nethobench.utils.calculation import iqr_robust
+from nethobench.utils.helpers import load_and_align
 from nethobench.neuro.reporting import generate_full_neuro_report
 from nethobench.utils.evaluation_constants import (
     MIN_SAMPLES_KL,
@@ -141,7 +141,7 @@ def compute_mean_score_top10(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
     mu_pr = np.nanmean(pred_arr, axis=1)
 
     iqr_gt = np.array(
-        [_iqr_robust(gt_arr[:, :, r].reshape(-1)) for r in range(n_reg)],
+        [iqr_robust(gt_arr[:, :, r].reshape(-1)) for r in range(n_reg)],
         dtype=np.float64,
     )
     d = np.abs(mu_gt - mu_pr) / (iqr_gt[None, :] + EPS)
@@ -182,7 +182,7 @@ def compute_quantile_score_simple(
     tail_mask = (quantiles <= tail_lo) | (quantiles >= tail_hi)
 
     iqr_gt = np.array(
-        [_iqr_robust(gt_arr[:, :, r].reshape(-1)) for r in range(n_reg)],
+        [iqr_robust(gt_arr[:, :, r].reshape(-1)) for r in range(n_reg)],
         dtype=np.float64,
     )
     d_tail_sr = np.full((n_seq, n_reg), np.nan, dtype=np.float64)
@@ -309,7 +309,7 @@ def _robust_median_mad(x: np.ndarray) -> tuple[float, float]:
 
 def compute_error_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
     n_seq, _, n_reg = gt_arr.shape
-    iqr_gt = np.array([_iqr_robust(gt_arr[:, :, r].reshape(-1)) for r in range(n_reg)])
+    iqr_gt = np.array([iqr_robust(gt_arr[:, :, r].reshape(-1)) for r in range(n_reg)])
     nrmse_sr = np.full((n_seq, n_reg), np.nan)
 
     for i in range(n_seq):
@@ -435,7 +435,7 @@ def compute_composite_scores(
             "per_sequence_stats is not supported for legacy notebook-based neuro scores."
         )
 
-    gt, pred, _ = _load_and_align(
+    gt, pred, _ = load_and_align(
         Path(predictions_csv),
         Path(ground_truth_csv),
         neuro_cols=neuro_cols,

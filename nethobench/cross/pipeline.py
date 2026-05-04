@@ -5,8 +5,8 @@ from typing import Dict, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from nethobench.utils.helpers import _clip01, _geometric_mean_scores
-from nethobench.utils.calculation import _merge_aligned
+from nethobench.utils.helpers import clip_fn, geometric_mean_scores
+from nethobench.utils.calculation import merge_aligned
 from nethobench.utils.validation import validate_multimodal_data
 from nethobench.neuro.metrics.composites import load_and_run_neuro_full_analysis
 from nethobench.etho.metrics import (
@@ -20,16 +20,16 @@ from nethobench.etho.metrics import (
     trajectory_shape_score,
 )
 from nethobench.cross.metrics import (
-    _load_config,
-    _arrays_from_aligned,
-    _behavior_feature_matrix,
-    _behavior_feature_sequences,
-    _neural_feature_matrix,
-    _neural_feature_sequences,
-    _cca_mean,
-    _predictive_r2,
-    _lead_lag_peak,
-    _speed_from_behavior,
+    load_config,
+    arrays_from_aligned,
+    behavior_feature_matrix,
+    behavior_feature_sequences,
+    neural_feature_matrix,
+    neural_feature_sequences,
+    cca_mean,
+    predictive_r2,
+    lead_lag_peak,
+    speed_from_behavior,
 )
 
 
@@ -38,16 +38,16 @@ def compute_cross_scores(
 ) -> Dict[str, object]:
     # Read GT once for config inference if needed
     sample_df = pd.read_csv(ground_truth_csv)
-    cfg = _load_config(config, sample_df=sample_df)
-    aligned = _merge_aligned(ground_truth_csv, predictions_csv, cfg)
+    cfg = load_config(config, sample_df=sample_df)
+    aligned = merge_aligned(ground_truth_csv, predictions_csv, cfg)
     validate_multimodal_data(aligned, cfg)
     neuro_cols = cfg.get("neuro_cols")
     if not neuro_cols:
         raise ValueError("Config must include neuro_cols for cross-scores.")
 
     # --- Neuro axis ---
-    gt_neuro = _arrays_from_aligned(aligned, neuro_cols, "gt", cfg)
-    pr_neuro = _arrays_from_aligned(aligned, neuro_cols, "inf", cfg)
+    gt_neuro = arrays_from_aligned(aligned, neuro_cols, "gt", cfg)
+    pr_neuro = arrays_from_aligned(aligned, neuro_cols, "inf", cfg)
     neuro_scores = load_and_run_neuro_full_analysis(
         gt_neuro, pr_neuro
     )
@@ -66,46 +66,46 @@ def compute_cross_scores(
     )[0]
     beh_scores["syllable_score"] = syllable_score(aligned)[0]
     beh_scores["trajectory_shape_score"] = trajectory_shape_score(aligned)[0]
-    beh_scores["composite_score"] = _geometric_mean_scores(list(beh_scores.values()))
+    beh_scores["composite_score"] = geometric_mean_scores(list(beh_scores.values()))
 
     # --- Cross-modal axis ---
-    neuro_gt_flat = _neural_feature_matrix(aligned, neuro_cols, "gt", cfg)
-    neuro_pr_flat = _neural_feature_matrix(aligned, neuro_cols, "inf", cfg)
-    beh_gt_flat = _behavior_feature_matrix(aligned, cfg, "gt")
-    beh_pr_flat = _behavior_feature_matrix(aligned, cfg, "inf")
-    neuro_gt_seq = _neural_feature_sequences(aligned, neuro_cols, "gt", cfg)
-    neuro_pr_seq = _neural_feature_sequences(aligned, neuro_cols, "inf", cfg)
-    beh_gt_seq = _behavior_feature_sequences(aligned, cfg, "gt")
-    beh_pr_seq = _behavior_feature_sequences(aligned, cfg, "inf")
+    neuro_gt_flat = neural_feature_matrix(aligned, neuro_cols, "gt", cfg)
+    neuro_pr_flat = neural_feature_matrix(aligned, neuro_cols, "inf", cfg)
+    beh_gt_flat = behavior_feature_matrix(aligned, cfg, "gt")
+    beh_pr_flat = behavior_feature_matrix(aligned, cfg, "inf")
+    neuro_gt_seq = neural_feature_sequences(aligned, neuro_cols, "gt", cfg)
+    neuro_pr_seq = neural_feature_sequences(aligned, neuro_cols, "inf", cfg)
+    beh_gt_seq = behavior_feature_sequences(aligned, cfg, "gt")
+    beh_pr_seq = behavior_feature_sequences(aligned, cfg, "inf")
 
-    cca_gt = _cca_mean(neuro_gt_flat, beh_gt_flat)
-    cca_pr = _cca_mean(neuro_pr_flat, beh_pr_flat)
+    cca_gt = cca_mean(neuro_gt_flat, beh_gt_flat)
+    cca_pr = cca_mean(neuro_pr_flat, beh_pr_flat)
     cca_alignment_score = (
         float(1.0 - min(1.0, abs(cca_gt - cca_pr)))
         if np.isfinite(cca_gt) and np.isfinite(cca_pr)
         else np.nan
     )
 
-    r2_n2b_gt = _predictive_r2(neuro_gt_seq, beh_gt_seq)
-    r2_n2b_pr = _predictive_r2(neuro_pr_seq, beh_pr_seq)
+    r2_n2b_gt = predictive_r2(neuro_gt_seq, beh_gt_seq)
+    r2_n2b_pr = predictive_r2(neuro_pr_seq, beh_pr_seq)
     n2b_similarity = (
         float(1.0 / (1.0 + abs(r2_n2b_gt - r2_n2b_pr)))
         if np.isfinite(r2_n2b_gt) and np.isfinite(r2_n2b_pr)
         else np.nan
     )
 
-    r2_b2n_gt = _predictive_r2(beh_gt_seq, neuro_gt_seq)
-    r2_b2n_pr = _predictive_r2(beh_pr_seq, neuro_pr_seq)
+    r2_b2n_gt = predictive_r2(beh_gt_seq, neuro_gt_seq)
+    r2_b2n_pr = predictive_r2(beh_pr_seq, neuro_pr_seq)
     b2n_similarity = (
         float(1.0 / (1.0 + abs(r2_b2n_gt - r2_b2n_pr)))
         if np.isfinite(r2_b2n_gt) and np.isfinite(r2_b2n_pr)
         else np.nan
     )
 
-    speed_gt, _ = _speed_from_behavior(aligned, cfg, "gt")
-    speed_pr, _ = _speed_from_behavior(aligned, cfg, "inf")
-    lag_gt = _lead_lag_peak(neuro_gt_seq, speed_gt)
-    lag_pr = _lead_lag_peak(neuro_pr_seq, speed_pr)
+    speed_gt, _ = speed_from_behavior(aligned, cfg, "gt")
+    speed_pr, _ = speed_from_behavior(aligned, cfg, "inf")
+    lag_gt = lead_lag_peak(neuro_gt_seq, speed_gt)
+    lag_pr = lead_lag_peak(neuro_pr_seq, speed_pr)
     lead_lag_score = (
         1.0 - min(1.0, abs(lag_gt - lag_pr) / 30.0)
         if (lag_gt == lag_gt) and (lag_pr == lag_pr)
