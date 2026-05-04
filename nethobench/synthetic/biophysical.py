@@ -208,17 +208,19 @@ def _build_biophysical_system(
         tau_rise = tau_rise * np.clip(1.0 + 0.70 * level, 0.60, 1.8)
         ar1, ar2 = _ar2_from_taus(tau_rise, tau_decay)
     if perturbation in {"temporal_refractory_jitter", "temporal_combo"}:
-        # Crush the refractory period almost entirely to induce heavy, unnatural bursting
-        refractory_region = np.clip(refractory_region * (1.0 - 0.95 * level), 0.01, 2.5)
-        # Add heavy jitter to the shared events
-        shared_event_profile = np.clip(
-            shared_event_profile
-            + (0.60 * level * rng.normal(size=shared_event_profile.shape)),
-            0.01,
-            0.99,
-        )
-        # Desynchronize the low-frequency baseline drift to further damage temporal spectra
-        drift_phase = drift_phase + (level * np.pi * rng.random(size=n_regions))
+         # Keep the softened, physiologically valid refractory floor
+         refractory_region = np.clip(refractory_region * (1.0 - 0.40 * level), 0.20, 2.5)
+         shared_event_profile = np.clip(
+             shared_event_profile
+             + (0.40 * level * rng.normal(size=shared_event_profile.shape)),
+             0.05,
+             0.99,
+         )
+         # Jitter the calcium decay per-region to break temporal synchrony and force TRJDIST to drop
+         tau_decay = tau_decay * np.clip(1.0 + 0.50 * level * rng.normal(size=n_regions), 0.4, 1.6)
+         ar1, ar2 = _ar2_from_taus(tau_rise, tau_decay)
+         # Desynchronize the slow baseline oscillations
+         drift_phase = drift_phase + (level * np.pi * rng.random(size=n_regions))
     if perturbation in {"relational_assembly_shuffle", "relational_combo"}:
         perm = rng.permutation(n_regions)
         mix = 0.85 * level

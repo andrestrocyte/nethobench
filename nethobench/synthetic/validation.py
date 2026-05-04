@@ -240,7 +240,7 @@ def _build_system(spec: SyntheticNeuralSpec) -> dict[str, np.ndarray]:
     if perturbation in {"relational_sign_flip", "relational_combo"}:
         # Zero out connections to break absolute relational graphs 
         drop_mask = np.ones_like(W)
-        drop_mask[rng.random(size=W.shape) < (0.50 * level)] = 0.0
+        drop_mask[rng.random(size=W.shape) < (0.35 * level)] = 0.10
         W = W * drop_mask
         W /= np.linalg.norm(W, axis=1, keepdims=True) + 1e-9
         A = np.diag(np.diag(A)) + ((1.0 - 2.0 * level) * (A - np.diag(np.diag(A))))
@@ -253,13 +253,17 @@ def _build_system(spec: SyntheticNeuralSpec) -> dict[str, np.ndarray]:
         scales = scales / np.mean(scales)
         latent_transform = np.diag(scales) @ latent_transform
     if perturbation in {"geometry_rank_truncation", "geometry_combo"}:
-        keep = np.ones(latent_dim, dtype=np.float64)
-        if latent_dim > 1:
-            keep[1:] = np.maximum(
-                1.0 - (level * np.linspace(1.5, 2.5, latent_dim - 1)), 0.0
-            )
-        latent_transform = np.diag(keep) @ latent_transform
-        latent_warp_strength = max(latent_warp_strength, 2.0 * level)
+         keep = np.ones(latent_dim, dtype=np.float64)
+         if latent_dim > 1:
+             # Keep the aggressive collapse rate (1.5 to 2.5), but 
+             # restore the 0.02 floor so linear metrics don't break.
+             keep[1:] = np.maximum(
+                 1.0 - (level * np.linspace(1.5, 2.5, latent_dim - 1)), 0.02
+             )
+         latent_transform = np.diag(keep) @ latent_transform
+         
+         # Reduce the warp multiplier from 2.0 back down to 1.0
+         latent_warp_strength = max(latent_warp_strength, 1.0 * level)
 
     return {
         "A": A.astype(np.float64),
