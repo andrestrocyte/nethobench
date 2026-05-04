@@ -11,6 +11,10 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from nethobench.utils.helpers import _clip01, _geometric_mean_scores
 from nethobench.utils.calculation import _merge_aligned
+from nethobench.utils.evaluation_constants import (
+    LEAD_LAG_MIN_ARRAY_SIZE,
+    LEAD_LAG_DEFAULT_MAX_LAG,
+)
 from nethobench.neuro.metrics.composites import load_and_run_neuro_full_analysis
 from nethobench.etho.metrics import (
     position_kl_score,
@@ -229,13 +233,13 @@ def _predictive_r2(
 def _lead_lag_peak(
     neural_sequences: list[np.ndarray],
     behavior_sequences: list[np.ndarray],
-    max_lag: int = 30,
+    max_lag: int = LEAD_LAG_DEFAULT_MAX_LAG,
 ) -> int:
     lags = np.arange(-max_lag, max_lag + 1)
     seq_cors = []
     for neural_arr, behavior_arr in zip(neural_sequences, behavior_sequences):
         if neural_arr.shape[0] != behavior_arr.shape[0] or neural_arr.shape[0] < max(
-            5, max_lag + 3
+            LEAD_LAG_MIN_ARRAY_SIZE, max_lag + 3
         ):
             continue
         X = neural_arr - neural_arr.mean(axis=0, keepdims=True)
@@ -254,7 +258,7 @@ def _lead_lag_peak(
             else:
                 a = pc1
                 bb = b
-            if a.size < 5 or bb.size < 5:
+            if a.size < LEAD_LAG_MIN_ARRAY_SIZE or bb.size < LEAD_LAG_MIN_ARRAY_SIZE:
                 cors.append(np.nan)
             else:
                 cors.append(np.corrcoef(a, bb)[0, 1])

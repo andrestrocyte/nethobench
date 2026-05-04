@@ -25,6 +25,21 @@ from nethobench.neuro.metrics.sensitive import (
     trajectory_occupancy_velocity,
     trajectory_path_features,
 )
+from nethobench.utils.evaluation_constants import (
+    WEIGHT_MOMENT_VAR,
+    WEIGHT_MOMENT_SKEW,
+    WEIGHT_MOMENT_KURT,
+    WEIGHT_GRAPH_JACCARD,
+    WEIGHT_GRAPH_WEIGHT,
+    WEIGHT_GRAPH_DEGREE,
+    WEIGHT_GRAPH_CLUSTER,
+    WEIGHT_CROSSCORR_LAGGED,
+    WEIGHT_CROSSCORR_TOPEDGE,
+    WEIGHT_TRAJECTORY_OCCUPANCY,
+    WEIGHT_TRAJECTORY_PATH,
+    WEIGHT_MANIFOLD_TOPOLOGY,
+    WEIGHT_MANIFOLD_LOCAL,
+)
 
 ScoreFn = Callable[[np.ndarray, np.ndarray], dict]
 CorruptionFn = Callable[[np.ndarray, float, int], np.ndarray]
@@ -233,7 +248,7 @@ def _final_moment_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
         )
     score, per_stat = _score_from_components(
         components,
-        {"var": 0.40, "skew": 0.30, "kurt": 0.30},
+        {"var": WEIGHT_MOMENT_VAR, "skew": WEIGHT_MOMENT_SKEW, "kurt": WEIGHT_MOMENT_KURT},
     )
     return {
         "score": score,
@@ -322,10 +337,10 @@ def _final_graph_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
             "cluster": cluster_score,
         },
         {
-            "jaccard": 0.35,
-            "weight": 0.30,
-            "degree": 0.20,
-            "cluster": 0.15,
+            "jaccard": WEIGHT_GRAPH_JACCARD,
+            "weight": WEIGHT_GRAPH_WEIGHT,
+            "degree": WEIGHT_GRAPH_DEGREE,
+            "cluster": WEIGHT_GRAPH_CLUSTER,
         },
     )
     return {
@@ -479,7 +494,7 @@ def _final_crosscorr_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
     return {
         "score": weighted_mean_available(
             {"lagged": lagged, "topedge": topedge},
-            {"lagged": 0.75, "topedge": 0.25},
+            {"lagged": WEIGHT_CROSSCORR_LAGGED, "topedge": WEIGHT_CROSSCORR_TOPEDGE},
         )
     }
 
@@ -490,7 +505,7 @@ def _final_trajectory_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
     return {
         "score": weighted_mean_available(
             {"occupancy": occupancy, "path": path},
-            {"occupancy": 0.60, "path": 0.40},
+            {"occupancy": WEIGHT_TRAJECTORY_OCCUPANCY, "path": WEIGHT_TRAJECTORY_PATH},
         )
     }
 
@@ -501,7 +516,7 @@ def _final_manifold_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict:
     return {
         "score": weighted_mean_available(
             {"topology": topology, "local": local},
-            {"topology": 0.75, "local": 0.25},
+            {"topology": WEIGHT_MANIFOLD_TOPOLOGY, "local": WEIGHT_MANIFOLD_LOCAL},
         )
     }
 

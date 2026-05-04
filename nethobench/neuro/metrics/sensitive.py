@@ -7,6 +7,20 @@ import numpy as np
 from scipy import signal
 from sklearn.decomposition import PCA
 from nethobench.utils.calculation import _align_arrays, _robust_scale, _corr_score, EPS
+from nethobench.utils.evaluation_constants import (
+    MIN_ROWS_PCA,
+    MIN_SAMPLES_MANIFOLD,
+    CROSS_CORR_MAX_LAG_SMALL,
+    MIN_ROWS_CORRCOEF,
+    AUTOCORR_MAX_LAG,
+    LATENT_SUBSAMPLE_SIZE,
+    N_POINTS_MANIFOLD_PH_KNN,
+    MAX_SEQUENCES_STRATIFIED,
+    DISTRIBUTION_GRID_QUANTILES,
+    WELCH_SAMPLING_FREQUENCY,
+    WELCH_NPERSEG,
+    HISTOGRAM_BINS_DEFAULT,
+)
 try:
     from ripser import ripser
 except Exception:  # pragma: no cover - optional dependency during development
@@ -59,7 +73,7 @@ def _score_from_distance(distance: float) -> float:
 
 
 def _quantile_distance(
-    x: np.ndarray, y: np.ndarray, qs: tuple[float, ...] = (0.1, 0.25, 0.5, 0.75, 0.9)
+    x: np.ndarray, y: np.ndarray, qs: tuple[float, ...] = DISTRIBUTION_GRID_QUANTILES
 ) -> float:
     x = np.asarray(x, dtype=np.float64)
     y = np.asarray(y, dtype=np.float64)
@@ -81,7 +95,7 @@ def _tv_score_from_hist(hist_g: np.ndarray, hist_p: np.ndarray) -> float:
     return float(np.clip(1.0 - 0.5 * np.sum(np.abs(hist_g - hist_p)), 0.0, 1.0))
 
 
-def _gt_hist_score(xg: np.ndarray, xp: np.ndarray, bins: int = 12) -> float:
+def _gt_hist_score(xg: np.ndarray, xp: np.ndarray, bins: int = HISTOGRAM_BINS_DEFAULT) -> float:
     xg = np.asarray(xg, dtype=np.float64)
     xp = np.asarray(xp, dtype=np.float64)
     xg = xg[np.isfinite(xg)]
@@ -120,7 +134,7 @@ def _fit_gt_pca_pooled(
     Xg = gt.reshape(-1, gt.shape[-1])
     Xp = pred.reshape(-1, pred.shape[-1])
     Xg, Xp = _finite_rows(Xg, Xp)
-    if Xg.shape[0] < 32:
+    if Xg.shape[0] < MIN_ROWS_PCA:
         raise ValueError("Not enough valid rows for pooled PCA.")
     Xg_z, Xp_z = _standardize_with_gt(Xg, Xp)
     k = _choose_k(Xg_z, k_max=k_max)
@@ -162,13 +176,13 @@ def _crosscorr_1d(x: np.ndarray, y: np.ndarray, max_lag: int) -> np.ndarray:
 
 
 def _welch_relative_psd(
-    x: np.ndarray, fs: float = 30.0
+    x: np.ndarray, fs: float = WELCH_SAMPLING_FREQUENCY
 ) -> tuple[np.ndarray, np.ndarray]:
     x = np.asarray(x, dtype=np.float64)
     x = x[np.isfinite(x)]
-    if x.size < 64:
+    if x.size < MIN_SAMPLES_MANIFOLD:
         return np.array([]), np.array([])
-    nperseg = min(256, x.size)
+    nperseg = min(WELCH_NPERSEG, x.size)
     freqs, pxx = signal.welch(
         x, fs=fs, nperseg=nperseg, noverlap=min(nperseg // 2, nperseg - 1)
     )
@@ -185,7 +199,7 @@ def _safe_corrcoef(X: np.ndarray) -> np.ndarray | None:
     X = np.asarray(X, dtype=np.float64)
     mask = np.isfinite(X).all(axis=1)
     X = X[mask]
-    if X.shape[0] < 16:
+    if X.shape[0] < MIN_ROWS_CORRCOEF:
         return None
     C = np.corrcoef(X, rowvar=False)
     if not np.all(np.isfinite(C)):
@@ -216,7 +230,7 @@ def _lagged_corr_matrix(arr: Array3D, lag: int) -> np.ndarray | None:
     mask = np.isfinite(left).all(axis=1) & np.isfinite(right).all(axis=1)
     left = left[mask]
     right = right[mask]
-    if left.shape[0] < 16:
+    if left.shape[0] < MIN_ROWS_CORRCOEF:
         return None
     out = np.empty((arr.shape[-1], arr.shape[-1]), dtype=np.float64)
     for i in range(arr.shape[-1]):
@@ -236,14 +250,14 @@ def _pooled_latent_clouds(
     pred: Array3D,
     *,
     k_max: int = 3,
-    n_points: int = 96,
+    n_points: int = LATENT_SUBSAMPLE_SIZE,
     seed: int = 0,
 ) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
     gt, pred = _align_arrays(gt, pred)
     Xg = gt.reshape(-1, gt.shape[-1])
     Xp = pred.reshape(-1, pred.shape[-1])
     Xg, Xp = _finite_rows(Xg, Xp)
-    if Xg.shape[0] < 64:
+    if Xg.shape[0] < MIN_SAMPLES_MANIFOLD:
         return None, None
     Xg_z, Xp_z = _standardize_with_gt(Xg, Xp)
     k = _choose_k(Xg_z, k_max=min(k_max, Xg_z.shape[1]))
@@ -271,7 +285,7 @@ def _fit_pooled_gt_pca(
     Xg = gt.reshape(-1, gt.shape[-1])
     Xp = pred.reshape(-1, pred.shape[-1])
     Xg, Xp = _finite_rows(Xg, Xp)
-    if Xg.shape[0] < 64:
+    if Xg.shape[0] < MIN_SAMPLES_MANIFOLD:
         return None, None, None
     mu = np.mean(Xg, axis=0, keepdims=True)
     sd = np.std(Xg, axis=0, keepdims=True)
@@ -288,7 +302,7 @@ def _stratified_latent_clouds(
     *,
     k_max: int = 3,
     points_per_seq: int = 2,
-    max_sequences: int = 48,
+    max_sequences: int = MAX_SEQUENCES_STRATIFIED,
     seed: int = 0,
 ) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
     gt, pred = _align_arrays(gt, pred)
@@ -318,8 +332,8 @@ def _stratified_latent_clouds(
     )
 
 
-def _ripser_diagrams(X: np.ndarray, *, maxdim: int = 1, n_perm: int = 64):
-    if ripser is None or X is None or X.shape[0] < 16:
+def _ripser_diagrams(X: np.ndarray, n_perm: int, *, maxdim: int = 1):
+    if ripser is None or X is None or X.shape[0] < CROSS_CORR_MAX_LAG_SMALL:
         return None
     return ripser(X, maxdim=maxdim, n_perm=min(n_perm, X.shape[0]))["dgms"]
 
@@ -439,7 +453,7 @@ def trajectory_path_features(gt: Array3D, pred: Array3D) -> dict:
     Xg = gt.reshape(-1, gt.shape[-1])
     Xp = pred.reshape(-1, pred.shape[-1])
     Xg, Xp = _finite_rows(Xg, Xp)
-    if Xg.shape[0] < 64:
+    if Xg.shape[0] < MIN_SAMPLES_MANIFOLD:
         return {"score": np.nan}
     Xg_z, Xp_z = _standardize_with_gt(Xg, Xp)
     k = _choose_k(Xg_z, k_max=k_max)
@@ -485,7 +499,7 @@ def trajectory_occupancy_velocity(gt: Array3D, pred: Array3D) -> dict:
     Xg = gt.reshape(-1, gt.shape[-1])
     Xp = pred.reshape(-1, pred.shape[-1])
     Xg, Xp = _finite_rows(Xg, Xp)
-    if Xg.shape[0] < 64:
+    if Xg.shape[0] < MIN_SAMPLES_MANIFOLD:
         return {"score": np.nan}
     Xg_z, Xp_z = _standardize_with_gt(Xg, Xp)
     k = _choose_k(Xg_z, k_max=min(3, Xg_z.shape[1]))
@@ -494,7 +508,7 @@ def trajectory_occupancy_velocity(gt: Array3D, pred: Array3D) -> dict:
     Zp = pca.transform(Xp_z)
     occ_scores = []
     for dim in range(k):
-        occ_scores.append(_gt_hist_score(Zg[:, dim], Zp[:, dim], bins=12))
+        occ_scores.append(_gt_hist_score(Zg[:, dim], Zp[:, dim], bins=HISTOGRAM_BINS_DEFAULT))
     Zg_seq = pca.transform(gt.reshape(-1, gt.shape[-1])).reshape(
         gt.shape[0], gt.shape[1], k
     )
@@ -513,7 +527,7 @@ def trajectory_occupancy_velocity(gt: Array3D, pred: Array3D) -> dict:
         (np.linalg.norm(vp[1:], axis=1) * np.linalg.norm(vp[:-1], axis=1)) + EPS
     )
     turn_score = _score_from_distance(
-        _quantile_distance(turn_g, turn_p, qs=(0.1, 0.3, 0.5, 0.7, 0.9))
+        _quantile_distance(turn_g, turn_p, qs=DISTRIBUTION_GRID_QUANTILES)
     )
     return {"score": float(np.nanmean(occ_scores + [speed_score, turn_score]))}
 
@@ -586,7 +600,7 @@ def pca_reconstruction_product(gt: Array3D, pred: Array3D) -> dict:
 
 def autocorr_weighted_rmse(gt: Array3D, pred: Array3D) -> dict:
     gt, pred = _align_arrays(gt, pred)
-    max_lag = min(48, gt.shape[1] // 6)
+    max_lag = min(AUTOCORR_MAX_LAG, gt.shape[1] // 6)
     weights = 1.0 / np.sqrt(np.arange(1, max_lag + 1, dtype=np.float64))
     region_scores = []
     for region in range(gt.shape[-1]):
@@ -654,7 +668,7 @@ def crosscorr_topedge_profiles(gt: Array3D, pred: Array3D) -> dict:
     pairs = [(i, j) for i, j, w in zip(iu[0], iu[1], edge_strength) if w >= thresh]
     if not pairs:
         return {"score": np.nan}
-    max_lag = min(16, gt.shape[1] // 12)
+    max_lag = min(CROSS_CORR_MAX_LAG_SMALL, gt.shape[1] // 12)
     scores = []
     for i, j in pairs:
         cc_g = np.nanmean(
@@ -691,7 +705,7 @@ def crosscorr_topedge_profiles(gt: Array3D, pred: Array3D) -> dict:
 
 
 def manifold_ph_lifetime_profile(gt: Array3D, pred: Array3D) -> dict:
-    Zg, Zp = _pooled_latent_clouds(gt, pred, k_max=3, n_points=96, seed=0)
+    Zg, Zp = _pooled_latent_clouds(gt, pred, k_max=3, n_points=LATENT_SUBSAMPLE_SIZE, seed=0)
     if Zg is None or Zp is None:
         return {"score": np.nan}
     dgms_g = _ripser_diagrams(Zg, maxdim=1, n_perm=64)
@@ -704,7 +718,7 @@ def manifold_ph_lifetime_profile(gt: Array3D, pred: Array3D) -> dict:
 
 
 def manifold_ph_knn_profile(gt: Array3D, pred: Array3D) -> dict:
-    Zg, Zp = _pooled_latent_clouds(gt, pred, k_max=3, n_points=128, seed=3)
+    Zg, Zp = _pooled_latent_clouds(gt, pred, k_max=3, n_points=N_POINTS_MANIFOLD_PH_KNN, seed=3)
     if Zg is None or Zp is None:
         return {"score": np.nan}
     score_life = manifold_ph_lifetime_profile(gt, pred).get("score", np.nan)

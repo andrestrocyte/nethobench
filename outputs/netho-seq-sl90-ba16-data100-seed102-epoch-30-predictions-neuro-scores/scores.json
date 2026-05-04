@@ -4,7 +4,7 @@
     "QNT_score01": 0.24131193023821057,
     "MOM_score01": 0.29382117624398163,
     "Mean_score01": 0.2827355536295425,
-    "TRJDIST_score01": 0.582603360316656,
+    "TRJDIST_score01": 0.5803599017702445,
     "GRAPH_score01": 0.629380163178734,
     "CrossRegionMI_score01": 0.6586887871154662,
     "LaggedCovariance_score01": 0.6929549993126303,
@@ -17,12 +17,12 @@
     "LatentStateTransitionLag2K11_score01": 0.42404203070068774,
     "LatentStateTransitionLag3K11_score01": 0.4079758070708389,
     "family_distribution": 0.22942340580427936,
-    "family_temporal_spectral": 0.582603360316656,
+    "family_temporal_spectral": 0.5803599017702445,
     "family_relational": 0.6139084655313931,
     "family_geometry": 0.8303568838964619,
     "family_state_dynamics": 0.3974219560671173,
-    "composite_score": 0.5236799770549182,
-    "FINAL_COMPOSITE_SCORE": 0.5236799770549182,
-    "FINAL_NEURO_COMPOSITE_SCORE": 0.5236799770549182
+    "composite_score": 0.5232761545165641,
+    "FINAL_COMPOSITE_SCORE": 0.5232761545165641,
+    "FINAL_NEURO_COMPOSITE_SCORE": 0.5232761545165641
   }
 }

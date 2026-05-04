@@ -7,6 +7,23 @@ from sklearn.cluster import MiniBatchKMeans
 from sklearn.covariance import LedoitWolf
 from sklearn.feature_selection import mutual_info_regression
 from nethobench.utils.calculation import _align_arrays, _rmse_similarity, weighted_mean_available, _corr_score
+from nethobench.utils.evaluation_constants import (
+    PCA_VARIANCE_THRESHOLD,
+    MI_MAX_POINTS,
+    MI_N_NEIGHBORS,
+    DFC_STATE_CONFIGS,
+    WELCH_NPERSEG,
+    HISTOGRAM_BINS_DEFAULT,
+    WEIGHT_SPECTRUM_CORR,
+    WEIGHT_SPECTRUM_RMSE,
+    WEIGHT_MATRIX_CORR,
+    WEIGHT_MATRIX_RMSE,
+    WEIGHT_HIST_OVERLAP,
+    WEIGHT_HIST_CORR,
+    WEIGHT_HIST_RMSE,
+    QUANTILE_IQR_LO,
+    QUANTILE_IQR_HI,
+)
 EPS = 1e-9
 
 
@@ -20,8 +37,8 @@ def _pooled_rows(arr: np.ndarray) -> np.ndarray:
 def _standardize_columns(data: np.ndarray) -> np.ndarray:
     data = np.asarray(data, dtype=np.float64)
     med = np.nanmedian(data, axis=0)
-    q25 = np.nanquantile(data, 0.25, axis=0)
-    q75 = np.nanquantile(data, 0.75, axis=0)
+    q25 = np.nanquantile(data, QUANTILE_IQR_LO, axis=0)
+    q75 = np.nanquantile(data, QUANTILE_IQR_HI, axis=0)
     scale = q75 - q25
     scale = np.where(np.isfinite(scale) & (scale > EPS), scale, np.nanstd(data, axis=0))
     scale = np.where(np.isfinite(scale) & (scale > EPS), scale, 1.0)
@@ -31,8 +48,8 @@ def _standardize_columns(data: np.ndarray) -> np.ndarray:
 def _fit_reference_scaler(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     data = np.asarray(data, dtype=np.float64)
     med = np.nanmedian(data, axis=0)
-    q25 = np.nanquantile(data, 0.25, axis=0)
-    q75 = np.nanquantile(data, 0.75, axis=0)
+    q25 = np.nanquantile(data, QUANTILE_IQR_LO, axis=0)
+    q75 = np.nanquantile(data, QUANTILE_IQR_HI, axis=0)
     scale = q75 - q25
     scale = np.where(np.isfinite(scale) & (scale > EPS), scale, np.nanstd(data, axis=0))
     scale = np.where(np.isfinite(scale) & (scale > EPS), scale, 1.0)
@@ -108,7 +125,7 @@ def _spectrum_similarity(x: np.ndarray, y: np.ndarray) -> float:
     return weighted_mean_available(
         dict(enumerate([_corr_score(np.log(x + EPS), np.log(y + EPS)),
         _rmse_similarity(x, y)])),
-        weights={0:0.55, 1:0.45},
+        weights={0: WEIGHT_SPECTRUM_CORR, 1: WEIGHT_SPECTRUM_RMSE},
     )
 
 
@@ -120,7 +137,7 @@ def _matrix_similarity(gt_mat: np.ndarray | None, pred_mat: np.ndarray | None) -
     return weighted_mean_available(
         dict(enumerate([_corr_score(gt_vec, pred_vec),
         _rmse_similarity(gt_vec, pred_vec)])),
-        weights={0:0.6, 1:0.4},
+        weights={0: WEIGHT_MATRIX_CORR, 1: WEIGHT_MATRIX_RMSE},
     )
 
 
@@ -131,7 +148,7 @@ def _mean_region_psd(arr: np.ndarray) -> np.ndarray:
         region_series = region_series[np.isfinite(region_series)]
         if region_series.size < 32:
             continue
-        _, psd = welch(region_series, nperseg=min(256, region_series.size))
+        _, psd = welch(region_series, nperseg=min(WELCH_NPERSEG, region_series.size))
         psd = np.asarray(psd, dtype=np.float64)
         if psd.size == 0 or not np.isfinite(psd).any():
             continue
@@ -168,7 +185,7 @@ def _principal_subspace(cov: np.ndarray | None, max_dim: int = 6) -> np.ndarray 
     if total < EPS:
         return None
     cum = np.cumsum(eigvals) / total
-    k = int(np.searchsorted(cum, 0.85) + 1)
+    k = int(np.searchsorted(cum, PCA_VARIANCE_THRESHOLD) + 1)
     k = max(1, min(k, max_dim, cov.shape[0]))
     return eigvecs[:, :k]
 
@@ -217,7 +234,7 @@ def _var1_coefficients(flat: np.ndarray, ridge: float = 1e-2) -> np.ndarray | No
 
 
 def _mi_matrix(
-    flat: np.ndarray, max_points: int = 1500, n_neighbors: int = 5
+    flat: np.ndarray, max_points: int = MI_MAX_POINTS, n_neighbors: int = MI_N_NEIGHBORS
 ) -> np.ndarray | None:
     if flat.shape[0] < 40 or flat.shape[1] < 2:
         return None
@@ -336,7 +353,7 @@ def _hist_similarity(gt_hist: np.ndarray, pred_hist: np.ndarray) -> float:
         dict(enumerate([overlap,
         _corr_score(gt_hist, pred_hist),
         _rmse_similarity(gt_hist, pred_hist)])),
-        weights={0:0.40, 1:0.25, 2:0.35},
+        weights={0: WEIGHT_HIST_OVERLAP, 1: WEIGHT_HIST_CORR, 2: WEIGHT_HIST_RMSE},
     )
 
 
@@ -553,9 +570,8 @@ def _latent_state_score_bundle(
 
 
 def _dfc_state_occupancy_score(gt: np.ndarray, pred: np.ndarray) -> float:
-    configs = ((45, 15, 8), (60, 30, 8), (90, 30, 8))
     per_cfg = []
-    for window, step, n_states in configs:
+    for window, step, n_states in DFC_STATE_CONFIGS:
         gt_feat, _ = _window_fc_features(gt, window=window, step=step)
         pred_feat, _ = _window_fc_features(pred, window=window, step=step)
         if gt_feat is None or pred_feat is None:
@@ -632,7 +648,7 @@ def compute_additional_structural_metrics(
     psd_shape = weighted_mean_available(
         dict(enumerate([_corr_score(np.log(gt_psd + EPS), np.log(pred_psd + EPS)),
         _rmse_similarity(gt_psd, pred_psd)])),
-        weights={0:0.55, 1:0.45},
+        weights={0: WEIGHT_SPECTRUM_CORR, 1: WEIGHT_SPECTRUM_RMSE},
     )
 
     dim_gt = _effective_dimension(gt_cov)

@@ -13,6 +13,13 @@ from nethobench.utils.helpers import (
     _geometric_mean_scores,
 )
 from nethobench.utils.calculation import _merge_aligned
+from nethobench.utils.evaluation_constants import (
+    MAX_POINTS_MANIFOLD_ALIGNMENT,
+    STATIONARY_THRESHOLD_PERCENTILE,
+    KMEANS_K_TRAJECTORY,
+    KMEANS_K_SYLLABLE,
+    CHUNK_SIZE_EMBEDDINGS,
+)
 
 
 
@@ -71,7 +78,7 @@ def stationary_score(
     if not all_speeds_gt:
         return np.nan, {}, {}
 
-    thresh = np.percentile(all_speeds_gt, 10)
+    thresh = np.percentile(all_speeds_gt, STATIONARY_THRESHOLD_PERCENTILE)
     seq_scores = {}
     seq_weights = {}
     gaps = []
@@ -345,7 +352,7 @@ def _cluster_and_score_kl(
 
 
 def trajectory_shape_score(
-    paired_df: pd.DataFrame, k: int = 6
+    paired_df: pd.DataFrame, k: int = KMEANS_K_TRAJECTORY
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
     if paired_df.empty:
         return np.nan, {}, {}
@@ -398,7 +405,7 @@ def trajectory_shape_score(
 
 
 def syllable_score(
-    paired_df: pd.DataFrame, k: int = 8
+    paired_df: pd.DataFrame, k: int = KMEANS_K_SYLLABLE
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
     if paired_df.empty:
         return np.nan, {}, {}
@@ -596,15 +603,14 @@ def manifold_alignment_metrics(paired_df: pd.DataFrame) -> Dict[str, float]:
         proc_sim = np.nan
 
     # Subsample to prevent O(N^2) memory explosion in distance matrix
-    MAX_MMD_POINTS = 2000
     rng = np.random.default_rng(42)
-    if len(gt_emb) > MAX_MMD_POINTS:
-        gt_emb_sub = gt_emb[rng.choice(len(gt_emb), MAX_MMD_POINTS, replace=False)]
+    if len(gt_emb) > MAX_POINTS_MANIFOLD_ALIGNMENT:
+        gt_emb_sub = gt_emb[rng.choice(len(gt_emb), MAX_POINTS_MANIFOLD_ALIGNMENT, replace=False)]
     else:
         gt_emb_sub = gt_emb
 
-    if len(inf_emb) > MAX_MMD_POINTS:
-        inf_emb_sub = inf_emb[rng.choice(len(inf_emb), MAX_MMD_POINTS, replace=False)]
+    if len(inf_emb) > MAX_POINTS_MANIFOLD_ALIGNMENT:
+        inf_emb_sub = inf_emb[rng.choice(len(inf_emb), MAX_POINTS_MANIFOLD_ALIGNMENT, replace=False)]
     else:
         inf_emb_sub = inf_emb
 
@@ -627,7 +633,7 @@ def manifold_alignment_metrics(paired_df: pd.DataFrame) -> Dict[str, float]:
 
 
 def get_chunked_embeddings(
-    paired_df: pd.DataFrame, chunk_size: int = 5
+    paired_df: pd.DataFrame, chunk_size: int = CHUNK_SIZE_EMBEDDINGS
 ) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """Generates 2D embeddings of short movement chunks for diagnostics."""
     try:

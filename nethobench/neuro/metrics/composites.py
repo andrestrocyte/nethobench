@@ -27,6 +27,19 @@ from nethobench.neuro.metrics.additional import (
 from nethobench.utils.calculation import _iqr_robust
 from nethobench.utils.helpers import _load_and_align
 from nethobench.neuro.reporting import generate_full_neuro_report
+from nethobench.utils.evaluation_constants import (
+    MIN_SAMPLES_KL,
+    MIN_SAMPLES_ERROR,
+    MIN_SAMPLES_MI,
+    MAX_TIME_STEPS_SUBSAMPLE,
+    QUANTILE_10P,
+    TAIL_TRIM_QUANTILE_LO,
+    TAIL_TRIM_QUANTILE_HI,
+    QUANTILE_IQR_LO,
+    QUANTILE_IQR_HI,
+    MAD_TO_STD_CONSTANT,
+    MI_N_NEIGHBORS,
+)
 
 
 
@@ -46,7 +59,7 @@ def _tail_binned_hist(
     gt_vals: np.ndarray,
     pr_vals: np.ndarray,
     bins: int = 60,
-    support_q: tuple = (0.001, 0.999),
+    support_q: tuple = (TAIL_TRIM_QUANTILE_LO, TAIL_TRIM_QUANTILE_HI),
     eps: float = 1e-12,
 ):
     gt_vals = np.asarray(gt_vals, dtype=np.float64)
@@ -54,7 +67,7 @@ def _tail_binned_hist(
     gt_vals = gt_vals[np.isfinite(gt_vals)]
     pr_vals = pr_vals[np.isfinite(pr_vals)]
 
-    if gt_vals.size < 10 or pr_vals.size < 10:
+    if gt_vals.size < MIN_SAMPLES_KL or pr_vals.size < MIN_SAMPLES_KL:
         return None, None
 
     pool = np.concatenate([gt_vals, pr_vals])
@@ -116,7 +129,7 @@ def compute_kl_score(
     valid = kl_geo_seq[np.isfinite(kl_geo_seq)]
     if valid.size:
         kl_mean = float(np.mean(valid))
-        kl_q10 = float(np.quantile(valid, 0.10))
+        kl_q10 = float(np.quantile(valid, QUANTILE_10P))
         return 0.5 * (kl_mean + kl_q10)
     return np.nan
 
@@ -133,7 +146,7 @@ def compute_mean_score01_top10(gt_arr: np.ndarray, pred_arr: np.ndarray) -> floa
     )
     d = np.abs(mu_gt - mu_pr) / (iqr_gt[None, :] + EPS)
 
-    K = max(1, int(np.ceil(0.1 * n_reg)))
+    K = max(1, int(np.ceil(QUANTILE_10P * n_reg)))
 
     D_top10_seq = np.full(n_seq, np.nan, dtype=np.float64)
     for i in range(n_seq):
@@ -155,11 +168,11 @@ def compute_quantile_score01_simple(
     q_lo: float = 0.01,
     q_hi: float = 0.99,
     n_q: int = 99,
-    tail_lo: float = 0.10,
+    tail_lo: float = QUANTILE_10P,
     tail_hi: float = 0.90,
-    min_samples: int = 80,
-    max_time: int = 1200,
-    top_q_regions: float = 0.25,
+    min_samples: int = MIN_SAMPLES_MI,
+    max_time: int = MAX_TIME_STEPS_SUBSAMPLE,
+    top_q_regions: float = QUANTILE_IQR_LO,
     rng_seed: int = 0,
 ) -> float:
     n_seq, _, n_reg = gt_arr.shape
@@ -286,7 +299,7 @@ def calculate_neuro_composites(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict
 def _robust_median_mad(x: np.ndarray) -> tuple[float, float]:
     med = float(np.nanmedian(x))
     mad = float(np.nanmedian(np.abs(x - med)))
-    s = 1.4826 * mad
+    s = MAD_TO_STD_CONSTANT * mad
     if not np.isfinite(s) or s <= 1e-12:
         s = float(np.nanstd(x))
     if not np.isfinite(s) or s <= 1e-12:
@@ -304,7 +317,7 @@ def compute_error_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
             x = gt_arr[i, :, r]
             y = pred_arr[i, :, r]
             m = np.isfinite(x) & np.isfinite(y)
-            if m.sum() < 50:
+            if m.sum() < MIN_SAMPLES_ERROR:
                 continue
             rmse = np.sqrt(np.mean((y[m] - x[m]) ** 2))
             nrmse_sr[i, r] = rmse / (iqr_gt[r] + 1e-12)
@@ -315,7 +328,7 @@ def compute_error_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
         row = row[np.isfinite(row)]
         if row.size == 0:
             continue
-        k = max(1, int(np.ceil(0.25 * row.size)))
+        k = max(1, int(np.ceil(QUANTILE_IQR_LO * row.size)))
         D_seq[i] = np.mean(np.sort(row)[-k:])
 
     D = np.nanmean(D_seq)
@@ -332,12 +345,12 @@ def compute_mi_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
             x = gt_arr[i, :, r]
             y = pred_arr[i, :, r]
             m = np.isfinite(x) & np.isfinite(y)
-            if m.sum() < 80:
+            if m.sum() < MIN_SAMPLES_MI:
                 continue
             x, y = x[m], y[m]
 
-            if x.size > 1200:
-                idx = rng.choice(x.size, size=1200, replace=False)
+            if x.size > MAX_TIME_STEPS_SUBSAMPLE:
+                idx = rng.choice(x.size, size=MAX_TIME_STEPS_SUBSAMPLE, replace=False)
                 x, y = x[idx], y[idx]
 
             mx, sx = _robust_median_mad(x)
@@ -351,7 +364,7 @@ def compute_mi_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
                     x.reshape(-1, 1),
                     y,
                     discrete_features=False,
-                    n_neighbors=5,
+                    n_neighbors=MI_N_NEIGHBORS,
                     random_state=0,
                 )[0]
                 if np.isfinite(mi_val):

@@ -10,6 +10,11 @@ from nethobench.utils.validation import (
     validate_dataframe_schema,
     validate_alignment_overlap,
 )
+from nethobench.utils.evaluation_constants import (
+    MIN_ITEMS_IQR_ROBUST_FALLBACK,
+    QUANTILE_IQR_LO,
+    QUANTILE_IQR_HI,
+)
 
 
 EPS = 1e-8
@@ -66,7 +71,7 @@ def _robust_scale(values: np.ndarray) -> float:
     values = values[np.isfinite(values)]
     if values.size < 2:
         return np.nan
-    q25, q75 = np.quantile(values, [0.25, 0.75])
+    q25, q75 = np.quantile(values, [QUANTILE_IQR_LO, QUANTILE_IQR_HI])
     scale = float(q75 - q25)
     if not np.isfinite(scale) or scale < 1e-9:
         scale = float(np.nanstd(values))
@@ -142,10 +147,10 @@ def dataset_to_sequence_frame(arr: np.ndarray, region_names: list[str]) -> pd.Da
 def _iqr_robust(x: np.ndarray) -> float:
     x = np.asarray(x, dtype=np.float64)
     x = x[np.isfinite(x)]
-    if x.size < 10:
+    if x.size < MIN_ITEMS_IQR_ROBUST_FALLBACK:
         s = np.nanstd(x)
         return float(s if np.isfinite(s) and s > 0 else 1.0)
-    q25, q75 = np.nanquantile(x, [0.25, 0.75])
+    q25, q75 = np.nanquantile(x, [QUANTILE_IQR_LO, QUANTILE_IQR_HI])
     s = float(q75 - q25)
     if not np.isfinite(s) or s <= 0:
         s = float(np.nanstd(x))
