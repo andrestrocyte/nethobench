@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from nethobench.neuro.fidelity import compute_fidelity_scores
 from nethobench.neuro.metrics.composites import load_and_run_neuro_full_analysis
 from nethobench.neuro.metrics.definitions import NEURO_FAMILY_WEIGHTS
 from nethobench.utils.helpers import (
@@ -632,6 +631,7 @@ def run_validation_pipeline(
     oracle_replicates: int,
     perturbations: Iterable[PerturbationSpec],
     save_datasets: bool,
+    save_artifacts: bool = True,
     prefix: str,
     oracle_seed_base: int,
     perturbation_seed: int,
@@ -639,12 +639,17 @@ def run_validation_pipeline(
     metric_selectivity_title: str,
 ) -> dict[str, object]:
     output_root = Path(output_root)
-    output_root.mkdir(parents=True, exist_ok=True)
-    tables_dir = output_root / "tables"
-    figures_dir = output_root / "figures"
-    datasets_dir = output_root / "datasets"
-    for path in [tables_dir, figures_dir, datasets_dir]:
-        path.mkdir(parents=True, exist_ok=True)
+    if save_artifacts:
+        output_root.mkdir(parents=True, exist_ok=True)
+        tables_dir = output_root / "tables"
+        figures_dir = output_root / "figures"
+        datasets_dir = output_root / "datasets"
+        for path in [tables_dir, figures_dir, datasets_dir]:
+            path.mkdir(parents=True, exist_ok=True)
+    else:
+        tables_dir = output_root / "tables"
+        figures_dir = output_root / "figures"
+        datasets_dir = output_root / "datasets"
 
     perturbation_defs = tuple(perturbations)
     target_lookup = {
@@ -653,7 +658,7 @@ def run_validation_pipeline(
     }
 
     reference = generator_fn(spec, sample_seed=101)
-    if save_datasets:
+    if save_artifacts and save_datasets:
         dataset_to_sequence_frame(reference.array, reference.region_names).to_csv(
             datasets_dir / f"{prefix}_ground_truth.csv", index=False
         )
@@ -662,21 +667,15 @@ def run_validation_pipeline(
     for rep_idx in range(oracle_replicates):
         oracle_seed = oracle_seed_base + rep_idx
         oracle = generator_fn(spec, sample_seed=oracle_seed)
-        if save_datasets and rep_idx == 0:
+        if save_artifacts and save_datasets and rep_idx == 0:
             dataset_to_sequence_frame(oracle.array, oracle.region_names).to_csv(
                 datasets_dir / f"{prefix}_oracle_prediction.csv", index=False
             )
-        scores = load_and_run_neuro_full_analysis(
-            reference.array, oracle.array, region_names=reference.region_names
-        )
+        scores = load_and_run_neuro_full_analysis(reference.array, oracle.array)
         scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(
             scores
         )
-        scores.update(
-            compute_fidelity_scores(
-                reference.array, oracle.array, region_names=reference.region_names
-            )
-        )
+        scores["FIDELITY_SCORE"] = scores.get("family_fidelity", float("nan"))
         row = _score_row_metadata(
             spec, "oracle", oracle_seed, target_lookup=target_lookup
         )
@@ -691,24 +690,18 @@ def run_validation_pipeline(
                 perturbation_level=float(level),
             )
             perturbed = generator_fn(perturbed_spec, sample_seed=perturbation_seed)
-            if save_datasets and level == max(perturbation.levels):
+            if save_artifacts and save_datasets and level == max(perturbation.levels):
                 out_name = f"{perturbation.name}-level-{int(level * 100):03d}.csv"
                 dataset_to_sequence_frame(
                     perturbed.array, perturbed.region_names
                 ).to_csv(datasets_dir / out_name, index=False)
             scores = load_and_run_neuro_full_analysis(
-                reference.array, perturbed.array, region_names=reference.region_names
+                reference.array, perturbed.array
             )
             scores["ORACLE_VALIDATION_COMPOSITE_SCORE"] = _oracle_validation_composite(
                 scores
             )
-            scores.update(
-                compute_fidelity_scores(
-                    reference.array,
-                    perturbed.array,
-                    region_names=reference.region_names,
-                )
-            )
+            scores["FIDELITY_SCORE"] = scores.get("family_fidelity", float("nan"))
             row = _score_row_metadata(
                 perturbed_spec, "perturbation", perturbation_seed, target_lookup=target_lookup
             )
@@ -765,23 +758,24 @@ def run_validation_pipeline(
     metric_dose_path = tables_dir / f"{prefix}_metric_dose_response.csv"
     fidelity_dose_path = tables_dir / f"{prefix}_fidelity_dose_response.csv"
     metadata_path = output_root / f"{prefix}_validation_metadata.json"
-    scores_df.to_csv(scores_path, index=False)
-    family_oracle_summary.to_csv(family_oracle_path, index=False)
-    metric_oracle_summary.to_csv(metric_oracle_path, index=False)
-    fidelity_oracle_summary.to_csv(fidelity_oracle_path, index=False)
-    family_selectivity_df.to_csv(family_selectivity_path, index=False)
-    metric_selectivity_df.to_csv(metric_selectivity_path, index=False)
-    fidelity_selectivity_df.to_csv(fidelity_selectivity_path, index=False)
-    family_dose_df.to_csv(family_dose_path, index=False)
-    metric_dose_df.to_csv(metric_dose_path, index=False)
-    fidelity_dose_df.to_csv(fidelity_dose_path, index=False)
-    metadata_path.write_text(json.dumps(metadata, indent=2))
+    if save_artifacts:
+        scores_df.to_csv(scores_path, index=False)
+        family_oracle_summary.to_csv(family_oracle_path, index=False)
+        metric_oracle_summary.to_csv(metric_oracle_path, index=False)
+        fidelity_oracle_summary.to_csv(fidelity_oracle_path, index=False)
+        family_selectivity_df.to_csv(family_selectivity_path, index=False)
+        metric_selectivity_df.to_csv(metric_selectivity_path, index=False)
+        fidelity_selectivity_df.to_csv(fidelity_selectivity_path, index=False)
+        family_dose_df.to_csv(family_dose_path, index=False)
+        metric_dose_df.to_csv(metric_dose_path, index=False)
+        fidelity_dose_df.to_csv(fidelity_dose_path, index=False)
+        metadata_path.write_text(json.dumps(metadata, indent=2))
 
     ceiling_plot = figures_dir / f"{prefix}_family_ceiling_floor.png"
     family_selectivity_plot = figures_dir / f"{prefix}_family_selectivity.png"
     metric_selectivity_plot = figures_dir / f"{prefix}_metric_selectivity.png"
     dose_plot = figures_dir / f"{prefix}_dose_response.png"
-    if perturbation_defs:
+    if save_artifacts and perturbation_defs:
         _plot_family_ceiling_floor(
             scores_df, ceiling_plot, perturbation_defs=perturbation_defs
         )
@@ -838,6 +832,7 @@ def run_synthetic_neuro_validation(
     oracle_replicates: int = 3,
     perturbations: Iterable[PerturbationSpec] = DEFAULT_PERTURBATIONS,
     save_datasets: bool = True,
+    save_artifacts: bool = True,
 ) -> dict[str, object]:
     return run_validation_pipeline(
         spec=spec or SyntheticNeuralSpec(),
@@ -846,6 +841,7 @@ def run_synthetic_neuro_validation(
         oracle_replicates=oracle_replicates,
         perturbations=perturbations,
         save_datasets=save_datasets,
+        save_artifacts=save_artifacts,
         prefix="synthetic",
         oracle_seed_base=501,
         perturbation_seed=701,

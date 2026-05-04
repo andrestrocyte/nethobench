@@ -8,7 +8,6 @@ from typing import Iterable, Optional
 from nethobench.cli.neuro_cli import add_neuro_subparsers
 from nethobench.cli.etho_cli import add_etho_subparsers
 from nethobench.cli.cross_cli import add_cross_subparsers
-from nethobench.cli.synthetic_cli import add_synthetic_subparsers
 from nethobench.cli.utils import (
     _find_candidates,
     _prompt_for_file,
@@ -34,7 +33,6 @@ def _build_parser() -> argparse.ArgumentParser:
     add_neuro_subparsers(subparsers)
     add_etho_subparsers(subparsers)
     add_cross_subparsers(subparsers)
-    add_synthetic_subparsers(subparsers)
 
     return parser
 

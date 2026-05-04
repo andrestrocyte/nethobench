@@ -403,6 +403,7 @@ def run_biophysical_synthetic_neuro_validation(
     oracle_replicates: int = 3,
     perturbations: Iterable[PerturbationSpec] = DEFAULT_BIOPHYSICAL_PERTURBATIONS,
     save_datasets: bool = True,
+    save_artifacts: bool = True,
 ) -> dict[str, object]:
     return run_validation_pipeline(
         spec=spec or BiophysicalSyntheticNeuralSpec(),
@@ -411,6 +412,7 @@ def run_biophysical_synthetic_neuro_validation(
         oracle_replicates=oracle_replicates,
         perturbations=perturbations,
         save_datasets=save_datasets,
+        save_artifacts=save_artifacts,
         prefix="biophysical",
         oracle_seed_base=701,
         perturbation_seed=1701,
