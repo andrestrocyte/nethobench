@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Callable
 
 import matplotlib.pyplot as plt
@@ -7,6 +8,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy.stats import kurtosis, skew, spearmanr
+
+logger = logging.getLogger(__name__)
 from nethobench.utils.calculation import _align_arrays, weighted_mean_available, EPS
 from nethobench.neuro.metrics.sensitive import (
     _finite_rows,
@@ -451,14 +454,14 @@ def _display_summary(
     description: str,
     corruption_df: pd.DataFrame,
 ) -> None:
-    print(f"=== {label} replacement metric ===")
-    print(description)
-    print(f"{score_key}: {score:.6f}" if np.isfinite(score) else f"{score_key}: NaN")
+    logger.info(f"=== {label} replacement metric ===")
+    logger.info(description)
+    logger.info(f"{score_key}: {score:.6f}" if np.isfinite(score) else f"{score_key}: NaN")
     if corruption_df.empty:
         return
     cols = ["family", "magnitude", score_key]
-    print("\nCorruption sweep:")
-    print(corruption_df[cols].to_string(index=False))
+    logger.info("\nCorruption sweep:")
+    logger.info(corruption_df[cols].to_string(index=False))
 
 
 def _wrap_population_metric(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import logging
 import re
 import time
 from datetime import datetime
@@ -14,6 +15,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from nethobench.neuro.pipeline import compute_neuro_scores
+
+logger = logging.getLogger(__name__)
 
 NOISE_RE = re.compile(r"\.noise_(\d+(?:\.\d+)?)\.csv$")
 
@@ -440,7 +443,7 @@ def run(
         row["pred_csv"] = str(row["pred_csv"])
         row["run_index"] = i
         rows.append(row)
-        print(
+        logger.info(
             f"[{i:02d}/{len(scenarios):02d}] {sc['scenario_name']}: composite={scores.get('composite_score', float('nan')):.4f} runtime={scores['runtime_sec']:.2f}s"
         )
 
@@ -500,7 +503,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--data-dir",
         type=Path,
-        default=Path("/Users/deviandr/netholabs/test_benchmark/other_test"),
+        default=Path.cwd(),
         help="Directory containing data-clean.csv, data-clean-all.json, predictions CSV, and optional noise ladder CSVs.",
     )
     parser.add_argument(
@@ -542,7 +545,7 @@ def main() -> None:
         synthetic_sigmas=list(args.sigmas),
         synthetic_sigma_mode=args.sigma_mode,
     )
-    print(f"Saved sanity-check outputs to: {final}")
+    logger.info(f"Saved sanity-check outputs to: {final}")
 
 
 if __name__ == "__main__":

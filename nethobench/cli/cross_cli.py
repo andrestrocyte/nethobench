@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -16,6 +17,8 @@ from nethobench.cli.utils import (
     _print_composite,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def _run_cross(args: argparse.Namespace) -> None:
     gt = _prompt_for_file("ground-truth", "gt_", args.gt)
@@ -25,7 +28,6 @@ def _run_cross(args: argparse.Namespace) -> None:
     _print_scores("Neuro scores", scores["neuro_scores"])
     _print_scores("Behavior scores", scores["behavior_scores"])
     _print_scores("Cross-modal scores", scores["cross_scores"])
-    print("")
     _print_composite("Composite neuro", scores.get("neuro_composite", float("nan")))
     _print_composite("Composite etho", scores.get("etho_composite", float("nan")))
     _print_composite("Composite cross", scores.get("cross_composite", float("nan")))
@@ -43,7 +45,7 @@ def _run_cross(args: argparse.Namespace) -> None:
     out.mkdir(parents=True, exist_ok=True)
     with open(f"{out}/scores.json", "w") as f:
         f.write(json.dumps(scores, indent=2))
-    print(f"Saved scores to {out}")
+    logger.info(f"Saved scores to {out}")
 
 
 def _run_cross_full(args: argparse.Namespace) -> None:
@@ -53,7 +55,7 @@ def _run_cross_full(args: argparse.Namespace) -> None:
     outdir = _quiet_call(
         run_cross_full_analysis, preds, gt, cfg_path, output_root=args.output_root
     )
-    print(f"Cross-modal full analysis executed. Outputs under {outdir}")
+    logger.info(f"Cross-modal full analysis executed. Outputs under {outdir}")
 
 
 def add_cross_subparsers(subparsers) -> None:

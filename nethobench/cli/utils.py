@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import json
 from pathlib import Path
@@ -8,6 +9,8 @@ from typing import Optional
 import numpy as np
 
 from nethobench.utils.helpers import _quiet_call
+
+logger = logging.getLogger(__name__)
 
 
 def _find_candidates(prefix: str) -> list[Path]:
@@ -26,9 +29,9 @@ def _prompt_for_file(label: str, prefix: str, provided: Optional[str]) -> Path:
 
     candidates = _find_candidates(prefix)
     if candidates:
-        print(f"Detected {label.lower()} candidates in {Path.cwd()}:")
+        logger.info(f"Detected {label.lower()} candidates in {Path.cwd()}:")
         for idx, candidate in enumerate(candidates, start=1):
-            print(f"  [{idx}] {candidate.name}")
+            logger.info(f"  [{idx}] {candidate.name}")
 
     default_candidate = candidates[0] if len(candidates) == 1 else None
 
@@ -46,12 +49,12 @@ def _prompt_for_file(label: str, prefix: str, provided: Optional[str]) -> Path:
             if 0 <= idx < len(candidates):
                 selection = candidates[idx]
             else:
-                print("Invalid selection number. Try again.")
+                logger.warning("Invalid selection number. Try again.")
                 continue
         elif response:
             selection = Path(response)
         else:
-            print("Please provide a filename or choose one of the listed entries.")
+            logger.warning("Please provide a filename or choose one of the listed entries.")
             continue
 
         selection = selection.expanduser()
@@ -59,7 +62,7 @@ def _prompt_for_file(label: str, prefix: str, provided: Optional[str]) -> Path:
             selection = Path.cwd() / selection
         if selection.is_file():
             return selection
-        print(f"{selection} does not exist. Try again.")
+        logger.warning(f"{selection} does not exist. Try again.")
 
 
 def _prompt_for_config(provided: Optional[str]) -> Optional[Path]:
@@ -69,9 +72,9 @@ def _prompt_for_config(provided: Optional[str]) -> Optional[Path]:
     if len(jsons) == 1:
         return jsons[0]
     if jsons:
-        print("Detected possible config JSON files:")
+        logger.info("Detected possible config JSON files:")
         for idx, candidate in enumerate(jsons, start=1):
-            print(f"  [{idx}] {candidate.name}")
+            logger.info(f"  [{idx}] {candidate.name}")
         response = input(
             "Enter config filename (or leave blank to auto-infer): "
         ).strip()
@@ -122,16 +125,16 @@ def _render_score_bar(value: float, width: int = 16) -> str:
 
 
 def _print_scores(label: str, scores: dict[str, float]) -> None:
-    print(f"\n{label}:")
+    logger.info(f"\n{label}:")
     for key, value in scores.items():
-        print(f"  {key:24s}: {value:.3f} {_render_score_bar(value)}")
+        logger.info(f"  {key:24s}: {value:.3f} {_render_score_bar(value)}")
 
 
 def _print_composite(label: str, value: float) -> None:
     if value == value:
-        print(f"{label:18s}: {value:.3f} {_render_score_bar(value)}")
+        logger.info(f"{label:18s}: {value:.3f} {_render_score_bar(value)}")
     else:
-        print(f"{label:18s}: NaN")
+        logger.info(f"{label:18s}: NaN")
 
 
 def _default_json_output(command: str, preds: Path) -> Path:

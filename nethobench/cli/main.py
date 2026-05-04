@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import logging
+import sys
 from typing import Iterable, Optional
 
 from nethobench.cli.neuro_cli import add_neuro_subparsers
@@ -38,6 +40,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Iterable[str]] = None) -> None:
+    if not logging.getLogger().handlers:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(message)s",
+            stream=sys.stdout,
+        )
     parser = _build_parser()
     args = parser.parse_args(argv)
     try:

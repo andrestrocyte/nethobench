@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -9,6 +10,8 @@ import numpy as np
 
 from nethobench.etho.pipeline import compute_etho_scores, run_etho_full_analysis
 from nethobench.cli.utils import _prompt_for_file, _quiet_call, _print_scores
+
+logger = logging.getLogger(__name__)
 
 
 def _run_etho(args: argparse.Namespace) -> None:
@@ -35,7 +38,7 @@ def _run_etho(args: argparse.Namespace) -> None:
     with open(os.path.join(out, "scores.json"), "w") as f:
         f.write(json.dumps(payload, indent=2))
 
-    print(f"Saved scores to {out}")
+    logger.info(f"Saved scores to {out}")
 
 
 def _run_etho_full(args: argparse.Namespace) -> None:
@@ -45,7 +48,7 @@ def _run_etho_full(args: argparse.Namespace) -> None:
         Path(args.inf_dir),
         output_root=args.output_root,
     )
-    print(f"Behavioral full analysis executed natively. Outputs under {outdir}")
+    logger.info(f"Behavioral full analysis executed natively. Outputs under {outdir}")
 
 
 def add_etho_subparsers(subparsers) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 from pathlib import Path
 
 from nethobench.neuro.pipeline import compute_neuro_scores, run_neuro_full_analysis
@@ -12,6 +13,8 @@ from nethobench.cli.utils import (
     _save_json_payload,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def _run_neuro(args: argparse.Namespace) -> None:
     gt = _prompt_for_file("ground-truth", "gt_", args.gt)
@@ -21,7 +24,7 @@ def _run_neuro(args: argparse.Namespace) -> None:
     out = _save_json_payload(
         {"scores": scores}, requested=args.json_out, command="neuro-scores", preds=preds
     )
-    print(f"Saved scores to {out}")
+    logger.info(f"Saved scores to {out}")
 
 
 def _run_fidelity(args: argparse.Namespace) -> None:
@@ -35,7 +38,7 @@ def _run_fidelity(args: argparse.Namespace) -> None:
         command="fidelity-scores",
         preds=preds,
     )
-    print(f"Saved scores to {out}")
+    logger.info(f"Saved scores to {out}")
 
 
 def _run_neuro_full(args: argparse.Namespace) -> None:
