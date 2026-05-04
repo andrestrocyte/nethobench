@@ -208,13 +208,17 @@ def _build_biophysical_system(
         tau_rise = tau_rise * np.clip(1.0 + 0.70 * level, 0.60, 1.8)
         ar1, ar2 = _ar2_from_taus(tau_rise, tau_decay)
     if perturbation in {"temporal_refractory_jitter", "temporal_combo"}:
-        refractory_region = np.clip(refractory_region * (1.0 - 0.55 * level), 0.15, 2.5)
+        # Crush the refractory period almost entirely to induce heavy, unnatural bursting
+        refractory_region = np.clip(refractory_region * (1.0 - 0.95 * level), 0.01, 2.5)
+        # Add heavy jitter to the shared events
         shared_event_profile = np.clip(
             shared_event_profile
-            + (0.30 * level * rng.normal(size=shared_event_profile.shape)),
-            0.05,
+            + (0.60 * level * rng.normal(size=shared_event_profile.shape)),
+            0.01,
             0.99,
         )
+        # Desynchronize the low-frequency baseline drift to further damage temporal spectra
+        drift_phase = drift_phase + (level * np.pi * rng.random(size=n_regions))
     if perturbation in {"relational_assembly_shuffle", "relational_combo"}:
         perm = rng.permutation(n_regions)
         mix = 0.85 * level
@@ -231,13 +235,16 @@ def _build_biophysical_system(
             0.75 * level * region_event_profile[:, rng.permutation(n_regions)]
         )
     if perturbation in {"geometry_subspace_rotation", "geometry_combo"}:
-        latent_transform = _blend_rotation(latent_dim, level, rng) @ latent_transform
+        # Rotate the ambient space of W_spike and W_cont
+        Q = _blend_rotation(n_regions, level, rng)
+        W_spike = Q @ W_spike
+        W_cont = Q @ W_cont
     if perturbation in {"geometry_rank_collapse", "geometry_combo"}:
+        # Sharpen the collapse
         latent_rank_scale[1:] = np.maximum(
             1.0 - (level * np.linspace(0.80, 1.25, latent_dim - 1)), 0.03
         )
         latent_transform = np.diag(latent_rank_scale) @ latent_transform
-
     return {
         "A_states": A_states.astype(np.float64),
         "state_biases": state_biases.astype(np.float64),

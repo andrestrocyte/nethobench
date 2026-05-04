@@ -224,8 +224,8 @@ def _build_system(spec: SyntheticNeuralSpec) -> dict[str, np.ndarray]:
         )
     if perturbation in {"temporal_kernel_mismatch", "temporal_combo"}:
         pattern = np.sin(np.linspace(0.0, 2.0 * np.pi, n_regions, endpoint=False))
-        alphas = np.clip(alphas + (0.24 * level * pattern), 0.35, 0.995)
-        observation_noise = observation_noise * (1.0 + 1.5 * level)
+        alphas = np.clip(alphas + (0.45 * level * pattern), 0.25, 0.995)
+        observation_noise = observation_noise * (1.0 + 3.0 * level)
     if perturbation in {"relational_coupling_rewire", "relational_combo"}:
         A = np.diag(np.diag(A)) + (1.0 - level) * (A - np.diag(np.diag(A)))
         perm = rng.permutation(n_regions)
@@ -238,25 +238,28 @@ def _build_system(spec: SyntheticNeuralSpec) -> dict[str, np.ndarray]:
         W = ((1.0 - swap) * W) + (swap * W[perm])
         W /= np.linalg.norm(W, axis=1, keepdims=True) + 1e-9
     if perturbation in {"relational_sign_flip", "relational_combo"}:
-        sign_mask = np.ones_like(W)
-        sign_mask[rng.random(size=W.shape) < (0.35 * level)] = -1.0
-        W = W * sign_mask
+        # Zero out connections to break absolute relational graphs 
+        drop_mask = np.ones_like(W)
+        drop_mask[rng.random(size=W.shape) < (0.50 * level)] = 0.0
+        W = W * drop_mask
         W /= np.linalg.norm(W, axis=1, keepdims=True) + 1e-9
         A = np.diag(np.diag(A)) + ((1.0 - 2.0 * level) * (A - np.diag(np.diag(A))))
     if perturbation in {"geometry_subspace_rotation", "geometry_combo"}:
-        latent_transform = _blended_rotation(latent_dim, level, rng) @ latent_transform
+        # Rotate the ambient space of W to change the Subspace Angle
+        Q = _blended_rotation(n_regions, level, rng)
+        W = Q @ W
     if perturbation in {"geometry_variance_redistribution", "geometry_combo"}:
-        scales = np.exp(level * np.linspace(1.1, -1.1, latent_dim))
+        scales = np.exp(level * np.linspace(1.2, -1.2, latent_dim))
         scales = scales / np.mean(scales)
         latent_transform = np.diag(scales) @ latent_transform
     if perturbation in {"geometry_rank_truncation", "geometry_combo"}:
         keep = np.ones(latent_dim, dtype=np.float64)
         if latent_dim > 1:
             keep[1:] = np.maximum(
-                1.0 - (level * np.linspace(0.85, 1.20, latent_dim - 1)), 0.02
+                1.0 - (level * np.linspace(1.5, 2.5, latent_dim - 1)), 0.0
             )
         latent_transform = np.diag(keep) @ latent_transform
-        latent_warp_strength = max(latent_warp_strength, 0.85 * level)
+        latent_warp_strength = max(latent_warp_strength, 2.0 * level)
 
     return {
         "A": A.astype(np.float64),
