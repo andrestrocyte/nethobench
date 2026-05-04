@@ -81,30 +81,30 @@ The active neuro families are:
 ### Active metric list
 
 - `distribution`
-  - `KL_or_JSD_score01`: histogram-based similarity of per-region activity-value distributions.
-  - `QNT_score01`: agreement of quantile structure and tail behavior.
-  - `MOM_score01`: agreement of variance, skewness, and kurtosis structure.
-  - `Mean_score01`: agreement of first-order location statistics.
+  - `KL_or_JSD_score`: histogram-based similarity of per-region activity-value distributions.
+  - `QNT_score`: agreement of quantile structure and tail behavior.
+  - `MOM_score`: agreement of variance, skewness, and kurtosis structure.
+  - `Mean_score`: agreement of first-order location statistics.
 
 - `temporal_spectral`
-  - `TRJDIST_score01`: low-dimensional trajectory realism, combining occupancy, speed, turning, and path-shape features in a shared GT latent space.
+  - `TRJDIST_score`: low-dimensional trajectory realism, combining occupancy, speed, turning, and path-shape features in a shared GT latent space.
 
 - `relational`
-  - `GRAPH_score01`: agreement of graph-level interaction structure derived from inter-regional coupling.
-  - `CrossRegionMI_score01`: agreement of region-by-region mutual-information structure within each dataset.
-  - `LaggedCovariance_score01`: agreement of covariance structure at nonzero temporal lags.
-  - `ImpulseResponse_score01`: agreement of simple directed temporal influence kernels between regions.
+  - `GRAPH_score`: agreement of graph-level interaction structure derived from inter-regional coupling.
+  - `CrossRegionMI_score`: agreement of region-by-region mutual-information structure within each dataset.
+  - `LaggedCovariance_score`: agreement of covariance structure at nonzero temporal lags.
+  - `ImpulseResponse_score`: agreement of simple directed temporal influence kernels between regions.
 
 - `geometry`
-  - `MANI_score01`: agreement of low-dimensional geometry, combining persistent-topology lifetimes with local-neighborhood structure.
-  - `SubspaceAngle_score01`: agreement of dominant latent subspaces via principal angles.
+  - `MANI_score`: agreement of low-dimensional geometry, combining persistent-topology lifetimes with local-neighborhood structure.
+  - `SubspaceAngle_score`: agreement of dominant latent subspaces via principal angles.
 
 - `state_dynamics`
-  - `LatentStateOccupancyK11_score01`: agreement of GT-derived latent-state occupancy using an 11-state partition.
-  - `LatentStateOccupancyK12_score01`: same occupancy test with a 12-state partition.
-  - `LatentStateTransitionLag1K11_score01`: agreement of one-step transition structure between GT-derived latent states.
-  - `LatentStateTransitionLag2K11_score01`: agreement of two-step transition structure between GT-derived latent states.
-  - `LatentStateTransitionLag3K11_score01`: agreement of three-step transition structure between GT-derived latent states.
+  - `LatentStateOccupancyK11_score`: agreement of GT-derived latent-state occupancy using an 11-state partition.
+  - `LatentStateOccupancyK12_score`: same occupancy test with a 12-state partition.
+  - `LatentStateTransitionLag1K11_score`: agreement of one-step transition structure between GT-derived latent states.
+  - `LatentStateTransitionLag2K11_score`: agreement of two-step transition structure between GT-derived latent states.
+  - `LatentStateTransitionLag3K11_score`: agreement of three-step transition structure between GT-derived latent states.
 
 ### Family and composite definition
 The default neuro score is a weighted arithmetic mean over family composites:
@@ -144,8 +144,8 @@ The CLI reports these as:
 ### Separate fidelity score
 The direct trace-alignment family is now reported separately:
 
-- `Error_score01`
-- `MI_score01`
+- `Error_score`
+- `MI_score`
 - `family_fidelity`
 - `FIDELITY_SCORE`
 
@@ -211,22 +211,22 @@ The terminal CLI uses ANSI colors; the example below shows the same structure in
 
 ```text
 Neuro scores:
-  KL_or_JSD_score01                   : 0.742  [medium]  0 ━━━━━━━━━━━▶──── 1
-  QNT_score01                         : 0.766  [medium]  0 ━━━━━━━━━━━▶──── 1
-  MOM_score01                         : 0.641  [medium]  0 ━━━━━━━━━▶────── 1
-  Mean_score01                        : 0.781  [medium]  0 ━━━━━━━━━━━━▶─── 1
-  TRJDIST_score01                     : 0.989  [high]    0 ━━━━━━━━━━━━━━━▶ 1
-  GRAPH_score01                       : 0.996  [high]    0 ━━━━━━━━━━━━━━━▶ 1
-  CrossRegionMI_score01               : 0.911  [high]    0 ━━━━━━━━━━━━━▶── 1
-  LaggedCovariance_score01            : 0.969  [high]    0 ━━━━━━━━━━━━━━▶─ 1
-  ImpulseResponse_score01             : 0.922  [high]    0 ━━━━━━━━━━━━━▶── 1
-  MANI_score01                        : 0.884  [high]    0 ━━━━━━━━━━━━▶─── 1
-  SubspaceAngle_score01               : 0.946  [high]    0 ━━━━━━━━━━━━━━▶─ 1
-  LatentStateOccupancyK11_score01     : 0.910  [high]    0 ━━━━━━━━━━━━━▶── 1
-  LatentStateOccupancyK12_score01     : 0.903  [high]    0 ━━━━━━━━━━━━━▶── 1
-  LatentStateTransitionLag1K11_score01: 0.861  [high]    0 ━━━━━━━━━━━━▶── 1
-  LatentStateTransitionLag2K11_score01: 0.844  [high]    0 ━━━━━━━━━━━━▶── 1
-  LatentStateTransitionLag3K11_score01: 0.829  [high]    0 ━━━━━━━━━━━▶─── 1
+  KL_or_JSD_score                   : 0.742  [medium]  0 ━━━━━━━━━━━▶──── 1
+  QNT_score                         : 0.766  [medium]  0 ━━━━━━━━━━━▶──── 1
+  MOM_score                         : 0.641  [medium]  0 ━━━━━━━━━▶────── 1
+  Mean_score                        : 0.781  [medium]  0 ━━━━━━━━━━━━▶─── 1
+  TRJDIST_score                     : 0.989  [high]    0 ━━━━━━━━━━━━━━━▶ 1
+  GRAPH_score                       : 0.996  [high]    0 ━━━━━━━━━━━━━━━▶ 1
+  CrossRegionMI_score               : 0.911  [high]    0 ━━━━━━━━━━━━━▶── 1
+  LaggedCovariance_score            : 0.969  [high]    0 ━━━━━━━━━━━━━━▶─ 1
+  ImpulseResponse_score             : 0.922  [high]    0 ━━━━━━━━━━━━━▶── 1
+  MANI_score                        : 0.884  [high]    0 ━━━━━━━━━━━━▶─── 1
+  SubspaceAngle_score               : 0.946  [high]    0 ━━━━━━━━━━━━━━▶─ 1
+  LatentStateOccupancyK11_score     : 0.910  [high]    0 ━━━━━━━━━━━━━▶── 1
+  LatentStateOccupancyK12_score     : 0.903  [high]    0 ━━━━━━━━━━━━━▶── 1
+  LatentStateTransitionLag1K11_score: 0.861  [high]    0 ━━━━━━━━━━━━▶── 1
+  LatentStateTransitionLag2K11_score: 0.844  [high]    0 ━━━━━━━━━━━━▶── 1
+  LatentStateTransitionLag3K11_score: 0.829  [high]    0 ━━━━━━━━━━━▶─── 1
   family_distribution                 : 0.733  [medium]  0 ━━━━━━━━━━━▶──── 1
   family_temporal_spectral            : 0.989  [high]    0 ━━━━━━━━━━━━━━━▶ 1
   family_relational                   : 0.950  [high]    0 ━━━━━━━━━━━━━━▶─ 1

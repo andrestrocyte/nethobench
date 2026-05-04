@@ -25,8 +25,8 @@ def compute_fidelity_scores(
         ddconfig_path=ddconfig_path,
     )
     out = {
-        "Error_score01": float(legacy_scores.get("Error_score01", np.nan)),
-        "MI_score01": float(legacy_scores.get("MI_score01", np.nan)),
+        "Error_score": float(legacy_scores.get("Error_score", np.nan)),
+        "MI_score": float(legacy_scores.get("MI_score", np.nan)),
     }
     fidelity = compute_fidelity_composite(out)
     out["family_fidelity"] = fidelity

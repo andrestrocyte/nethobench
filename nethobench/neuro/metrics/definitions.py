@@ -13,10 +13,10 @@ NEURO_FAMILY_METRICS: "OrderedDict[str, OrderedDict[str, float]]" = OrderedDict(
             "distribution",
             OrderedDict(
                 [
-                    ("KL_or_JSD_score01", 0.25),
-                    ("QNT_score01", 0.25),
-                    ("MOM_score01", 0.25),
-                    ("Mean_score01", 0.25),
+                    ("KL_or_JSD_score", 0.25),
+                    ("QNT_score", 0.25),
+                    ("MOM_score", 0.25),
+                    ("Mean_score", 0.25),
                 ]
             ),
         ),
@@ -24,7 +24,7 @@ NEURO_FAMILY_METRICS: "OrderedDict[str, OrderedDict[str, float]]" = OrderedDict(
             "temporal_spectral",
             OrderedDict(
                 [
-                    ("TRJDIST_score01", 1.0),
+                    ("TRJDIST_score", 1.0),
                 ]
             ),
         ),
@@ -32,10 +32,10 @@ NEURO_FAMILY_METRICS: "OrderedDict[str, OrderedDict[str, float]]" = OrderedDict(
             "relational",
             OrderedDict(
                 [
-                    ("GRAPH_score01", 0.25),
-                    ("CrossRegionMI_score01", 0.25),
-                    ("LaggedCovariance_score01", 0.25),
-                    ("ImpulseResponse_score01", 0.25),
+                    ("GRAPH_score", 0.25),
+                    ("CrossRegionMI_score", 0.25),
+                    ("LaggedCovariance_score", 0.25),
+                    ("ImpulseResponse_score", 0.25),
                 ]
             ),
         ),
@@ -43,8 +43,8 @@ NEURO_FAMILY_METRICS: "OrderedDict[str, OrderedDict[str, float]]" = OrderedDict(
             "geometry",
             OrderedDict(
                 [
-                    ("MANI_score01", 0.50),
-                    ("SubspaceAngle_score01", 0.50),
+                    ("MANI_score", 0.50),
+                    ("SubspaceAngle_score", 0.50),
                 ]
             ),
         ),
@@ -52,11 +52,11 @@ NEURO_FAMILY_METRICS: "OrderedDict[str, OrderedDict[str, float]]" = OrderedDict(
             "state_dynamics",
             OrderedDict(
                 [
-                    ("LatentStateOccupancyK11_score01", 0.20),
-                    ("LatentStateOccupancyK12_score01", 0.20),
-                    ("LatentStateTransitionLag1K11_score01", 0.20),
-                    ("LatentStateTransitionLag2K11_score01", 0.20),
-                    ("LatentStateTransitionLag3K11_score01", 0.20),
+                    ("LatentStateOccupancyK11_score", 0.20),
+                    ("LatentStateOccupancyK12_score", 0.20),
+                    ("LatentStateTransitionLag1K11_score", 0.20),
+                    ("LatentStateTransitionLag2K11_score", 0.20),
+                    ("LatentStateTransitionLag3K11_score", 0.20),
                 ]
             ),
         ),
@@ -75,8 +75,8 @@ NEURO_FAMILY_WEIGHTS: "OrderedDict[str, float]" = OrderedDict(
 
 FIDELITY_METRICS: "OrderedDict[str, float]" = OrderedDict(
     [
-        ("Error_score01", 0.65),
-        ("MI_score01", 0.35),
+        ("Error_score", 0.65),
+        ("MI_score", 0.35),
     ]
 )
 

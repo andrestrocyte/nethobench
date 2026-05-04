@@ -16,10 +16,10 @@ from nethobench.neuro.metrics.definitions import (
     build_neuro_families_df,
 )
 from nethobench.neuro.metrics.direct import (
-    compute_moment_score01,
-    compute_graph_score01,
-    compute_manifold_score01,
-    compute_trajectory_score01,
+    compute_moment_score,
+    compute_graph_score,
+    compute_manifold_score,
+    compute_trajectory_score,
 )
 from nethobench.neuro.metrics.additional import (
     compute_additional_structural_metrics,
@@ -134,7 +134,7 @@ def compute_kl_score(
     return np.nan
 
 
-def compute_mean_score01_top10(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
+def compute_mean_score_top10(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
     n_seq, _, n_reg = gt_arr.shape
 
     mu_gt = np.nanmean(gt_arr, axis=1)
@@ -162,7 +162,7 @@ def compute_mean_score01_top10(gt_arr: np.ndarray, pred_arr: np.ndarray) -> floa
     return float(1.0 / (1.0 + D)) if np.isfinite(D) else np.nan
 
 
-def compute_quantile_score01_simple(
+def compute_quantile_score_simple(
     gt_arr: np.ndarray,
     pred_arr: np.ndarray,
     q_lo: float = 0.01,
@@ -223,21 +223,21 @@ def calculate_neuro_composites(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict
     """
     # 1. Distribution Family
     kl_score = compute_kl_score(gt_arr, pred_arr)
-    mean_score = compute_mean_score01_top10(gt_arr, pred_arr)
-    qnt_score = compute_quantile_score01_simple(gt_arr, pred_arr)
+    mean_score = compute_mean_score_top10(gt_arr, pred_arr)
+    qnt_score = compute_quantile_score_simple(gt_arr, pred_arr)
 
-    mom_out = compute_moment_score01(gt_arr, pred_arr)
-    mom_score = mom_out["scores"].get("MOM_score01", np.nan)
+    mom_out = compute_moment_score(gt_arr, pred_arr)
+    mom_score = mom_out["scores"].get("MOM_score", np.nan)
 
     # 2. Relational & Geometry Families (Direct Imports)
-    graph_out = compute_graph_score01(gt_arr, pred_arr)
-    graph_score = graph_out["scores"].get("GRAPH_score01", np.nan)
+    graph_out = compute_graph_score(gt_arr, pred_arr)
+    graph_score = graph_out["scores"].get("GRAPH_score", np.nan)
 
-    mani_out = compute_manifold_score01(gt_arr, pred_arr)
-    mani_score = mani_out["scores"].get("MANI_score01", np.nan)
+    mani_out = compute_manifold_score(gt_arr, pred_arr)
+    mani_score = mani_out["scores"].get("MANI_score", np.nan)
 
-    trj_out = compute_trajectory_score01(gt_arr, pred_arr)
-    trj_score = trj_out["scores"].get("TRJDIST_score01", np.nan)
+    trj_out = compute_trajectory_score(gt_arr, pred_arr)
+    trj_score = trj_out["scores"].get("TRJDIST_score", np.nan)
 
     # 3. Additional Structural Metrics
     add_out = compute_additional_structural_metrics(gt_arr, pred_arr)
@@ -245,26 +245,26 @@ def calculate_neuro_composites(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict
 
     # The notebook explicitly whitelisted only these specific extra metrics
     extra_metric_names = [
-        "CrossRegionMI_score01",
-        "SubspaceAngle_score01",
-        "LaggedCovariance_score01",
-        "ImpulseResponse_score01",
-        "LatentStateOccupancyK11_score01",
-        "LatentStateOccupancyK12_score01",
-        "LatentStateTransitionLag1K11_score01",
-        "LatentStateTransitionLag2K11_score01",
-        "LatentStateTransitionLag3K11_score01",
+        "CrossRegionMI_score",
+        "SubspaceAngle_score",
+        "LaggedCovariance_score",
+        "ImpulseResponse_score",
+        "LatentStateOccupancyK11_score",
+        "LatentStateOccupancyK12_score",
+        "LatentStateTransitionLag1K11_score",
+        "LatentStateTransitionLag2K11_score",
+        "LatentStateTransitionLag3K11_score",
     ]
 
     # Construct the master SCORES dictionary
     SCORES = {
-        "KL_or_JSD_score01": kl_score,
-        "Mean_score01": mean_score,
-        "QNT_score01": qnt_score,
-        "MOM_score01": mom_score,
-        "GRAPH_score01": graph_score,
-        "MANI_score01": mani_score,
-        "TRJDIST_score01": trj_score,
+        "KL_or_JSD_score": kl_score,
+        "Mean_score": mean_score,
+        "QNT_score": qnt_score,
+        "MOM_score": mom_score,
+        "GRAPH_score": graph_score,
+        "MANI_score": mani_score,
+        "TRJDIST_score": trj_score,
     }
 
     # Merge ONLY the whitelisted structural scores
@@ -406,8 +406,8 @@ def load_and_run_neuro_full_analysis(
     flat_scores = calculate_neuro_composites(gt_arr, pred_arr)
 
     # Calculate fidelity implementations locally
-    flat_scores["Error_score01"] = compute_error_score(gt_arr, pred_arr)
-    flat_scores["MI_score01"] = compute_mi_score(gt_arr, pred_arr)
+    flat_scores["Error_score"] = compute_error_score(gt_arr, pred_arr)
+    flat_scores["MI_score"] = compute_mi_score(gt_arr, pred_arr)
 
     # Compute master composites
     fid_composite = compute_fidelity_composite(flat_scores)

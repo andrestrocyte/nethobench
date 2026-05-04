@@ -223,35 +223,35 @@ def plot_final_composites(scores: dict[str, float], outdir: Path) -> None:
 
     # We maintain standard family groupings so colors are assigned correctly
     family_mapping = {
-        "KL_or_JSD_score01": "distribution",
-        "Mean_score01": "distribution",
-        "QNT_score01": "distribution",
-        "MOM_score01": "distribution",
-        "Error_score01": "fidelity",
-        "MI_score01": "fidelity",
-        "AUTO_score01": "temporal_spectral",
-        "BP_score01": "temporal_spectral",
-        "TRJDIST_score01": "temporal_spectral",
-        "PSDShape_score01": "temporal_spectral",
-        "FC_score01": "relational",
-        "CC_score01": "relational",
-        "GRAPH_score01": "relational",
-        "PartialCorr_score01": "relational",
-        "CrossRegionMI_score01": "relational",
-        "PrecisionMatrixSpectrum_score01": "relational",
-        "LaggedCovariance_score01": "relational",
-        "ImpulseResponse_score01": "relational",
-        "PCA_score01": "geometry",
-        "MANI_score01": "geometry",
-        "CCA_score01": "geometry",
-        "Dimensionality_score01": "geometry",
-        "SubspaceAngle_score01": "geometry",
-        "EigenspectrumShape_score01": "geometry",
-        "LatentStateOccupancyK11_score01": "state_dynamics",
-        "LatentStateOccupancyK12_score01": "state_dynamics",
-        "LatentStateTransitionLag1K11_score01": "state_dynamics",
-        "LatentStateTransitionLag2K11_score01": "state_dynamics",
-        "LatentStateTransitionLag3K11_score01": "state_dynamics",
+        "KL_or_JSD_score": "distribution",
+        "Mean_score": "distribution",
+        "QNT_score": "distribution",
+        "MOM_score": "distribution",
+        "Error_score": "fidelity",
+        "MI_score": "fidelity",
+        "AUTO_score": "temporal_spectral",
+        "BP_score": "temporal_spectral",
+        "TRJDIST_score": "temporal_spectral",
+        "PSDShape_score": "temporal_spectral",
+        "FC_score": "relational",
+        "CC_score": "relational",
+        "GRAPH_score": "relational",
+        "PartialCorr_score": "relational",
+        "CrossRegionMI_score": "relational",
+        "PrecisionMatrixSpectrum_score": "relational",
+        "LaggedCovariance_score": "relational",
+        "ImpulseResponse_score": "relational",
+        "PCA_score": "geometry",
+        "MANI_score": "geometry",
+        "CCA_score": "geometry",
+        "Dimensionality_score": "geometry",
+        "SubspaceAngle_score": "geometry",
+        "EigenspectrumShape_score": "geometry",
+        "LatentStateOccupancyK11_score": "state_dynamics",
+        "LatentStateOccupancyK12_score": "state_dynamics",
+        "LatentStateTransitionLag1K11_score": "state_dynamics",
+        "LatentStateTransitionLag2K11_score": "state_dynamics",
+        "LatentStateTransitionLag3K11_score": "state_dynamics",
     }
 
     family_colors = {
@@ -268,7 +268,7 @@ def plot_final_composites(scores: dict[str, float], outdir: Path) -> None:
             continue
 
         if (
-            k.endswith("_score01")
+            k.endswith("_score")
             and not k.startswith("family_")
             and k
             not in [

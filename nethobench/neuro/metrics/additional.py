@@ -535,11 +535,11 @@ def _latent_state_score_bundle(
     ref = _prepare_latent_state_reference(gt, pred, gt_flat_raw, pred_flat_raw)
     if ref is None:
         return {
-            "LatentStateOccupancyK11_score01": np.nan,
-            "LatentStateOccupancyK12_score01": np.nan,
-            "LatentStateTransitionLag1K11_score01": np.nan,
-            "LatentStateTransitionLag2K11_score01": np.nan,
-            "LatentStateTransitionLag3K11_score01": np.nan,
+            "LatentStateOccupancyK11_score": np.nan,
+            "LatentStateOccupancyK12_score": np.nan,
+            "LatentStateTransitionLag1K11_score": np.nan,
+            "LatentStateTransitionLag2K11_score": np.nan,
+            "LatentStateTransitionLag3K11_score": np.nan,
         }
 
     def _occupancy_for_k(k: int) -> float:
@@ -561,11 +561,11 @@ def _latent_state_score_bundle(
         return _transition_similarity(gt_seq_assign, pred_seq_assign, k, lag)
 
     return {
-        "LatentStateOccupancyK11_score01": _occupancy_for_k(11),
-        "LatentStateOccupancyK12_score01": _occupancy_for_k(12),
-        "LatentStateTransitionLag1K11_score01": _transition_for_k(11, 1),
-        "LatentStateTransitionLag2K11_score01": _transition_for_k(11, 2),
-        "LatentStateTransitionLag3K11_score01": _transition_for_k(11, 3),
+        "LatentStateOccupancyK11_score": _occupancy_for_k(11),
+        "LatentStateOccupancyK12_score": _occupancy_for_k(12),
+        "LatentStateTransitionLag1K11_score": _transition_for_k(11, 1),
+        "LatentStateTransitionLag2K11_score": _transition_for_k(11, 2),
+        "LatentStateTransitionLag3K11_score": _transition_for_k(11, 3),
     }
 
 
@@ -683,15 +683,15 @@ def compute_additional_structural_metrics(
     )
 
     scores = {
-        "PartialCorr_score01": partial_corr,
-        "PSDShape_score01": psd_shape,
-        "Dimensionality_score01": dimensionality,
-        "CrossRegionMI_score01": cross_mi,
-        "PrecisionMatrixSpectrum_score01": precision_spectrum,
-        "SubspaceAngle_score01": subspace_angle,
-        "EigenspectrumShape_score01": eigenspectrum_shape,
-        "LaggedCovariance_score01": lagged_covariance,
-        "ImpulseResponse_score01": impulse_response,
+        "PartialCorr_score": partial_corr,
+        "PSDShape_score": psd_shape,
+        "Dimensionality_score": dimensionality,
+        "CrossRegionMI_score": cross_mi,
+        "PrecisionMatrixSpectrum_score": precision_spectrum,
+        "SubspaceAngle_score": subspace_angle,
+        "EigenspectrumShape_score": eigenspectrum_shape,
+        "LaggedCovariance_score": lagged_covariance,
+        "ImpulseResponse_score": impulse_response,
     }
     scores.update(latent_state_scores)
     return {"scores": scores}

@@ -31,7 +31,7 @@ FAMILY_COLUMNS = [f"family_{name}" for name in NEURO_FAMILY_WEIGHTS] + [
 ORACLE_VALIDATION_WEIGHTS = {
     f"family_{name}": weight for name, weight in NEURO_FAMILY_WEIGHTS.items()
 }
-FIDELITY_COLUMNS = ["Error_score01", "MI_score01", "family_fidelity", "FIDELITY_SCORE"]
+FIDELITY_COLUMNS = ["Error_score", "MI_score", "family_fidelity", "FIDELITY_SCORE"]
 
 
 @dataclass(frozen=True)
@@ -392,7 +392,7 @@ def _score_row_metadata(
 
 
 def _metric_score_columns(scores_df: pd.DataFrame) -> list[str]:
-    return [column for column in scores_df.columns if column.endswith("_score01")]
+    return [column for column in scores_df.columns if column.endswith("_score")]
 
 
 def _build_selectivity_table(
@@ -553,7 +553,7 @@ def _plot_selectivity_heatmap(
     ax.set_xticks(np.arange(len(score_columns)))
     ax.set_xticklabels(
         [
-            col.replace("family_", "").replace("_score01", "").replace("_", " ")
+            col.replace("family_", "").replace("_score", "").replace("_", " ")
             for col in score_columns
         ],
         rotation=30,

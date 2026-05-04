@@ -182,13 +182,13 @@ def _build_report_tables(
         "monotonic_v2_composite_score",
         "multiplicative_v3_composite_score",
         "MeanShiftZ_mean",
-        "Bandpower_score01_avg",
-        "QNT_tail_score01_avg",
-        "ERR_nRMSE_score01_avg",
-        "MI_mean_score01_avg",
-        "FC_core_score01_avg",
-        "PCA_comp_score01_avg",
-        "GRAPH_core_score01_avg",
+        "Bandpower_score_avg",
+        "QNT_tail_score_avg",
+        "ERR_nRMSE_score_avg",
+        "MI_mean_score_avg",
+        "FC_core_score_avg",
+        "PCA_comp_score_avg",
+        "GRAPH_core_score_avg",
     ]
     for tag in ["provided_gt_noise", "synthetic_gt_noise", "synthetic_pred_noise"]:
         chunk = results[results["scenario_group"] == tag]
@@ -208,13 +208,13 @@ def _build_saturation(results: pd.DataFrame) -> Dict[str, Dict[str, float]]:
         "monotonic_v2_composite_score",
         "multiplicative_v3_composite_score",
         "MeanShiftZ_mean",
-        "Bandpower_score01_avg",
-        "QNT_tail_score01_avg",
-        "ERR_nRMSE_score01_avg",
-        "MI_mean_score01_avg",
-        "FC_core_score01_avg",
-        "PCA_comp_score01_avg",
-        "GRAPH_core_score01_avg",
+        "Bandpower_score_avg",
+        "QNT_tail_score_avg",
+        "ERR_nRMSE_score_avg",
+        "MI_mean_score_avg",
+        "FC_core_score_avg",
+        "PCA_comp_score_avg",
+        "GRAPH_core_score_avg",
     ]:
         if metric not in results.columns:
             continue

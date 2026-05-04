@@ -71,14 +71,14 @@ def _distance_from_score(score: float) -> float:
 
 def _metric_display_name(metric_key: str) -> str:
     names = {
-        "MOM_score01": "Moments",
-        "GRAPH_score01": "Graph",
-        "PCA_score01": "PCA",
-        "AUTO_score01": "Autocorr",
-        "CC_score01": "CrossCorr",
-        "MANI_score01": "Manifold",
-        "BP_score01": "Bandpower",
-        "TRJDIST_score01": "Trajectory",
+        "MOM_score": "Moments",
+        "GRAPH_score": "Graph",
+        "PCA_score": "PCA",
+        "AUTO_score": "Autocorr",
+        "CC_score": "CrossCorr",
+        "MANI_score": "Manifold",
+        "BP_score": "Bandpower",
+        "TRJDIST_score": "Trajectory",
     }
     return names.get(metric_key, metric_key)
 
@@ -537,7 +537,7 @@ def compute_pca_replacement(
     )
     score = _extract_score(pca_reconstruction_product(gt_arr, pred_arr))
     pca_simple = _wrap_population_metric(
-        score_key="PCA_score01",
+        score_key="PCA_score",
         mean_key="PCA_mean",
         score=score,
         description=description,
@@ -547,19 +547,19 @@ def compute_pca_replacement(
         gt_arr,
         pca_reconstruction_product,
         corruption_region_permute_blend,
-        score_key="PCA_score01",
+        score_key="PCA_score",
         family_label="region_permute_blend",
     )
     _display_summary(
         label="PCA",
-        score_key="PCA_score01",
+        score_key="PCA_score",
         score=score,
         description=description,
         corruption_df=pca_corr_df,
     )
     _plot_corruption_df(
         pca_corr_df,
-        score_key="PCA_score01",
+        score_key="PCA_score",
         title="PCA replacement degradation",
         enable_plots=enable_plots,
     )
@@ -576,7 +576,7 @@ def compute_moment_replacement(
     result = _perfected_moment_score_legacy(gt_arr, pred_arr)
     score = _extract_score(result)
     mom_simple = _wrap_population_metric(
-        score_key="MOM_score01",
+        score_key="MOM_score",
         mean_key="MOM_mean",
         score=score,
         description=description,
@@ -586,19 +586,19 @@ def compute_moment_replacement(
         gt_arr,
         _perfected_moment_score_legacy,
         corruption_gain_scaling_blend,
-        score_key="MOM_score01",
+        score_key="MOM_score",
         family_label="gain_scaling_blend",
     )
     _display_summary(
         label="Moments",
-        score_key="MOM_score01",
+        score_key="MOM_score",
         score=score,
         description=description,
         corruption_df=mom_corr_df,
     )
     _plot_corruption_df(
         mom_corr_df,
-        score_key="MOM_score01",
+        score_key="MOM_score",
         title="Moments replacement degradation",
         enable_plots=enable_plots,
     )
@@ -615,7 +615,7 @@ def compute_graph_replacement(
     result = _perfected_graph_score_legacy(gt_arr, pred_arr)
     score = _extract_score(result)
     graph_simple = _wrap_population_metric(
-        score_key="GRAPH_score01",
+        score_key="GRAPH_score",
         mean_key="GRAPH_mean",
         score=score,
         description=description,
@@ -630,19 +630,19 @@ def compute_graph_replacement(
         gt_arr,
         _perfected_graph_score_legacy,
         corruption_region_permute_blend,
-        score_key="GRAPH_score01",
+        score_key="GRAPH_score",
         family_label="region_permute_blend",
     )
     _display_summary(
         label="Graph",
-        score_key="GRAPH_score01",
+        score_key="GRAPH_score",
         score=score,
         description=description,
         corruption_df=graph_corr_df,
     )
     _plot_corruption_df(
         graph_corr_df,
-        score_key="GRAPH_score01",
+        score_key="GRAPH_score",
         title="Graph replacement degradation",
         enable_plots=enable_plots,
     )
@@ -662,7 +662,7 @@ def compute_autocorr_replacement(
     score = _extract_score(autocorr_weighted_rmse_power(gt_arr, pred_arr))
     distance = _distance_from_score(score)
     auto_sensitive = _wrap_population_metric(
-        score_key="AUTO_score01",
+        score_key="AUTO_score",
         mean_key="AUTO_mean",
         score=score,
         description=description,
@@ -673,19 +673,19 @@ def compute_autocorr_replacement(
         gt_arr,
         autocorr_weighted_rmse_power,
         corruption_time_shuffle_blend,
-        score_key="AUTO_score01",
+        score_key="AUTO_score",
         family_label="time_shuffle_blend",
     )
     _display_summary(
         label="Autocorr",
-        score_key="AUTO_score01",
+        score_key="AUTO_score",
         score=score,
         description=description,
         corruption_df=auto_corr_df,
     )
     _plot_corruption_df(
         auto_corr_df,
-        score_key="AUTO_score01",
+        score_key="AUTO_score",
         title="Autocorr replacement degradation",
         enable_plots=enable_plots,
     )
@@ -705,7 +705,7 @@ def compute_crosscorr_replacement(
     score = _extract_score(_final_crosscorr_score(gt_arr, pred_arr))
     distance = _distance_from_score(score)
     cc_sensitive = _wrap_population_metric(
-        score_key="CC_score01",
+        score_key="CC_score",
         mean_key="CC_mean",
         score=score,
         description=description,
@@ -716,19 +716,19 @@ def compute_crosscorr_replacement(
         gt_arr,
         _final_crosscorr_score,
         corruption_region_shift_desync,
-        score_key="CC_score01",
+        score_key="CC_score",
         family_label="region_shift_desync",
     )
     _display_summary(
         label="CrossCorr",
-        score_key="CC_score01",
+        score_key="CC_score",
         score=score,
         description=description,
         corruption_df=cc_corr_df,
     )
     _plot_corruption_df(
         cc_corr_df,
-        score_key="CC_score01",
+        score_key="CC_score",
         title="CrossCorr replacement degradation",
         enable_plots=enable_plots,
     )
@@ -748,7 +748,7 @@ def compute_bandpower_replacement(
     )
     score = _extract_score(bandpower_band_fraction(gt_arr, pred_arr))
     bandpower_simple = _wrap_population_metric(
-        score_key="BP_score01",
+        score_key="BP_score",
         mean_key="BP_mean",
         score=score,
         description=description,
@@ -758,19 +758,19 @@ def compute_bandpower_replacement(
         gt_arr,
         bandpower_band_fraction,
         corruption_time_shuffle_blend,
-        score_key="BP_score01",
+        score_key="BP_score",
         family_label="time_shuffle_blend",
     )
     _display_summary(
         label="Bandpower",
-        score_key="BP_score01",
+        score_key="BP_score",
         score=score,
         description=description,
         corruption_df=bp_corr_df,
     )
     _plot_corruption_df(
         bp_corr_df,
-        score_key="BP_score01",
+        score_key="BP_score",
         title="Bandpower replacement degradation",
         enable_plots=enable_plots,
     )
@@ -789,7 +789,7 @@ def compute_trajectory_replacement(
     )
     score = _extract_score(_final_trajectory_score(gt_arr, pred_arr))
     trajectory_dist_simple = _wrap_population_metric(
-        score_key="TRJDIST_score01",
+        score_key="TRJDIST_score",
         mean_key="TRJDIST_seq_mean",
         score=score,
         description=description,
@@ -799,19 +799,19 @@ def compute_trajectory_replacement(
         gt_arr,
         _final_trajectory_score,
         corruption_time_shuffle_blend,
-        score_key="TRJDIST_score01",
+        score_key="TRJDIST_score",
         family_label="time_shuffle_blend",
     )
     _display_summary(
         label="Trajectory",
-        score_key="TRJDIST_score01",
+        score_key="TRJDIST_score",
         score=score,
         description=description,
         corruption_df=trjdist_corr_df,
     )
     _plot_corruption_df(
         trjdist_corr_df,
-        score_key="TRJDIST_score01",
+        score_key="TRJDIST_score",
         title="Trajectory replacement degradation",
         enable_plots=enable_plots,
     )
@@ -831,7 +831,7 @@ def compute_manifold_replacement(
     )
     score = _extract_score(_final_manifold_score(gt_arr, pred_arr))
     mani_simple = _wrap_population_metric(
-        score_key="MANI_score01",
+        score_key="MANI_score",
         mean_key="MANI_mean",
         score=score,
         description=description,
@@ -841,20 +841,20 @@ def compute_manifold_replacement(
         gt_arr,
         _final_manifold_score,
         corruption_region_permute_blend,
-        score_key="MANI_score01",
+        score_key="MANI_score",
         family_label="region_permute_blend",
     )
     _display_summary(
         label="Manifold",
-        score_key="MANI_score01",
+        score_key="MANI_score",
         score=score,
         description=description,
         corruption_df=mani_corr_df,
     )
     _plot_corruption_df(
         mani_corr_df,
-        score_key="MANI_score01",
-        title=f"{_metric_display_name('MANI_score01')} replacement degradation",
+        score_key="MANI_score",
+        title=f"{_metric_display_name('MANI_score')} replacement degradation",
         enable_plots=enable_plots,
     )
     return mani_simple, mani_corr_df
