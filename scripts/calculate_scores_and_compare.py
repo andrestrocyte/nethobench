@@ -100,6 +100,10 @@ if __name__ == "__main__":
     r = subprocess.run(cmd)
     assert r.returncode == 0, f"cross-scores: {' '.join(cmd)}"
 
+    cmd = ["nethobench", "cross-analysis", "--gt", "data/cross/gt/cross-gt-behavior-neuro.csv", "--preds", "data/cross/predictions/sequifier-cross-noisy-behavior-neuro-last-100.csv"]
+    r = subprocess.run(cmd)
+    assert r.returncode == 0, f"cross-analysis: {' '.join(cmd)}"
+
     my_repo = "."
     my_folder = "outputs"  # Path relative to the repo root
 
