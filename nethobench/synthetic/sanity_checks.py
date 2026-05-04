@@ -121,17 +121,16 @@ def _score_pair(
     buf = io.StringIO()
     start = time.time()
     with io.StringIO() as _err, io.StringIO() as _out:
-        with pd.option_context("mode.chained_assignment", None):
-            with np.errstate(all="ignore"):
-                # redirect via lightweight local context managers
-                import contextlib
+        with np.errstate(all="ignore"):
+            # redirect via lightweight local context managers
+            import contextlib
 
-                with contextlib.redirect_stdout(_out), contextlib.redirect_stderr(_err):
-                    scores = compute_neuro_scores(
-                        pred_csv, gt_csv, ddconfig_path=ddconfig
-                    )
-                buf.write(_out.getvalue())
-                buf.write(_err.getvalue())
+            with contextlib.redirect_stdout(_out), contextlib.redirect_stderr(_err):
+                scores = compute_neuro_scores(
+                    pred_csv, gt_csv, ddconfig_path=ddconfig
+                )
+            buf.write(_out.getvalue())
+            buf.write(_err.getvalue())
     elapsed = time.time() - start
     out = {
         k: float(v)
