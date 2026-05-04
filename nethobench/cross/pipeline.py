@@ -36,6 +36,25 @@ from nethobench.cross.metrics import (
 def compute_cross_scores(
     predictions_csv: Path, ground_truth_csv: Path, config: Union[Path, dict, None]
 ) -> Dict[str, object]:
+    """
+    Compute cross-modal scores combining neural and behavioral assessments.
+
+    Loads and aligns the ground-truth and prediction CSVs, validates the
+    multimodal data, then evaluates performance along three axes:
+    neural, behavioral, and cross-modal (CCA alignment, predictive R²,
+    lead-lag relationships).
+
+    Args:
+        predictions_csv: Path to the predictions CSV file.
+        ground_truth_csv: Path to the ground-truth CSV file.
+        config: Path to a config file, a configuration dictionary, or None.
+            Used to infer column mappings and hyperparameters.
+
+    Returns:
+        Dictionary with keys ``neuro_scores``, ``behavior_scores``,
+        ``cross_scores``, ``neuro_composite``, ``etho_composite``,
+        ``cross_composite``, and ``composite``.
+    """
     # Read GT once for config inference if needed
     sample_df = pd.read_csv(ground_truth_csv)
     cfg = load_config(config, sample_df=sample_df)

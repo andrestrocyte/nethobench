@@ -286,6 +286,24 @@ def generate_synthetic_neural_dataset(
     *,
     sample_seed: int,
 ) -> SyntheticDataset:
+    """
+    Generate a synthetic neural dataset from a latent dynamical system.
+
+    Simulates latent latent oscillatory dynamics, projects them through a
+    region loading matrix, and applies calcium-filter-like smoothing and
+    observation noise to produce realistic synthetic neural traces.
+
+    Args:
+        spec: Specification object controlling sequences, length, regions,
+            latent dimension, perturbations, and system hyperparameters.
+        sample_seed: Random seed for sampling stochastic noise and initial
+            conditions.
+
+    Returns:
+        A ``SyntheticDataset`` containing the 3D array of traces
+        ``[n_sequences, seq_length, n_regions]``, region names, and a summary
+        dictionary.
+    """
     system = _build_system(spec)
     rng = np.random.default_rng(sample_seed)
     n_seq = spec.n_sequences
@@ -841,6 +859,30 @@ def run_synthetic_neuro_validation(
     save_datasets: bool = True,
     save_artifacts: bool = True,
 ) -> dict[str, object]:
+    """
+    Run the full synthetic neural validation pipeline.
+
+    Generates oracle and perturbed synthetic datasets, scores them with the
+    neuro composite metrics, and produces summary tables, selectivity
+    heatmaps, dose-response curves, and optional CSV artifacts.
+
+    Args:
+        output_root: Directory where tables, figures, and datasets are saved.
+        spec: ``SyntheticNeuralSpec`` instance. If None, default spec values
+            are used.
+        oracle_replicates: Number of independent oracle runs to average for
+            the baseline ceiling. Defaults to 3.
+        perturbations: Iterable of ``PerturbationSpec`` definitions to test.
+            Defaults to ``DEFAULT_PERTURBATIONS``.
+        save_datasets: Whether to write generated datasets to CSV.
+            Defaults to True.
+        save_artifacts: Whether to write tables, figures, and metadata to disk.
+            Defaults to True.
+
+    Returns:
+        Dictionary of output paths and resulting DataFrames from the
+        validation pipeline.
+    """
     return run_validation_pipeline(
         spec=spec or SyntheticNeuralSpec(),
         generator_fn=generate_synthetic_neural_dataset,

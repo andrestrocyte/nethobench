@@ -19,7 +19,25 @@ def compute_neuro_scores(
     per_sequence_stats: bool = False,
     neuro_cols: Optional[list[str]] = None,
 ) -> Dict[str, float]:
+    """
+    Compute neuro composite scores from prediction and ground-truth CSVs.
 
+    Loads the CSV files, aligns them into 3D tensors of shape
+    ``[n_sequences, n_timesteps, n_regions]``, and calculates the
+    composite neuro scores.
+
+    Args:
+        predictions_csv: Path to the predictions CSV file.
+        ground_truth_csv: Path to the ground-truth CSV file.
+        per_sequence_stats: If True, raises a ``ValueError`` because
+            per-sequence statistics are not supported for notebook-based
+            neuro scores. Defaults to False.
+        neuro_cols: Optional list of column names to use as neural regions.
+            If None, all matching columns are inferred automatically.
+
+    Returns:
+        Dictionary mapping composite score names to float values.
+    """
     if per_sequence_stats:
         raise ValueError(
             "per_sequence_stats is not supported for notebook-based neuro scores."

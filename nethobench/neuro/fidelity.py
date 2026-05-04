@@ -17,6 +17,27 @@ def compute_fidelity_scores(
     neuro_cols: Optional[list[str]] = None,
     ddconfig_path: Optional[Path] = None,
 ) -> Dict[str, float]:
+    """
+    Compute fidelity scores from prediction and ground-truth CSVs.
+
+    Calculates the Error and Mutual Information (MI) scores using the legacy
+    composite pipeline, then derives the ``family_fidelity`` and
+    ``FIDELITY_SCORE`` values from them.
+
+    Args:
+        predictions_csv: Path to the predictions CSV file.
+        ground_truth_csv: Path to the ground-truth CSV file.
+        per_sequence_stats: Whether to compute per-sequence statistics.
+            Passed through to the legacy composite scorer. Defaults to False.
+        neuro_cols: Optional list of column names to treat as neural regions.
+            If None, columns are inferred automatically.
+        ddconfig_path: Optional path to a configuration file for the legacy
+            scorer.
+
+    Returns:
+        Dictionary containing ``Error_score``, ``MI_score``,
+        ``family_fidelity``, and ``FIDELITY_SCORE``.
+    """
     legacy_scores = compute_composite_scores(
         predictions_csv,
         ground_truth_csv,

@@ -276,6 +276,20 @@ def generate_biophysical_synthetic_dataset(
     *,
     sample_seed: int,
 ) -> SyntheticDataset:
+    """
+    Generate a ``SyntheticDataset`` from the biophysical synthetic bundle.
+
+    Convenience wrapper around ``generate_biophysical_synthetic_bundle`` that
+    returns only the signals, region names, and summary in a
+    ``SyntheticDataset``.
+
+    Args:
+        spec: ``BiophysicalSyntheticNeuralSpec`` for the simulation.
+        sample_seed: Random seed for the stochastic simulation.
+
+    Returns:
+        A ``SyntheticDataset`` with the observed neural traces.
+    """
     bundle = generate_biophysical_synthetic_bundle(spec, sample_seed=sample_seed)
     return SyntheticDataset(
         array=bundle["signals"],
@@ -289,6 +303,22 @@ def generate_biophysical_synthetic_bundle(
     *,
     sample_seed: int,
 ) -> dict[str, object]:
+    """
+    Generate a biophysically motivated synthetic neural bundle.
+
+    Simulates a latent spiking network with state-switching dynamics,
+    refractory effects, and AR(2) calcium filtering, producing traces that
+    more closely resemble real two-photon calcium imaging data.
+
+    Args:
+        spec: ``BiophysicalSyntheticNeuralSpec`` controlling sequences, length,
+            regions, latent dimension, calcium kinetics, and perturbations.
+        sample_seed: Random seed for the stochastic simulation.
+
+    Returns:
+        Dictionary with keys ``signals`` (observed traces), ``spikes``,
+        ``states``, ``region_names``, and ``summary``.
+    """
     system = _build_biophysical_system(spec)
     rng = np.random.default_rng(sample_seed)
     n_seq = spec.n_sequences
@@ -414,6 +444,30 @@ def run_biophysical_synthetic_neuro_validation(
     save_datasets: bool = True,
     save_artifacts: bool = True,
 ) -> dict[str, object]:
+    """
+    Run the full biophysical synthetic neural validation pipeline.
+
+    Generates oracle and perturbed biophysical datasets, scores them with the
+    neuro composite metrics, and produces summary tables, selectivity
+    heatmaps, dose-response curves, and optional CSV artifacts.
+
+    Args:
+        output_root: Directory where tables, figures, and datasets are saved.
+        spec: ``BiophysicalSyntheticNeuralSpec`` instance. If None, default
+            spec values are used.
+        oracle_replicates: Number of independent oracle runs for the baseline
+            ceiling. Defaults to 3.
+        perturbations: Iterable of ``PerturbationSpec`` definitions to test.
+            Defaults to ``DEFAULT_BIOPHYSICAL_PERTURBATIONS``.
+        save_datasets: Whether to write generated datasets to CSV.
+            Defaults to True.
+        save_artifacts: Whether to write tables, figures, and metadata to disk.
+            Defaults to True.
+
+    Returns:
+        Dictionary of output paths and resulting DataFrames from the
+        validation pipeline.
+    """
     return run_validation_pipeline(
         spec=spec or BiophysicalSyntheticNeuralSpec(),
         generator_fn=generate_biophysical_synthetic_dataset,

@@ -37,7 +37,28 @@ def compute_etho_scores(
 ) -> Tuple[
     Dict[str, float], Dict[str, List[float]], Dict[str, float], Dict[str, float]
 ]:
+    """
+    Compute behavioral (ethological) scores from paired ground-truth and
+    prediction data.
 
+    Args:
+        gt_dir: Path to the ground-truth data directory. Required if
+            ``paired_df`` is not provided.
+        inf_dir: Path to the inference/prediction data directory. Required if
+            ``paired_df`` is not provided.
+        paired_df: Optional pre-merged DataFrame of ground-truth and prediction
+            data. If supplied, ``gt_dir`` and ``inf_dir`` are ignored.
+
+    Returns:
+        A 4-tuple of:
+        - **scores**: Global score dictionary including position, velocity,
+          acceleration, direction, quadrant, syllable, trajectory shape,
+          DTW similarity, manifold alignment, and a ``composite_score``.
+        - **sequence_level_scores**: Per-sequence raw values for each metric.
+        - **sequence_means**: Weighted mean of each metric across sequences.
+        - **sequence_stds**: Weighted standard deviation of each metric across
+          sequences.
+    """
     # Avoid redundant loading if already passed from run_etho_full_analysis
     if paired_df is None:
         if gt_dir is None or inf_dir is None:
