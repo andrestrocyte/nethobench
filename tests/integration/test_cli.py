@@ -157,3 +157,59 @@ def test_cli_cross_scores(gt: Path, preds: Path, tmp_path: Path):
     assert "behavior_scores" in payload
     assert "cross_scores" in payload
     assert "composite" in payload
+
+@pytest.mark.parametrize("gt,preds", ETHO_FIXTURES)
+def test_cli_etho_analysis(gt: Path, preds: Path, tmp_path: Path):
+    output_root = tmp_path / "etho-analysis"
+    cmd = [
+        "nethobench",
+        "etho-analysis",
+        "--gt-dir",
+        str(gt),
+        "--inf-dir",
+        str(preds),
+        "--output-root",
+        str(output_root),
+    ]
+    result = _run(cmd)
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    
+    # The command creates a sub-directory named with a timestamp prefix
+    subdirs = [d for d in output_root.iterdir() if d.is_dir()]
+    assert subdirs, "Expected at least one output subdirectory"
+    
+    scores_json = subdirs[0] / "scores.json"
+    assert scores_json.exists()
+    
+    payload = json.loads(scores_json.read_text())
+    assert "global_scores" in payload
+    assert "per_sequence" in payload
+
+
+@pytest.mark.parametrize("gt,preds", CROSS_FIXTURES)
+def test_cli_cross_analysis(gt: Path, preds: Path, tmp_path: Path):
+    output_root = tmp_path / "cross-analysis"
+    cmd = [
+        "nethobench",
+        "cross-analysis",
+        "--gt",
+        str(gt),
+        "--preds",
+        str(preds),
+        "--output-root",
+        str(output_root),
+    ]
+    result = _run(cmd)
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    
+    # The command creates a sub-directory named after the predictions stem
+    subdirs = [d for d in output_root.iterdir() if d.is_dir()]
+    assert subdirs, "Expected at least one output subdirectory"
+    
+    scores_json = subdirs[0] / "scores.json"
+    assert scores_json.exists()
+    
+    payload = json.loads(scores_json.read_text())
+    assert "cross_scores" in payload
+    assert "cross_composite" in payload
+    assert "composite" in payload
