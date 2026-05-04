@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Callable
+import importlib.util
 
 import numpy as np
 from scipy import signal
@@ -21,9 +22,9 @@ from nethobench.utils.evaluation_constants import (
     WELCH_NPERSEG,
     HISTOGRAM_BINS_DEFAULT,
 )
-try:
+if importlib.util.find_spec("ripser") is not None:
     from ripser import ripser
-except Exception:  # pragma: no cover - optional dependency during development
+else: 
     ripser = None
 
 

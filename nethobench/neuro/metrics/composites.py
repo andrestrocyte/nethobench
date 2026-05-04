@@ -359,18 +359,16 @@ def compute_mi_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
             x = (x - mx) / (sx + 1e-12)
             y = (y - my) / (sy + 1e-12)
 
-            try:
-                mi_val = mutual_info_regression(
-                    x.reshape(-1, 1),
-                    y,
-                    discrete_features=False,
-                    n_neighbors=MI_N_NEIGHBORS,
-                    random_state=0,
-                )[0]
-                if np.isfinite(mi_val):
-                    mi_all[i, r] = max(0.0, float(mi_val))
-            except Exception:
-                pass
+            mi_val = mutual_info_regression(
+                x.reshape(-1, 1),
+                y,
+                discrete_features=False,
+                n_neighbors=MI_N_NEIGHBORS,
+                random_state=0,
+            )[0]
+            if np.isfinite(mi_val):
+                mi_all[i, r] = max(0.0, float(mi_val))
+
 
     seq_worst = np.full(n_seq, np.nan)
     for i in range(n_seq):

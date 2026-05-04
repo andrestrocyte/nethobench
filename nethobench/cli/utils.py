@@ -92,10 +92,7 @@ def prompt_for_config(provided: Optional[str]) -> Optional[Path]:
 
 
 def score_to_color(value: float) -> str:
-    try:
-        v = float(value)
-    except Exception:
-        return ""
+    v = float(value)
     if v >= 0.8:
         return "\033[32m"
     if v >= 0.4:
@@ -104,11 +101,7 @@ def score_to_color(value: float) -> str:
 
 
 def render_score_bar(value: float, width: int = 16) -> str:
-    try:
-        v = float(value)
-    except Exception:
-        return ""
-    v = max(0.0, min(1.0, v))
+    v = max(0.0, min(1.0, float(value)))
     arrow_idx = min(width - 1, max(0, int(round(v * (width - 1)))))
     icon = "↗" if v >= 0.8 else ("→" if v >= 0.4 else "↘")
     chars = []

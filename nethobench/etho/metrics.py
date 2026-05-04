@@ -637,47 +637,45 @@ def get_chunked_embeddings(
 ) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """Generates 2D embeddings of short movement chunks for diagnostics."""
     try:
-        try:
-            import umap
+        import umap
 
-            reducer = umap.UMAP(n_components=2, min_dist=0.1, random_state=0)
-        except ImportError:
-            from sklearn.decomposition import PCA
+        reducer = umap.UMAP(n_components=2, min_dist=0.1, random_state=0)
+    except ImportError:
+        from sklearn.decomposition import PCA
 
-            reducer = PCA(n_components=2)
+        reducer = PCA(n_components=2)
 
-        chunks, labels, seq_ids = [], [], []
-        for seq, seq_df in paired_df.sort_values("itemPosition").groupby("sequenceId"):
-            gt_feats = _build_features(seq_df, "gt", fallback_empty=True)
-            inf_feats = _build_features(seq_df, "inf", fallback_empty=True)
-            if len(gt_feats) < chunk_size or len(inf_feats) < chunk_size:
-                continue
-            mask_gt = ~np.isnan(gt_feats).any(axis=1)
-            mask_inf = ~np.isnan(inf_feats).any(axis=1)
-            gt_feats, inf_feats = gt_feats[mask_gt], inf_feats[mask_inf]
+    chunks, labels, seq_ids = [], [], []
+    for seq, seq_df in paired_df.sort_values("itemPosition").groupby("sequenceId"):
+        gt_feats = _build_features(seq_df, "gt", fallback_empty=True)
+        inf_feats = _build_features(seq_df, "inf", fallback_empty=True)
+        if len(gt_feats) < chunk_size or len(inf_feats) < chunk_size:
+            continue
+        mask_gt = ~np.isnan(gt_feats).any(axis=1)
+        mask_inf = ~np.isnan(inf_feats).any(axis=1)
+        gt_feats, inf_feats = gt_feats[mask_gt], inf_feats[mask_inf]
 
-            if len(gt_feats) < chunk_size or len(inf_feats) < chunk_size:
-                continue
+        if len(gt_feats) < chunk_size or len(inf_feats) < chunk_size:
+            continue
 
-            for arr, lbl in [(gt_feats, "gt"), (inf_feats, "inf")]:
-                for start in range(0, len(arr) - chunk_size + 1, chunk_size):
-                    chunks.append(arr[start : start + chunk_size].flatten())
-                    labels.append(lbl)
-                    seq_ids.append(seq)
-
-            shuffled = gt_feats.copy()
-            rng = np.random.default_rng(0)
-            rng.shuffle(shuffled)
-            for start in range(0, len(shuffled) - chunk_size + 1, chunk_size):
-                chunks.append(shuffled[start : start + chunk_size].flatten())
-                labels.append("gt_shuffled")
+        for arr, lbl in [(gt_feats, "gt"), (inf_feats, "inf")]:
+            for start in range(0, len(arr) - chunk_size + 1, chunk_size):
+                chunks.append(arr[start : start + chunk_size].flatten())
+                labels.append(lbl)
                 seq_ids.append(seq)
 
-        if not chunks:
-            return None
+        shuffled = gt_feats.copy()
+        rng = np.random.default_rng(0)
+        rng.shuffle(shuffled)
+        for start in range(0, len(shuffled) - chunk_size + 1, chunk_size):
+            chunks.append(shuffled[start : start + chunk_size].flatten())
+            labels.append("gt_shuffled")
+            seq_ids.append(seq)
 
-        X = np.vstack(chunks)
-        emb = reducer.fit_transform(X) if len(X) > 5 else np.zeros((len(X), 2))
-        return emb, np.array(labels), np.array(seq_ids)
-    except Exception:
+    if not chunks:
         return None
+
+    X = np.vstack(chunks)
+    emb = reducer.fit_transform(X) if len(X) > 5 else np.zeros((len(X), 2))
+    return emb, np.array(labels), np.array(seq_ids)
+

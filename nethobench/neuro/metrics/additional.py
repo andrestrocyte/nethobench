@@ -249,16 +249,14 @@ def _mi_matrix(
         for j in range(i + 1, n_reg):
             x = flat[:, i]
             y = flat[:, j]
-            try:
-                mi_xy = mutual_info_regression(
-                    x.reshape(-1, 1), y, n_neighbors=n_neighbors, random_state=0
-                )[0]
-                mi_yx = mutual_info_regression(
-                    y.reshape(-1, 1), x, n_neighbors=n_neighbors, random_state=0
-                )[0]
-                value = 0.5 * (max(float(mi_xy), 0.0) + max(float(mi_yx), 0.0))
-            except Exception:
-                value = np.nan
+            mi_xy = mutual_info_regression(
+                x.reshape(-1, 1), y, n_neighbors=n_neighbors, random_state=0
+            )[0]
+            mi_yx = mutual_info_regression(
+                y.reshape(-1, 1), x, n_neighbors=n_neighbors, random_state=0
+            )[0]
+            value = 0.5 * (max(float(mi_xy), 0.0) + max(float(mi_yx), 0.0))
+
             out[i, j] = value
             out[j, i] = value
     return out
