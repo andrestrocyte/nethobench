@@ -8,12 +8,6 @@ from sklearn.covariance import LedoitWolf
 from sklearn.feature_selection import mutual_info_regression
 from nethobench.utils.calculation import align_arrays, rmse_similarity, weighted_mean_available, correlation_score
 from nethobench.utils.evaluation_constants import (
-    PCA_VARIANCE_THRESHOLD,
-    MI_MAX_POINTS,
-    MI_N_NEIGHBORS,
-    DFC_STATE_CONFIGS,
-    WELCH_NPERSEG,
-    HISTOGRAM_BINS_DEFAULT,
     WEIGHT_SPECTRUM_CORR,
     WEIGHT_SPECTRUM_RMSE,
     WEIGHT_MATRIX_CORR,
@@ -23,6 +17,7 @@ from nethobench.utils.evaluation_constants import (
     WEIGHT_HIST_RMSE,
     QUANTILE_IQR_LO,
     QUANTILE_IQR_HI,
+    config,
 )
 EPS = 1e-9
 
@@ -148,7 +143,7 @@ def _mean_region_psd(arr: np.ndarray) -> np.ndarray:
         region_series = region_series[np.isfinite(region_series)]
         if region_series.size < 32:
             continue
-        _, psd = welch(region_series, nperseg=min(WELCH_NPERSEG, region_series.size))
+        _, psd = welch(region_series, nperseg=min(config.WELCH_NPERSEG, region_series.size))
         psd = np.asarray(psd, dtype=np.float64)
         if psd.size == 0 or not np.isfinite(psd).any():
             continue
@@ -185,7 +180,7 @@ def _principal_subspace(cov: np.ndarray | None, max_dim: int = 6) -> np.ndarray 
     if total < EPS:
         return None
     cum = np.cumsum(eigvals) / total
-    k = int(np.searchsorted(cum, PCA_VARIANCE_THRESHOLD) + 1)
+    k = int(np.searchsorted(cum, config.PCA_VARIANCE_THRESHOLD) + 1)
     k = max(1, min(k, max_dim, cov.shape[0]))
     return eigvecs[:, :k]
 
@@ -234,8 +229,12 @@ def _var1_coefficients(flat: np.ndarray, ridge: float = 1e-2) -> np.ndarray | No
 
 
 def _mi_matrix(
-    flat: np.ndarray, max_points: int = MI_MAX_POINTS, n_neighbors: int = MI_N_NEIGHBORS
+    flat: np.ndarray, max_points: int | None = None, n_neighbors: int | None = None
 ) -> np.ndarray | None:
+    if max_points is None:
+        max_points = config.MI_MAX_POINTS
+    if n_neighbors is None:
+        n_neighbors = config.MI_N_NEIGHBORS
     if flat.shape[0] < 40 or flat.shape[1] < 2:
         return None
     rng = np.random.default_rng(0)
@@ -569,7 +568,7 @@ def _latent_state_score_bundle(
 
 def _dfc_state_occupancy_score(gt: np.ndarray, pred: np.ndarray) -> float:
     per_cfg = []
-    for window, step, n_states in DFC_STATE_CONFIGS:
+    for window, step, n_states in config.DFC_STATE_CONFIGS:
         gt_feat, _ = _window_fc_features(gt, window=window, step=step)
         pred_feat, _ = _window_fc_features(pred, window=window, step=step)
         if gt_feat is None or pred_feat is None:

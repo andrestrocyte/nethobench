@@ -10,6 +10,7 @@ import pandas as pd
 from nethobench.utils.helpers import load_and_align, timestamped_outdir
 from nethobench.neuro.metrics.composites import calculate_neuro_composites
 from nethobench.neuro.reporting import generate_full_neuro_report
+from nethobench.utils.evaluation_constants import config as _bench_config
 
 
 def compute_neuro_scores(
@@ -47,6 +48,7 @@ def compute_neuro_scores(
         )
 
     cfg = config or {}
+    _bench_config.update_from_dict(cfg)
     seq_key = cfg.get("sequence_key", "sequenceId")
     time_key = cfg.get("time_key", "itemPosition")
     cols = neuro_cols if neuro_cols is not None else cfg.get("neuro_cols")
@@ -77,6 +79,7 @@ def run_neuro_full_analysis(
     outdir = timestamped_outdir(output_root, prefix=preds_path.stem)
 
     cfg = config or {}
+    _bench_config.update_from_dict(cfg)
     seq_key = cfg.get("sequence_key", "sequenceId")
     time_key = cfg.get("time_key", "itemPosition")
     cols = cfg.get("neuro_cols")

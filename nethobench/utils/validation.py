@@ -12,7 +12,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from nethobench.utils.evaluation_constants import MIN_SAMPLES_CORR_WINDOW
+from nethobench.utils.evaluation_constants import config
 
 
 class DataValidationError(ValueError):
@@ -307,10 +307,10 @@ def validate_multimodal_data(
     seq_lengths = df.groupby(seq_key).size()
     min_len = int(seq_lengths.min())
     max_len = int(seq_lengths.max())
-    if min_len < MIN_SAMPLES_CORR_WINDOW:
+    if min_len < config.MIN_SAMPLES_CORR_WINDOW:
         warnings.warn(
             f"Shortest sequence after alignment has length {min_len}. "
-            f"Cross-modal lead-lag metrics require at least {MIN_SAMPLES_CORR_WINDOW} time steps.",
+            f"Cross-modal lead-lag metrics require at least {config.MIN_SAMPLES_CORR_WINDOW} time steps.",
             UserWarning,
             stacklevel=3,
         )

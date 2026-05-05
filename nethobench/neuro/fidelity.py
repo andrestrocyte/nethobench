@@ -7,6 +7,7 @@ import numpy as np
 
 from nethobench.neuro.metrics.definitions import compute_fidelity_composite
 from nethobench.neuro.metrics.composites import compute_composite_scores
+from nethobench.utils.evaluation_constants import config as _bench_config
 
 
 def compute_fidelity_scores(
@@ -42,6 +43,7 @@ def compute_fidelity_scores(
         ``family_fidelity``, and ``FIDELITY_SCORE``.
     """
     cfg = config or {}
+    _bench_config.update_from_dict(cfg)
     seq_key = cfg.get("sequence_key", "sequenceId")
     time_key = cfg.get("time_key", "itemPosition")
     cols = neuro_cols if neuro_cols is not None else cfg.get("neuro_cols")

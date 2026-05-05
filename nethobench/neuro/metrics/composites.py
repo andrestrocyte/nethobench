@@ -31,14 +31,13 @@ from nethobench.utils.evaluation_constants import (
     MIN_SAMPLES_KL,
     MIN_SAMPLES_ERROR,
     MIN_SAMPLES_MI,
-    MAX_TIME_STEPS_SUBSAMPLE,
     QUANTILE_10P,
     TAIL_TRIM_QUANTILE_LO,
     TAIL_TRIM_QUANTILE_HI,
     QUANTILE_IQR_LO,
     QUANTILE_IQR_HI,
     MAD_TO_STD_CONSTANT,
-    MI_N_NEIGHBORS,
+    config,
 )
 
 
@@ -171,10 +170,12 @@ def compute_quantile_score_simple(
     tail_lo: float = QUANTILE_10P,
     tail_hi: float = 0.90,
     min_samples: int = MIN_SAMPLES_MI,
-    max_time: int = MAX_TIME_STEPS_SUBSAMPLE,
+    max_time: int | None = None,
     top_q_regions: float = QUANTILE_IQR_LO,
     rng_seed: int = 0,
 ) -> float:
+    if max_time is None:
+        max_time = config.MAX_TIME_STEPS_SUBSAMPLE
     n_seq, _, n_reg = gt_arr.shape
     rng = np.random.default_rng(rng_seed)
 
@@ -349,8 +350,8 @@ def compute_mi_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
                 continue
             x, y = x[m], y[m]
 
-            if x.size > MAX_TIME_STEPS_SUBSAMPLE:
-                idx = rng.choice(x.size, size=MAX_TIME_STEPS_SUBSAMPLE, replace=False)
+            if x.size > config.MAX_TIME_STEPS_SUBSAMPLE:
+                idx = rng.choice(x.size, size=config.MAX_TIME_STEPS_SUBSAMPLE, replace=False)
                 x, y = x[idx], y[idx]
 
             mx, sx = _robust_median_mad(x)
@@ -363,7 +364,7 @@ def compute_mi_score(gt_arr: np.ndarray, pred_arr: np.ndarray) -> float:
                 x.reshape(-1, 1),
                 y,
                 discrete_features=False,
-                n_neighbors=MI_N_NEIGHBORS,
+                n_neighbors=config.MI_N_NEIGHBORS,
                 random_state=0,
             )[0]
             if np.isfinite(mi_val):

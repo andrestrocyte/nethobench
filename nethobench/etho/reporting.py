@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from nethobench.utils.evaluation_constants import SPEED_OUTLIER_PERCENTILE
+from nethobench.utils.evaluation_constants import config
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ def plot_kinematics(paired_df: pd.DataFrame, outdir: Path) -> None:
             all_speeds = all_speeds[np.isfinite(all_speeds)]
             # Filter extreme outliers for visualization
             if len(all_speeds) > 0:
-                p99 = np.percentile(all_speeds, SPEED_OUTLIER_PERCENTILE)
+                p99 = np.percentile(all_speeds, config.SPEED_OUTLIER_PERCENTILE)
                 ax.hist(
                     all_speeds[all_speeds < p99],
                     bins=50,

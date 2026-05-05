@@ -27,6 +27,7 @@ from nethobench.etho.metrics import (
     manifold_alignment_metrics,
     get_chunked_embeddings,
 )
+from nethobench.utils.evaluation_constants import config
 
 
 def compute_etho_scores(
@@ -62,6 +63,9 @@ def compute_etho_scores(
         - **sequence_stds**: Weighted standard deviation of each metric across
           sequences.
     """
+    cfg = cfg or {}
+    config.update_from_dict(cfg)
+
     # Avoid redundant loading if already passed from run_etho_full_analysis
     if paired_df is None:
         if gt_dir is None or inf_dir is None:
@@ -69,7 +73,7 @@ def compute_etho_scores(
                 "Must provide either paired_df, or both gt_dir and inf_dir."
             )
         gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
-        paired_df = merge_aligned(gt_df, inf_df, cfg or {})
+        paired_df = merge_aligned(gt_df, inf_df, cfg)
 
     pos_res = position_kl_score(paired_df, cfg=cfg)
     stat_res = stationary_score(paired_df, cfg=cfg)
@@ -192,11 +196,14 @@ def run_etho_full_analysis(
         def generate_full_etho_report(*args, **kwargs):
             pass  # Failsafe if reporting module has not been fully implemented yet
 
+    cfg = cfg or {}
+    config.update_from_dict(cfg)
+
     outdir = timestamped_outdir(output_root, prefix="etho-analysis")
 
     # 1. Load Data
     gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
-    paired_df = merge_aligned(gt_df, inf_df, cfg or {})
+    paired_df = merge_aligned(gt_df, inf_df, cfg)
 
     # 2. Extract Additional Features for the Report
     coord_pairs = []

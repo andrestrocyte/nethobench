@@ -13,13 +13,7 @@ from nethobench.utils.helpers import (
     geometric_mean_scores,
 )
 from nethobench.utils.calculation import merge_aligned
-from nethobench.utils.evaluation_constants import (
-    MAX_POINTS_MANIFOLD_ALIGNMENT,
-    STATIONARY_THRESHOLD_PERCENTILE,
-    KMEANS_K_TRAJECTORY,
-    KMEANS_K_SYLLABLE,
-    CHUNK_SIZE_EMBEDDINGS,
-)
+from nethobench.utils.evaluation_constants import config
 
 
 
@@ -88,7 +82,7 @@ def stationary_score(
     if not all_speeds_gt:
         return np.nan, {}, {}
 
-    thresh = np.percentile(all_speeds_gt, STATIONARY_THRESHOLD_PERCENTILE)
+    thresh = np.percentile(all_speeds_gt, config.STATIONARY_THRESHOLD_PERCENTILE)
     seq_scores = {}
     seq_weights = {}
     gaps = []
@@ -388,8 +382,10 @@ def _cluster_and_score_kl(
 
 
 def trajectory_shape_score(
-    paired_df: pd.DataFrame, k: int = KMEANS_K_TRAJECTORY, cfg: Optional[dict] = None
+    paired_df: pd.DataFrame, k: int | None = None, cfg: Optional[dict] = None
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
+    if k is None:
+        k = config.KMEANS_K_TRAJECTORY
     if cfg is None:
         cfg = {}
     center_part = cfg.get("center_part", "CENTER")
@@ -445,8 +441,10 @@ def trajectory_shape_score(
 
 
 def syllable_score(
-    paired_df: pd.DataFrame, k: int = KMEANS_K_SYLLABLE, cfg: Optional[dict] = None
+    paired_df: pd.DataFrame, k: int | None = None, cfg: Optional[dict] = None
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
+    if k is None:
+        k = config.KMEANS_K_SYLLABLE
     if cfg is None:
         cfg = {}
     center_part = cfg.get("center_part", "CENTER")
@@ -653,13 +651,13 @@ def manifold_alignment_metrics(paired_df: pd.DataFrame, cfg: Optional[dict] = No
 
     # Subsample to prevent O(N^2) memory explosion in distance matrix
     rng = np.random.default_rng(42)
-    if len(gt_emb) > MAX_POINTS_MANIFOLD_ALIGNMENT:
-        gt_emb_sub = gt_emb[rng.choice(len(gt_emb), MAX_POINTS_MANIFOLD_ALIGNMENT, replace=False)]
+    if len(gt_emb) > config.MAX_POINTS_MANIFOLD_ALIGNMENT:
+        gt_emb_sub = gt_emb[rng.choice(len(gt_emb), config.MAX_POINTS_MANIFOLD_ALIGNMENT, replace=False)]
     else:
         gt_emb_sub = gt_emb
 
-    if len(inf_emb) > MAX_POINTS_MANIFOLD_ALIGNMENT:
-        inf_emb_sub = inf_emb[rng.choice(len(inf_emb), MAX_POINTS_MANIFOLD_ALIGNMENT, replace=False)]
+    if len(inf_emb) > config.MAX_POINTS_MANIFOLD_ALIGNMENT:
+        inf_emb_sub = inf_emb[rng.choice(len(inf_emb), config.MAX_POINTS_MANIFOLD_ALIGNMENT, replace=False)]
     else:
         inf_emb_sub = inf_emb
 
@@ -682,8 +680,10 @@ def manifold_alignment_metrics(paired_df: pd.DataFrame, cfg: Optional[dict] = No
 
 
 def get_chunked_embeddings(
-    paired_df: pd.DataFrame, chunk_size: int = CHUNK_SIZE_EMBEDDINGS, cfg: Optional[dict] = None
+    paired_df: pd.DataFrame, chunk_size: int | None = None, cfg: Optional[dict] = None
 ) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    if chunk_size is None:
+        chunk_size = config.CHUNK_SIZE_EMBEDDINGS
     """Generates 2D embeddings of short movement chunks for diagnostics."""
     try:
         import umap

@@ -31,6 +31,7 @@ from nethobench.cross.metrics import (
     lead_lag_peak,
     speed_from_behavior,
 )
+from nethobench.utils.evaluation_constants import config as _bench_config
 
 
 def compute_cross_scores(
@@ -58,6 +59,7 @@ def compute_cross_scores(
     # Read GT once for config inference if needed
     sample_df = pd.read_csv(ground_truth_csv)
     cfg = load_config(config, sample_df=sample_df)
+    _bench_config.update_from_dict(cfg)
     aligned = merge_aligned(ground_truth_csv, predictions_csv, cfg)
     validate_multimodal_data(aligned, cfg)
     neuro_cols = cfg.get("neuro_cols")
