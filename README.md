@@ -1,6 +1,6 @@
 # NethoBench
 
-NethoBench evaluates neural, behavioural and multimodal neural-behavioural generative models, such as autoregressive causal transformers, by measuring the realism or plausibility of generated traces. Each of the three modes is covered by its own command, and which is appropriate depends on the nature of the generated traces: synthetic neural traces should be evaluated using "neuro-scores", "fidelity-scores" and "neuro-analysis", synthetic behavioural traces should use "etho-scores" and "etho-analysis" and multimodal traces "cross-scores" and "cross-analysis".
+NethoBench evaluates neural, behavioural and multimodal neural-behavioural generative models by measuring the realism or plausibility of generated traces. Each of the three modes is covered by its own command, and which is appropriate depends on the nature of the generated traces: synthetic neural traces should be evaluated using `neuro-scores`, `fidelity-scores` and `neuro-analysis`, synthetic behavioural traces should use `etho-scores` and `etho-analysis` and multimodal traces `cross-scores` and `cross-analysis`.
 
 The project is licensed under the MIT license. 
 
@@ -57,11 +57,13 @@ nethobench cross-analysis --gt gt.csv --preds pred.csv --config config.json
 
 Configuration is optional if the data contains the columns "sequenceId" and "itemPosition", and specific rules apply for different CLIs:
 
-- neuro: any column that isn't "sequenceId" or "itemPosition" is considered a neuro column
-- etho: all body part coordinates end in "_X" and "_Y", "CENTER", "NOSE" and "TAIL_BASE" are part of the body part coordinate stems
-- cross: same as etho for coordinate variables, any columns that aren't "sequenceId" or "itemPosition" and don't end in "_X" or "_Y" are inferred to be neuro columns
+- neuro: any column that isn't `sequenceId` or `itemPosition` is considered a neuro column
+- etho: all body part coordinates end in `_X` and `_Y`, `CENTER`, `NOSE` and `TAIL_BASE` are part of the body part coordinate stems
+- cross: same as etho for coordinate variables, any columns that aren't `sequenceId` or `itemPosition` and don't end in `_X` or `_Y` are inferred to be neuro columns
 
-The configuration options are broadly divided into two categories: **Data Schema Mappings** (which tell NethoBench how to read your multimodal datasets) and **Data-Dependent Hyperparameters** (which adjust evaluation bounds based on your dataset's frame rate, length, or available compute).
+The configuration options are broadly divided into two categories:
+- **Data Schema Mappings** (which tell NethoBench how to read your multimodal datasets)
+- **Data-Dependent Hyperparameters** (which adjust evaluation bounds based on your dataset's frame rate, length, or available compute).
 
 ### 1. Data Schema Mappings
 These options map your dataset's columns to the semantic features NethoBench expects. If omitted, NethoBench will attempt to auto-infer them from the dataset headers.
@@ -201,4 +203,3 @@ Evaluates how well the generated data captures the latent coupling between neura
 
 ## License
 MIT License. See `LICENSE`.
-```
