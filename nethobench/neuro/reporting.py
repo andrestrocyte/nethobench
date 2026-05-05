@@ -151,7 +151,7 @@ def plot_umap_embeddings(
     falling back to PCA if umap-learn is not installed in the environment.
     """
     try:
-        from umap import UMAP
+        from umap.umap_ import UMAP
 
         reducer = UMAP(n_components=2, random_state=42)
         method_name = "UMAP"

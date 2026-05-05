@@ -7,7 +7,7 @@ name = "nethobench"
 version = "0.1.0"
 description = "Unified benchmark for neural, behavioral, and cross-modal (neural↔behavior) plausibility."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {file = "LICENSE"}
 authors = [{name = "NethoBench contributors"}]
 dependencies = [

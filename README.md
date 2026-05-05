@@ -28,7 +28,38 @@ pip install -e .
 - **Behavior:** Keypoint columns with `_X`/`_Y` suffixes (e.g., `CENTER_X`).
 - **Multimodal:** Provide a single merged CSV or a config JSON identifying column types.
 
+
+## CLI Usage
+All commands output JSON scores; `-analysis` commands also generate figures.
+
+**Neural**
+```bash
+nethobench neuro-scores --gt gt.csv --preds pred.csv --config config.json
+nethobench fidelity-scores --gt gt.csv --preds pred.csv --config config.json
+nethobench neuro-analysis --gt gt.csv --preds pred.csv --config config.json
+```
+
+**Behavioral**
+```bash
+nethobench etho-scores --gt-dir gt/ --inf-dir inf/ --config config.json
+nethobench etho-analysis --gt-dir gt/ --inf-dir inf/ --config config.json
+```
+
+**Multimodal**
+```bash
+nethobench cross-scores --gt gt.csv --preds pred.csv --config config.json
+nethobench cross-analysis --gt gt.csv --preds pred.csv --config config.json
+```
+
+
+
 ### Config Schema (`config.json`)
+
+Configuration is optional if the data contains the columns "sequenceId" and "itemPosition", and specific rules apply for different CLIs:
+
+- neuro: any column that isn't "sequenceId" or "itemPosition" is considered a neuro column
+- etho: all body part coordinates end in "_X" and "_Y", "CENTER", "NOSE" and "TAIL_BASE" are part of the body part coordinate stems
+- cross: same as etho for coordinate variables, any columns that aren't "sequenceId" or "itemPosition" and don't end in "_X" or "_Y" are inferred to be neuro columns
 
 The configuration options are broadly divided into two categories: **Data Schema Mappings** (which tell NethoBench how to read your multimodal datasets) and **Data-Dependent Hyperparameters** (which adjust evaluation bounds based on your dataset's frame rate, length, or available compute).
 
@@ -89,29 +120,6 @@ These values fine-tune the statistical bounds and metrics algorithms. They are t
 }
 ```
 
-## CLI Usage
-All commands output JSON scores; `-analysis` commands also generate figures.
-
-**Neural**
-```bash
-nethobench neuro-scores --gt gt.csv --preds pred.csv
-nethobench fidelity-scores --gt gt.csv --preds pred.csv
-nethobench neuro-analysis --gt gt.csv --preds pred.csv
-```
-
-**Behavioral**
-```bash
-nethobench etho-scores --gt-dir gt/ --inf-dir inf/
-nethobench etho-analysis --gt-dir gt/ --inf-dir inf/
-```
-
-**Multimodal**
-```bash
-nethobench cross-scores --gt gt.csv --preds pred.csv --config config.json
-nethobench cross-analysis --gt gt.csv --preds pred.csv --config config.json
-```
-
-```
 
 ## Metric Composites
 
