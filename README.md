@@ -23,7 +23,7 @@ pip install -e .
 ```
 
 ## Data Format
-- - Must include alignment columns for sequence ID and time step (defaults to sequenceId and itemPosition, but can be overridden in config.json).
+- Must include alignment columns for sequence ID and time step (defaults to sequenceId and itemPosition, but can be overridden in config.json).
 - **Neural:** One column per region.
 - **Behavior:** Keypoint columns with `_X`/`_Y` suffixes (e.g., `CENTER_X`).
 - **Multimodal:** Provide a single merged CSV or a config JSON identifying column types.
