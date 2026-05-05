@@ -12,15 +12,18 @@ license = {file = "LICENSE"}
 authors = [{name = "NethoBench contributors"}]
 dependencies = [
     "matplotlib>=3.5",
-    "networkx>=3.0",
     "numpy>=1.23",
     "pandas>=1.5",
     "scikit-learn>=1.2",
     "scipy>=1.9",
     "umap-learn>=0.5",
-    "nbformat>=5.9",
     "pyarrow>=10.0",
     "ripser>=0.6.12",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
 ]
 
 [project.scripts]
@@ -29,6 +32,3 @@ nethobench = "nethobench.cli:main"
 [tool.setuptools]
 packages = {find = {}}
 include-package-data = true
-
-[tool.setuptools.package-data]
-"nethobench" = ["notebooks/*.ipynb"]
