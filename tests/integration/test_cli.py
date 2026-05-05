@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -50,6 +51,8 @@ _CUSTOM_CROSS_GT = _TEST_DATA / "cross_custom" / "gt-custom.csv"
 _CUSTOM_CROSS_PREDS = _TEST_DATA / "cross_custom" / "preds-custom.csv"
 _CUSTOM_CROSS_CONFIG = _TEST_DATA / "cross_custom" / "custom_config.json"
 
+_NETHOBENCH_CMD = [sys.executable, "-m", "nethobench.cli.main"]
+
 
 def _run(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
     """Run a CLI command and return the completed process."""
@@ -60,7 +63,7 @@ def _run(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess
 def test_cli_neuro_scores(gt: Path, preds: Path, tmp_path: Path):
     json_out = tmp_path / "neuro-scores.json"
     cmd = [
-        "nethobench",
+        *_NETHOBENCH_CMD,
         "neuro-scores",
         "--gt",
         str(gt),
@@ -81,7 +84,7 @@ def test_cli_neuro_scores(gt: Path, preds: Path, tmp_path: Path):
 def test_cli_fidelity_scores(gt: Path, preds: Path, tmp_path: Path):
     json_out = tmp_path / "fidelity-scores.json"
     cmd = [
-        "nethobench",
+        *_NETHOBENCH_CMD,
         "fidelity-scores",
         "--gt",
         str(gt),
@@ -101,7 +104,7 @@ def test_cli_fidelity_scores(gt: Path, preds: Path, tmp_path: Path):
 def test_cli_neuro_analysis(gt: Path, preds: Path, tmp_path: Path):
     output_root = tmp_path / "neuro-analysis"
     cmd = [
-        "nethobench",
+        *_NETHOBENCH_CMD,
         "neuro-analysis",
         "--gt",
         str(gt),
@@ -125,7 +128,7 @@ def test_cli_neuro_analysis(gt: Path, preds: Path, tmp_path: Path):
 def test_cli_etho_scores(gt: Path, preds: Path, tmp_path: Path):
     json_out = tmp_path / "etho-scores"
     cmd = [
-        "nethobench",
+        *_NETHOBENCH_CMD,
         "etho-scores",
         "--gt-dir",
         str(gt),
@@ -149,7 +152,7 @@ def test_cli_etho_scores(gt: Path, preds: Path, tmp_path: Path):
 def test_cli_cross_scores(gt: Path, preds: Path, tmp_path: Path):
     json_out = tmp_path / "cross-scores"
     cmd = [
-        "nethobench",
+        *_NETHOBENCH_CMD,
         "cross-scores",
         "--gt",
         str(gt),
@@ -173,7 +176,7 @@ def test_cli_cross_scores(gt: Path, preds: Path, tmp_path: Path):
 def test_cli_etho_analysis(gt: Path, preds: Path, tmp_path: Path):
     output_root = tmp_path / "etho-analysis"
     cmd = [
-        "nethobench",
+        *_NETHOBENCH_CMD,
         "etho-analysis",
         "--gt-dir",
         str(gt),
@@ -201,7 +204,7 @@ def test_cli_etho_analysis(gt: Path, preds: Path, tmp_path: Path):
 def test_cli_cross_analysis(gt: Path, preds: Path, tmp_path: Path):
     output_root = tmp_path / "cross-analysis"
     cmd = [
-        "nethobench",
+        *_NETHOBENCH_CMD,
         "cross-analysis",
         "--gt",
         str(gt),
@@ -236,7 +239,7 @@ def test_cli_explicit_config_happy_path(command: str, tmp_path: Path):
     """A valid --config should allow the CLI to parse non-standard CSVs."""
     json_out = tmp_path / "scores.json"
     cmd = [
-        "nethobench",
+        *_NETHOBENCH_CMD,
         command,
         "--gt",
         str(_CUSTOM_NEURO_GT),
@@ -260,7 +263,7 @@ def test_cli_without_config_fails_on_custom_schema(command: str, tmp_path: Path)
     """Omitting --config on custom-schema CSVs should yield a schema validation error."""
     json_out = tmp_path / "scores.json"
     cmd = [
-        "nethobench",
+        *_NETHOBENCH_CMD,
         command,
         "--gt",
         str(_CUSTOM_NEURO_GT),
@@ -315,7 +318,7 @@ def test_cli_missing_config_file(
     """A non-existent --config should fail fast with FileNotFoundError."""
     json_out = tmp_path / "scores.json"
     cmd = [
-        "nethobench",
+        *_NETHOBENCH_CMD,
         command,
         gt_flag,
         gt_arg,
@@ -380,7 +383,7 @@ def test_cli_malformed_config_file(
     malformed.write_text(malformed_content)
     json_out = tmp_path / "scores.json"
     cmd = [
-        "nethobench",
+        *_NETHOBENCH_CMD,
         command,
         gt_flag,
         gt_arg,
@@ -411,7 +414,7 @@ def test_cli_auto_discovery_single_json(tmp_path: Path):
 
     json_out = tmp_path / "scores.json"
     cmd = [
-        "nethobench",
+        *_NETHOBENCH_CMD,
         "neuro-scores",
         "--gt",
         str(tmp_path / "gt.csv"),
@@ -439,7 +442,7 @@ def test_cli_auto_discovery_ambiguous_json(tmp_path: Path):
 
     json_out = tmp_path / "scores.json"
     cmd = [
-        "nethobench",
+        *_NETHOBENCH_CMD,
         "neuro-scores",
         "--gt",
         str(tmp_path / "gt.csv"),
@@ -448,7 +451,6 @@ def test_cli_auto_discovery_ambiguous_json(tmp_path: Path):
         "--json-out",
         str(json_out),
     ]
-    # Close stdin by piping from /dev/null equivalent (subprocess with no input)
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=tmp_path)
+    result = _run(cmd, cwd=tmp_path)
     assert result.returncode != 0
     assert "EOFError" in result.stderr
