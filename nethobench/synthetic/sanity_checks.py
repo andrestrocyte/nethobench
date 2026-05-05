@@ -127,7 +127,7 @@ def _score_pair(
 
             with contextlib.redirect_stdout(_out), contextlib.redirect_stderr(_err):
                 scores = compute_neuro_scores(
-                    pred_csv, gt_csv, ddconfig_path=ddconfig
+                    pred_csv, gt_csv
                 )
             buf.write(_out.getvalue())
             buf.write(_err.getvalue())

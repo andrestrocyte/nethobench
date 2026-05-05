@@ -426,6 +426,8 @@ def compute_composite_scores(
     per_sequence_stats: bool = False,
     neuro_cols: Optional[list[str]] = None,
     ddconfig_path: Optional[Path] = None,  # Parameter kept for signature compatibility
+    seq_key: str = "sequenceId",
+    time_key: str = "itemPosition",
 ) -> Dict[str, float]:
 
     if per_sequence_stats:
@@ -437,6 +439,8 @@ def compute_composite_scores(
         Path(predictions_csv),
         Path(ground_truth_csv),
         neuro_cols=neuro_cols,
+        seq_key=seq_key,
+        time_key=time_key,
     )
 
     return load_and_run_neuro_full_analysis(gt, pred)

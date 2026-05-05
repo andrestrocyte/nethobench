@@ -34,6 +34,7 @@ def compute_etho_scores(
     inf_dir: Optional[Path] = None,
     *,
     paired_df: Optional[pd.DataFrame] = None,
+    cfg: Optional[dict] = None,
 ) -> Tuple[
     Dict[str, float], Dict[str, List[float]], Dict[str, float], Dict[str, float]
 ]:
@@ -48,6 +49,8 @@ def compute_etho_scores(
             ``paired_df`` is not provided.
         paired_df: Optional pre-merged DataFrame of ground-truth and prediction
             data. If supplied, ``gt_dir`` and ``inf_dir`` are ignored.
+        cfg: Optional configuration dictionary with keys such as
+            ``sequence_key``, ``time_key``, ``center_part``, and ``body_axis``.
 
     Returns:
         A 4-tuple of:
@@ -66,22 +69,22 @@ def compute_etho_scores(
                 "Must provide either paired_df, or both gt_dir and inf_dir."
             )
         gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
-        paired_df = merge_aligned(gt_df, inf_df, {})
+        paired_df = merge_aligned(gt_df, inf_df, cfg or {})
 
-    pos_res = position_kl_score(paired_df)
-    stat_res = stationary_score(paired_df)
-    vel_res = velocity_distribution_score(paired_df)
-    acc_res = acceleration_distribution_score(paired_df)
-    dir_res = direction_score(paired_df)
-    quad_res = quadrant_score(paired_df)
-    syll_res = syllable_score(paired_df)
-    traj_res = trajectory_shape_score(paired_df)
+    pos_res = position_kl_score(paired_df, cfg=cfg)
+    stat_res = stationary_score(paired_df, cfg=cfg)
+    vel_res = velocity_distribution_score(paired_df, cfg=cfg)
+    acc_res = acceleration_distribution_score(paired_df, cfg=cfg)
+    dir_res = direction_score(paired_df, cfg=cfg)
+    quad_res = quadrant_score(paired_df, cfg=cfg)
+    syll_res = syllable_score(paired_df, cfg=cfg)
+    traj_res = trajectory_shape_score(paired_df, cfg=cfg)
 
     # Calculate memory-optimized DTW similarity
-    dtw_score, dtw_seq_scores = dtw_trajectory_similarity(paired_df)
+    dtw_score, dtw_seq_scores = dtw_trajectory_similarity(paired_df, cfg=cfg)
 
     # Calculate memory-optimized Manifold similarities
-    manifold_res = manifold_alignment_metrics(paired_df)
+    manifold_res = manifold_alignment_metrics(paired_df, cfg=cfg)
 
     scores = {
         "position_kl_score": float(pos_res[0]) if np.isfinite(pos_res[0]) else np.nan,
@@ -174,7 +177,7 @@ def compute_etho_scores(
 
 
 def run_etho_full_analysis(
-    gt_dir: Path, inf_dir: Path, *, output_root: Path | None = None
+    gt_dir: Path, inf_dir: Path, *, output_root: Path | None = None, cfg: Optional[dict] = None
 ) -> Path:
     """
     Executes the full behavioral analysis pipeline headlessly, saves metrics,
@@ -193,7 +196,7 @@ def run_etho_full_analysis(
 
     # 1. Load Data
     gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
-    paired_df = merge_aligned(gt_df, inf_df, {})
+    paired_df = merge_aligned(gt_df, inf_df, cfg or {})
 
     # 2. Extract Additional Features for the Report
     coord_pairs = []
@@ -204,16 +207,20 @@ def run_etho_full_analysis(
                 coord_pairs.append((base, col, f"{base}_Y"))
 
     errors_df = body_part_errors(paired_df, coord_pairs)
+
+    center_part = (cfg.get("center_part", "CENTER") if cfg else "CENTER")
+    axis = cfg.get("body_axis", ["NOSE", "TAIL_BASE"]) if cfg else ["NOSE", "TAIL_BASE"]
+    nose_part, tail_part = axis if len(axis) == 2 else ("NOSE", "TAIL_BASE")
     pairs_to_check = [
-        ("NOSE", "TAIL_BASE"),
+        (nose_part, tail_part),
         ("LEFT_EAR", "RIGHT_EAR"),
-        ("NOSE", "CENTER"),
+        (nose_part, center_part),
     ]
     distances_df = inter_limb_distances(paired_df, pairs_to_check)
-    chunk_data = get_chunked_embeddings(paired_df, chunk_size=5)
+    chunk_data = get_chunked_embeddings(paired_df, chunk_size=5, cfg=cfg)
 
     # 3. Compute Structural Scores (Pass paired_df to avoid double-loading!)
-    scores, seq_scores, seq_means, seq_stds = compute_etho_scores(paired_df=paired_df)
+    scores, seq_scores, seq_means, seq_stds = compute_etho_scores(paired_df=paired_df, cfg=cfg)
 
     # 4. Save JSON
     payload = {

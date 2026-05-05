@@ -30,13 +30,18 @@ def _calc_sym_kl(p: np.ndarray, q: np.ndarray) -> float:
     return 0.5 * (np.sum(p * np.log(p / q)) + np.sum(q * np.log(q / p)))
 
 
-def _build_features(df: pd.DataFrame, label: str, *, fallback_empty: bool = False) -> np.ndarray:
+def _build_features(df: pd.DataFrame, label: str, *, fallback_empty: bool = False, cfg: Optional[dict] = None) -> np.ndarray:
+    if cfg is None:
+        cfg = {}
+    center_part = cfg.get("center_part", "CENTER")
+    axis = cfg.get("body_axis", ["NOSE", "TAIL_BASE"])
+    nose_part, tail_part = axis if len(axis) == 2 else ("NOSE", "TAIL_BASE")
     try:
-        center = df[[f"CENTER_X_{label}", f"CENTER_Y_{label}"]].to_numpy()
+        center = df[[f"{center_part}_X_{label}", f"{center_part}_Y_{label}"]].to_numpy()
         vel = np.diff(center, axis=0)
         vel_pad = np.vstack([vel[:1], vel]) if len(vel) else np.zeros_like(center)
-        nose = df[[f"NOSE_X_{label}", f"NOSE_Y_{label}"]].to_numpy()
-        tail = df[[f"TAIL_BASE_X_{label}", f"TAIL_BASE_Y_{label}"]].to_numpy()
+        nose = df[[f"{nose_part}_X_{label}", f"{nose_part}_Y_{label}"]].to_numpy()
+        tail = df[[f"{tail_part}_X_{label}", f"{tail_part}_Y_{label}"]].to_numpy()
         axis_vec = nose - tail
         ears = df[
             [
@@ -59,14 +64,19 @@ def _build_features(df: pd.DataFrame, label: str, *, fallback_empty: bool = Fals
 
 def stationary_score(
     paired_df: pd.DataFrame,
+    cfg: Optional[dict] = None,
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
+    if cfg is None:
+        cfg = {}
+    center_part = cfg.get("center_part", "CENTER")
+
     if paired_df.empty:
         return np.nan, {}, {}
 
     all_speeds_gt = []
     seq_speeds = {"gt": {}, "inf": {}}
     for label in ["gt", "inf"]:
-        x_col, y_col = f"CENTER_X_{label}", f"CENTER_Y_{label}"
+        x_col, y_col = f"{center_part}_X_{label}", f"{center_part}_Y_{label}"
         for seq, seq_df in paired_df.sort_values("itemPosition").groupby("sequenceId"):
             coords = seq_df[[x_col, y_col]].to_numpy()
             vel = np.diff(coords, axis=0)
@@ -103,8 +113,12 @@ def stationary_score(
 
 
 def _kinematic_distribution_score(
-    paired_df: pd.DataFrame, derivative_order: int
+    paired_df: pd.DataFrame, derivative_order: int, cfg: Optional[dict] = None
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
+    if cfg is None:
+        cfg = {}
+    center_part = cfg.get("center_part", "CENTER")
+
     if paired_df.empty:
         return np.nan, {}, {}
 
@@ -112,7 +126,7 @@ def _kinematic_distribution_score(
     all_vals = []
 
     for label in ("gt", "inf"):
-        x_col, y_col = f"CENTER_X_{label}", f"CENTER_Y_{label}"
+        x_col, y_col = f"{center_part}_X_{label}", f"{center_part}_Y_{label}"
         for seq, seq_df in paired_df.sort_values("itemPosition").groupby("sequenceId"):
             coords = seq_df[[x_col, y_col]].to_numpy()
             deriv = coords
@@ -162,19 +176,30 @@ def _kinematic_distribution_score(
 
 def velocity_distribution_score(
     paired_df: pd.DataFrame,
+    cfg: Optional[dict] = None,
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
-    return _kinematic_distribution_score(paired_df, derivative_order=1)
+    return _kinematic_distribution_score(paired_df, derivative_order=1, cfg=cfg)
 
 
 def acceleration_distribution_score(
     paired_df: pd.DataFrame,
+    cfg: Optional[dict] = None,
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
-    return _kinematic_distribution_score(paired_df, derivative_order=2)
+    return _kinematic_distribution_score(paired_df, derivative_order=2, cfg=cfg)
 
 
 def direction_score(
-    paired_df: pd.DataFrame, nose_label: str = "NOSE", tail_label: str = "TAIL_BASE"
+    paired_df: pd.DataFrame,
+    nose_label: str = "NOSE",
+    tail_label: str = "TAIL_BASE",
+    *,
+    cfg: Optional[dict] = None,
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
+    if cfg is not None:
+        axis = cfg.get("body_axis", [nose_label, tail_label])
+        if len(axis) == 2:
+            nose_label, tail_label = axis
+
     if paired_df.empty:
         return np.nan, {}, {}
 
@@ -186,7 +211,8 @@ def direction_score(
     for seq, seq_df in grouped:
         cos_vals = {}
         for label in ("gt", "inf"):
-            coords = seq_df[[f"CENTER_X_{label}", f"CENTER_Y_{label}"]].to_numpy()
+            center_part = (cfg.get("center_part", "CENTER") if cfg else "CENTER")
+            coords = seq_df[[f"{center_part}_X_{label}", f"{center_part}_Y_{label}"]].to_numpy()
             vel = np.diff(coords, axis=0)
             if len(vel) == 0:
                 continue
@@ -222,20 +248,25 @@ def direction_score(
 
 def quadrant_score(
     paired_df: pd.DataFrame,
+    cfg: Optional[dict] = None,
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
+    if cfg is None:
+        cfg = {}
+    center_part = cfg.get("center_part", "CENTER")
+
     if paired_df.empty:
         return np.nan, {}, {}
 
     centers = paired_df[
-        ["CENTER_X_gt", "CENTER_Y_gt", "CENTER_X_inf", "CENTER_Y_inf", "sequenceId"]
+        [f"{center_part}_X_gt", f"{center_part}_Y_gt", f"{center_part}_X_inf", f"{center_part}_Y_inf", "sequenceId"]
     ].dropna()
     if centers.empty:
         return np.nan, {}, {}
 
-    min_x = centers[["CENTER_X_gt", "CENTER_X_inf"]].min().min()
-    max_x = centers[["CENTER_X_gt", "CENTER_X_inf"]].max().max()
-    min_y = centers[["CENTER_Y_gt", "CENTER_Y_inf"]].min().min()
-    max_y = centers[["CENTER_Y_gt", "CENTER_Y_inf"]].max().max()
+    min_x = centers[[f"{center_part}_X_gt", f"{center_part}_X_inf"]].min().min()
+    max_x = centers[[f"{center_part}_X_gt", f"{center_part}_X_inf"]].max().max()
+    min_y = centers[[f"{center_part}_Y_gt", f"{center_part}_Y_inf"]].min().min()
+    max_y = centers[[f"{center_part}_Y_gt", f"{center_part}_Y_inf"]].max().max()
     mid_x = 0.5 * (min_x + max_x)
     mid_y = 0.5 * (min_y + max_y)
 
@@ -247,8 +278,8 @@ def quadrant_score(
         counts = np.bincount(idx, minlength=4).astype(float)
         return counts
 
-    p_glob = get_quad_counts(centers, "CENTER_X_gt", "CENTER_Y_gt")
-    q_glob = get_quad_counts(centers, "CENTER_X_inf", "CENTER_Y_inf")
+    p_glob = get_quad_counts(centers, f"{center_part}_X_gt", f"{center_part}_Y_gt")
+    q_glob = get_quad_counts(centers, f"{center_part}_X_inf", f"{center_part}_Y_inf")
 
     if p_glob.sum() == 0 or q_glob.sum() == 0:
         return np.nan, {}, {}
@@ -259,8 +290,8 @@ def quadrant_score(
     seq_scores = {}
     seq_weights = {}
     for seq, seq_df in centers.groupby("sequenceId"):
-        p_seq = get_quad_counts(seq_df, "CENTER_X_gt", "CENTER_Y_gt")
-        q_seq = get_quad_counts(seq_df, "CENTER_X_inf", "CENTER_Y_inf")
+        p_seq = get_quad_counts(seq_df, f"{center_part}_X_gt", f"{center_part}_Y_gt")
+        q_seq = get_quad_counts(seq_df, f"{center_part}_X_inf", f"{center_part}_Y_inf")
         if p_seq.sum() > 0 and q_seq.sum() > 0:
             kl = _calc_sym_kl(p_seq / p_seq.sum(), q_seq / q_seq.sum())
             seq_scores[str(seq)] = 1.0 / (1.0 + kl)
@@ -271,20 +302,25 @@ def quadrant_score(
 
 def position_kl_score(
     paired_df: pd.DataFrame,
+    cfg: Optional[dict] = None,
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
+    if cfg is None:
+        cfg = {}
+    center_part = cfg.get("center_part", "CENTER")
+
     if paired_df.empty:
         return np.nan, {}, {}
 
     centers = paired_df[
-        ["CENTER_X_gt", "CENTER_Y_gt", "CENTER_X_inf", "CENTER_Y_inf", "sequenceId"]
+        [f"{center_part}_X_gt", f"{center_part}_Y_gt", f"{center_part}_X_inf", f"{center_part}_Y_inf", "sequenceId"]
     ].dropna()
     if centers.empty:
         return np.nan, {}, {}
 
     combined = np.vstack(
         [
-            centers[["CENTER_X_gt", "CENTER_Y_gt"]].to_numpy(),
-            centers[["CENTER_X_inf", "CENTER_Y_inf"]].to_numpy(),
+            centers[[f"{center_part}_X_gt", f"{center_part}_Y_gt"]].to_numpy(),
+            centers[[f"{center_part}_X_inf", f"{center_part}_Y_inf"]].to_numpy(),
         ]
     )
     x_min, x_max = combined[:, 0].min(), combined[:, 0].max()
@@ -307,16 +343,16 @@ def position_kl_score(
         )
         return H.flatten()
 
-    Pg = get_hist(centers, "CENTER_X_gt", "CENTER_Y_gt")
-    Pi = get_hist(centers, "CENTER_X_inf", "CENTER_Y_inf")
+    Pg = get_hist(centers, f"{center_part}_X_gt", f"{center_part}_Y_gt")
+    Pi = get_hist(centers, f"{center_part}_X_inf", f"{center_part}_Y_inf")
     global_kl = _calc_sym_kl(Pg, Pi)
     global_score = 1.0 / (1.0 + global_kl)
 
     seq_scores = {}
     seq_weights = {}
     for seq, seq_df in centers.groupby("sequenceId"):
-        p_seq = get_hist(seq_df, "CENTER_X_gt", "CENTER_Y_gt")
-        q_seq = get_hist(seq_df, "CENTER_X_inf", "CENTER_Y_inf")
+        p_seq = get_hist(seq_df, f"{center_part}_X_gt", f"{center_part}_Y_gt")
+        q_seq = get_hist(seq_df, f"{center_part}_X_inf", f"{center_part}_Y_inf")
         kl = _calc_sym_kl(p_seq, q_seq)
         seq_scores[str(seq)] = 1.0 / (1.0 + kl)
         seq_weights[str(seq)] = len(seq_df)
@@ -352,8 +388,12 @@ def _cluster_and_score_kl(
 
 
 def trajectory_shape_score(
-    paired_df: pd.DataFrame, k: int = KMEANS_K_TRAJECTORY
+    paired_df: pd.DataFrame, k: int = KMEANS_K_TRAJECTORY, cfg: Optional[dict] = None
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
+    if cfg is None:
+        cfg = {}
+    center_part = cfg.get("center_part", "CENTER")
+
     if paired_df.empty:
         return np.nan, {}, {}
 
@@ -362,7 +402,7 @@ def trajectory_shape_score(
     for seq, seq_df in paired_df.sort_values("itemPosition").groupby("sequenceId"):
         seq_feats = {}
         for label in ("gt", "inf"):
-            pts = seq_df[[f"CENTER_X_{label}", f"CENTER_Y_{label}"]].to_numpy()
+            pts = seq_df[[f"{center_part}_X_{label}", f"{center_part}_Y_{label}"]].to_numpy()
             if len(pts) < 3:
                 continue
             if label == "gt":
@@ -405,8 +445,12 @@ def trajectory_shape_score(
 
 
 def syllable_score(
-    paired_df: pd.DataFrame, k: int = KMEANS_K_SYLLABLE
+    paired_df: pd.DataFrame, k: int = KMEANS_K_SYLLABLE, cfg: Optional[dict] = None
 ) -> Tuple[float, Dict[str, float], Dict[str, int]]:
+    if cfg is None:
+        cfg = {}
+    center_part = cfg.get("center_part", "CENTER")
+
     if paired_df.empty:
         return np.nan, {}, {}
 
@@ -415,7 +459,7 @@ def syllable_score(
     seq_map = []
 
     def build_feats(df, label):
-        coords = df[[f"CENTER_X_{label}", f"CENTER_Y_{label}"]].to_numpy()
+        coords = df[[f"{center_part}_X_{label}", f"{center_part}_Y_{label}"]].to_numpy()
         vel = np.diff(coords, axis=0)
         acc = np.diff(vel, axis=0)
         speed = np.linalg.norm(vel, axis=1)
@@ -526,9 +570,14 @@ def inter_limb_distances(
 
 def dtw_trajectory_similarity(
     paired_df: pd.DataFrame,
+    cfg: Optional[dict] = None,
 ) -> Tuple[float, Dict[str, float]]:
     """Calculates Dynamic Time Warping (DTW) distance on CENTER tracking in O(M) memory."""
-    if paired_df.empty or "CENTER_X_gt" not in paired_df.columns:
+    if cfg is None:
+        cfg = {}
+    center_part = cfg.get("center_part", "CENTER")
+
+    if paired_df.empty or f"{center_part}_X_gt" not in paired_df.columns:
         return np.nan, {}
 
     def dtw_dist(seq_a, seq_b, window):
@@ -555,8 +604,8 @@ def dtw_trajectory_similarity(
 
     seq_scores = {}
     for seq, seq_df in paired_df.sort_values("itemPosition").groupby("sequenceId"):
-        gt_seq = seq_df[["CENTER_X_gt", "CENTER_Y_gt"]].dropna().to_numpy()
-        inf_seq = seq_df[["CENTER_X_inf", "CENTER_Y_inf"]].dropna().to_numpy()
+        gt_seq = seq_df[[f"{center_part}_X_gt", f"{center_part}_Y_gt"]].dropna().to_numpy()
+        inf_seq = seq_df[[f"{center_part}_X_inf", f"{center_part}_Y_inf"]].dropna().to_numpy()
         if not len(gt_seq) or not len(inf_seq):
             continue
         w = max(
@@ -569,7 +618,7 @@ def dtw_trajectory_similarity(
     return float(np.mean(vals)) if vals else np.nan, seq_scores
 
 
-def manifold_alignment_metrics(paired_df: pd.DataFrame) -> Dict[str, float]:
+def manifold_alignment_metrics(paired_df: pd.DataFrame, cfg: Optional[dict] = None) -> Dict[str, float]:
     """Calculates Procrustes and MMD metrics for movement manifolds (memory-safe)."""
     try:
         from sklearn.decomposition import PCA
@@ -580,8 +629,8 @@ def manifold_alignment_metrics(paired_df: pd.DataFrame) -> Dict[str, float]:
 
     gt_feats_all, inf_feats_all = [], []
     for seq, seq_df in paired_df.sort_values("itemPosition").groupby("sequenceId"):
-        gt_f = _build_features(seq_df, "gt")
-        inf_f = _build_features(seq_df, "inf")
+        gt_f = _build_features(seq_df, "gt", cfg=cfg)
+        inf_f = _build_features(seq_df, "inf", cfg=cfg)
         mask = ~np.isnan(gt_f).any(axis=1) & ~np.isnan(inf_f).any(axis=1)
         if mask.any():
             gt_feats_all.append(gt_f[mask])
@@ -633,7 +682,7 @@ def manifold_alignment_metrics(paired_df: pd.DataFrame) -> Dict[str, float]:
 
 
 def get_chunked_embeddings(
-    paired_df: pd.DataFrame, chunk_size: int = CHUNK_SIZE_EMBEDDINGS
+    paired_df: pd.DataFrame, chunk_size: int = CHUNK_SIZE_EMBEDDINGS, cfg: Optional[dict] = None
 ) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """Generates 2D embeddings of short movement chunks for diagnostics."""
     try:
@@ -647,8 +696,8 @@ def get_chunked_embeddings(
 
     chunks, labels, seq_ids = [], [], []
     for seq, seq_df in paired_df.sort_values("itemPosition").groupby("sequenceId"):
-        gt_feats = _build_features(seq_df, "gt", fallback_empty=True)
-        inf_feats = _build_features(seq_df, "inf", fallback_empty=True)
+        gt_feats = _build_features(seq_df, "gt", fallback_empty=True, cfg=cfg)
+        inf_feats = _build_features(seq_df, "inf", fallback_empty=True, cfg=cfg)
         if len(gt_feats) < chunk_size or len(inf_feats) < chunk_size:
             continue
         mask_gt = ~np.isnan(gt_feats).any(axis=1)

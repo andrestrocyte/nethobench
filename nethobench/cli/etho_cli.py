@@ -9,14 +9,16 @@ from pathlib import Path
 import numpy as np
 
 from nethobench.etho.pipeline import compute_etho_scores, run_etho_full_analysis
-from nethobench.cli.utils import prompt_for_file, quiet_call, print_scores
+from nethobench.cli.utils import prompt_for_file, prompt_for_config, load_cli_config, quiet_call, print_scores
 
 logger = logging.getLogger(__name__)
 
 
 def _run_etho(args: argparse.Namespace) -> None:
+    cfg_path = prompt_for_config(args.config)
+    cfg = load_cli_config(cfg_path)
     scores, seq_scores, seq_means, seq_stds = quiet_call(
-        compute_etho_scores, Path(args.gt_dir), Path(args.inf_dir)
+        compute_etho_scores, Path(args.gt_dir), Path(args.inf_dir), cfg=cfg
     )
     print_scores("Behavior scores", scores)
     if args.json_out:
@@ -42,11 +44,14 @@ def _run_etho(args: argparse.Namespace) -> None:
 
 
 def _run_etho_full(args: argparse.Namespace) -> None:
+    cfg_path = prompt_for_config(args.config)
+    cfg = load_cli_config(cfg_path)
     outdir = quiet_call(
         run_etho_full_analysis,
         Path(args.gt_dir),
         Path(args.inf_dir),
         output_root=args.output_root,
+        cfg=cfg,
     )
     logger.info(f"Behavioral full analysis executed natively. Outputs under {outdir}")
 
@@ -58,6 +63,10 @@ def add_etho_subparsers(subparsers) -> None:
     )
     etho.add_argument(
         "--inf-dir", required=True, help="Directory with inference pose parquet/CSV."
+    )
+    etho.add_argument(
+        "--config",
+        help="JSON config describing sequence/time keys and body parts (auto-inferred if omitted).",
     )
     etho.add_argument("--json-out", help="Optional JSON output path.")
     etho.set_defaults(func=_run_etho)
@@ -71,6 +80,10 @@ def add_etho_subparsers(subparsers) -> None:
     )
     etho_full.add_argument(
         "--inf-dir", required=True, help="Directory with inference pose parquet/CSV."
+    )
+    etho_full.add_argument(
+        "--config",
+        help="JSON config describing sequence/time keys and body parts (auto-inferred if omitted).",
     )
     etho_full.add_argument(
         "--output-root", type=Path, help="Output root (default ./outputs/)."

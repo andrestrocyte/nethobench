@@ -97,13 +97,13 @@ def load_and_align(
     predictions_csv: Path,
     ground_truth_csv: Path,
     neuro_cols: Optional[list[str]] = None,
+    seq_key: str = "sequenceId",
+    time_key: str = "itemPosition",
 ) -> tuple[np.ndarray, np.ndarray, list[str]]:
     
     # 1. Load tabular data
     gt_df = pd.read_csv(ground_truth_csv)
     pred_df = pd.read_csv(predictions_csv)
-
-    seq_key, time_key = "sequenceId", "itemPosition"
 
     # Safely format prediction dataframe (matching existing logic)
     if time_key not in pred_df.columns and pred_df.index.name != seq_key:

@@ -18,6 +18,7 @@ def compute_neuro_scores(
     *,
     per_sequence_stats: bool = False,
     neuro_cols: Optional[list[str]] = None,
+    config: Optional[dict] = None,
 ) -> Dict[str, float]:
     """
     Compute neuro composite scores from prediction and ground-truth CSVs.
@@ -34,6 +35,8 @@ def compute_neuro_scores(
             neuro scores. Defaults to False.
         neuro_cols: Optional list of column names to use as neural regions.
             If None, all matching columns are inferred automatically.
+        config: Optional configuration dictionary with keys such as
+            ``sequence_key``, ``time_key``, and ``neuro_cols``.
 
     Returns:
         Dictionary mapping composite score names to float values.
@@ -43,12 +46,19 @@ def compute_neuro_scores(
             "per_sequence_stats is not supported for notebook-based neuro scores."
         )
 
+    cfg = config or {}
+    seq_key = cfg.get("sequence_key", "sequenceId")
+    time_key = cfg.get("time_key", "itemPosition")
+    cols = neuro_cols if neuro_cols is not None else cfg.get("neuro_cols")
+
     # 1. Use the existing helper to load CSVs and reshape them into 3D tensors
     # shape: [n_sequences, n_timesteps, n_regions]
     gt_arr, pred_arr, overlap = load_and_align(
         Path(predictions_csv),
         Path(ground_truth_csv),
-        neuro_cols=neuro_cols,
+        neuro_cols=cols,
+        seq_key=seq_key,
+        time_key=time_key,
     )
 
     return calculate_neuro_composites(gt_arr, pred_arr)
@@ -58,13 +68,26 @@ def run_neuro_full_analysis(
     predictions_csv: Path,
     ground_truth_csv: Path,
     output_root: Optional[Path] = None,
+    config: Optional[dict] = None,
 ) -> Dict[str, object]:
     """
     Execute the active neuro notebook headlessly, save figures, and export notebook-derived scores.
     """
     preds_path = Path(predictions_csv)
     outdir = timestamped_outdir(output_root, prefix=preds_path.stem)
-    gt_arr, pred_arr, region_names = load_and_align(preds_path, Path(ground_truth_csv))
+
+    cfg = config or {}
+    seq_key = cfg.get("sequence_key", "sequenceId")
+    time_key = cfg.get("time_key", "itemPosition")
+    cols = cfg.get("neuro_cols")
+
+    gt_arr, pred_arr, region_names = load_and_align(
+        preds_path,
+        Path(ground_truth_csv),
+        neuro_cols=cols,
+        seq_key=seq_key,
+        time_key=time_key,
+    )
 
     scores = calculate_neuro_composites(gt_arr, pred_arr)
 

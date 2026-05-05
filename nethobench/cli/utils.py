@@ -65,6 +65,16 @@ def prompt_for_file(label: str, prefix: str, provided: Optional[str]) -> Path:
         logger.warning(f"{selection} does not exist. Try again.")
 
 
+def load_cli_config(path: Optional[Path]) -> Optional[dict]:
+    if path is None:
+        return None
+    with open(path, "r", encoding="utf-8") as f:
+        cfg = json.load(f)
+    if not isinstance(cfg, dict):
+        raise ValueError(f"Config file must contain a JSON object, got {type(cfg).__name__}")
+    return cfg
+
+
 def prompt_for_config(provided: Optional[str]) -> Optional[Path]:
     if provided:
         return Path(provided)
