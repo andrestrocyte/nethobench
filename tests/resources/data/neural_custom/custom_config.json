@@ -1,0 +1,10 @@
+{
+  "sequence_key": "trial_id",
+  "time_key": "frame_idx",
+  "neuro_cols": [
+    "sensor_1",
+    "sensor_2",
+    "sensor_3",
+    "sensor_4"
+  ]
+}

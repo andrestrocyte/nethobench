@@ -40,6 +40,8 @@ def load_config(
         cfg = _infer_config(sample_df)
     else:
         cfg = json.loads(Path(config).read_text())
+        if not isinstance(cfg, dict):
+            raise ValueError(f"Config file must contain a JSON object, got {type(cfg).__name__}")
     cfg.setdefault("sequence_key", "sequenceId")
     cfg.setdefault("time_key", "itemPosition")
     cfg.setdefault("behavior_parts", ["CENTER", "NOSE", "TAIL_BASE"])
