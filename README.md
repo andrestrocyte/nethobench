@@ -1,4 +1,3 @@
-```markdown
 # NethoBench
 
 NethoBench evaluates neural, behavioural and multimodal neural-behavioural generative models, such as autoregressive causal transformers, by measuring the realism or plausibility of generated traces. Each of the three modes is covered by its own command, and which is appropriate depends on the nature of the generated traces: synthetic neural traces should be evaluated using "neuro-scores", "fidelity-scores" and "neuro-analysis", synthetic behavioural traces should use "etho-scores" and "etho-analysis" and multimodal traces "cross-scores" and "cross-analysis".
