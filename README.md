@@ -50,9 +50,9 @@ nethobench cross-analysis --gt gt.csv --preds pred.csv --config config.json
 
 Configuration is optional if the data contains the columns "sequenceId" and "itemPosition", and specific rules apply for different CLIs:
 
-- neuro: any column that isn't `sequenceId` or `itemPosition` is considered a neuro column
-- etho: all body part coordinates end in `_X` and `_Y`, `CENTER`, `NOSE` and `TAIL_BASE` are part of the body part coordinate stems
-- cross: same as etho for coordinate variables, any columns that aren't `sequenceId` or `itemPosition` and don't end in `_X` or `_Y` are inferred to be neuro columns
+- `neuro`: any column that isn't `sequenceId` or `itemPosition` is considered a neuro column
+- `etho`: all body part coordinates end in `_X` and `_Y`, `CENTER`, `NOSE` and `TAIL_BASE` are part of the body part coordinate stems
+- `cross`: same as etho for coordinate variables, any columns that aren't `sequenceId` or `itemPosition` and don't end in `_X` or `_Y` are inferred to be neuro columns
 
 The configuration options are broadly divided into two categories:
 - **Data Schema Mappings** (which tell NethoBench how to read your multimodal datasets)
