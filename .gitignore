@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *.so
 
+data/*
+
 # Virtual envs
 .venv/
 env/
@@ -17,7 +19,6 @@ dist/
 .ipynb_checkpoints/
 
 # Outputs
-outputs/
 
 # OS
 .DS_Store
