@@ -27,6 +27,7 @@ def geometric_mean_scores(values: list[float]) -> float:
 
 
 def load_df(path: Path):
+    path = Path(path).expanduser()
     if str(path).endswith(".csv"):
         return pd.read_csv(path, index_col=None, header=0, sep=",")
     elif str(path).endswith(".parquet"):
@@ -35,10 +36,42 @@ def load_df(path: Path):
         raise Exception(f"Only parquet and csv files allowed")
 
 
-def load_gt_and_preds(gt_dir: Path, inf_dir: Path):
+def collect_data_files(path: Path) -> list[Path]:
+    path = Path(path).expanduser()
+    if path.is_file():
+        if path.suffix in {".csv", ".parquet"}:
+            return [path]
+        raise Exception(f"Only parquet and csv files allowed")
+    if not path.is_dir():
+        raise FileNotFoundError(f"{path} does not exist")
+    files = sorted(
+        [p for p in path.glob("*.parquet") if p.is_file()]
+        + [p for p in path.glob("*.csv") if p.is_file()],
+        key=lambda p: p.name,
+    )
+    if not files:
+        raise FileNotFoundError(f"No parquet/csv files in {path}")
+    return files
 
-    gt_df = load_df(gt_dir)
-    inf_df = load_df(inf_dir)
+
+def load_dataframes(path: Path) -> pd.DataFrame:
+    frames = []
+    columns = None
+    for file_path in collect_data_files(path):
+        df = load_df(file_path)
+        if columns is None:
+            columns = list(df.columns)
+        elif set(df.columns) != set(columns):
+            missing = set(columns) - set(df.columns)
+            extra = set(df.columns) - set(columns)
+            raise ValueError(
+                f"Header mismatch in {file_path}: missing {missing}, extra {extra}"
+            )
+        frames.append(df[columns])
+    return pd.concat(frames, ignore_index=True)
+
+
+def _assert_same_columns(gt_df: pd.DataFrame, inf_df: pd.DataFrame):
     diff1 = set(list(gt_df.columns)).difference(set(list(inf_df.columns)))
     diff2 = set(list(inf_df.columns)).difference(set(list(gt_df.columns)))
 
@@ -46,6 +79,59 @@ def load_gt_and_preds(gt_dir: Path, inf_dir: Path):
         len(diff1) == 0 and len(diff2) == 0
     ), f"Unequal cols found: in gt but not preds: {diff1}, in preds but not gt: {diff2}"
 
+
+def _tag_sequence_ids(df: pd.DataFrame, file_index: int, sequence_key: str):
+    if sequence_key not in df.columns:
+        return df
+    out = df.copy()
+    out[sequence_key] = out[sequence_key].map(lambda value: f"{file_index}:{value}")
+    return out
+
+
+def load_gt_and_preds(
+    gt_dir: Path, inf_dir: Path, sequence_key: str = "sequenceId"
+):
+    gt_files = collect_data_files(gt_dir)
+    inf_files = collect_data_files(inf_dir)
+
+    if len(gt_files) == len(inf_files):
+        pairs = list(zip(gt_files, inf_files))
+    elif len(gt_files) == 1:
+        pairs = [(gt_files[0], inf_file) for inf_file in inf_files]
+    elif len(inf_files) == 1:
+        pairs = [(gt_file, inf_files[0]) for gt_file in gt_files]
+    else:
+        raise ValueError(
+            "Cannot infer GT/prediction pairing from directories with different "
+            f"file counts: {len(gt_files)} GT files and {len(inf_files)} prediction files."
+        )
+
+    gt_frames = []
+    inf_frames = []
+    columns = None
+    multi_file = len(pairs) > 1
+    for idx, (gt_file, inf_file) in enumerate(pairs):
+        gt_df = load_df(gt_file)
+        inf_df = load_df(inf_file)
+        _assert_same_columns(gt_df, inf_df)
+        if columns is None:
+            columns = list(gt_df.columns)
+        elif set(gt_df.columns) != set(columns):
+            missing = set(columns) - set(gt_df.columns)
+            extra = set(gt_df.columns) - set(columns)
+            raise ValueError(
+                f"Header mismatch in {gt_file}: missing {missing}, extra {extra}"
+            )
+        gt_df = gt_df[columns]
+        inf_df = inf_df[columns]
+        if multi_file:
+            gt_df = _tag_sequence_ids(gt_df, idx, sequence_key)
+            inf_df = _tag_sequence_ids(inf_df, idx, sequence_key)
+        gt_frames.append(gt_df)
+        inf_frames.append(inf_df)
+
+    gt_df = pd.concat(gt_frames, ignore_index=True)
+    inf_df = pd.concat(inf_frames, ignore_index=True)
     return gt_df, inf_df
 
 

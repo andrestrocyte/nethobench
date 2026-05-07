@@ -66,20 +66,16 @@ def weighted_mean_available(
 
 
 
-def robust_scale(values: np.ndarray) -> float:
+def robust_scale(values: np.ndarray, floor: float = 0.05) -> float:
     values = np.asarray(values, dtype=np.float64)
     values = values[np.isfinite(values)]
-    if values.size < 2:
-        return np.nan
+    if values.size < 4:
+        return float(floor)
     q25, q75 = np.quantile(values, [QUANTILE_IQR_LO, QUANTILE_IQR_HI])
     scale = float(q75 - q25)
-    if not np.isfinite(scale) or scale < 1e-9:
+    if not np.isfinite(scale) or scale < floor:
         scale = float(np.nanstd(values))
-    if not np.isfinite(scale) or scale < 1e-9:
-        scale = float(np.nanmean(np.abs(values)))
-    if not np.isfinite(scale) or scale < 1e-9:
-        return 1.0
-    return scale + EPS
+    return float(scale if np.isfinite(scale) and scale >= floor else floor)
 
 
 def correlation_score(a: np.ndarray, b: np.ndarray) -> float:

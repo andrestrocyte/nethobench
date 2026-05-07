@@ -72,7 +72,9 @@ def compute_etho_scores(
             raise ValueError(
                 "Must provide either paired_df, or both gt_dir and inf_dir."
             )
-        gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
+        gt_df, inf_df = load_gt_and_preds(
+            gt_dir, inf_dir, sequence_key=cfg.get("sequence_key", "sequenceId")
+        )
         paired_df = merge_aligned(gt_df, inf_df, cfg)
 
     pos_res = position_kl_score(paired_df, cfg=cfg)
@@ -202,7 +204,9 @@ def run_etho_full_analysis(
     outdir = timestamped_outdir(output_root, prefix="etho-analysis")
 
     # 1. Load Data
-    gt_df, inf_df = load_gt_and_preds(gt_dir, inf_dir)
+    gt_df, inf_df = load_gt_and_preds(
+        gt_dir, inf_dir, sequence_key=cfg.get("sequence_key", "sequenceId")
+    )
     paired_df = merge_aligned(gt_df, inf_df, cfg)
 
     # 2. Extract Additional Features for the Report

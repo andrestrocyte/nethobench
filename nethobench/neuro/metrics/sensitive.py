@@ -78,7 +78,7 @@ def _quantile_distance(
     qx = np.quantile(x, qs)
     qy = np.quantile(y, qs)
     scale = robust_scale(x)
-    return float(np.mean(np.abs(qx - qy) / (scale)))
+    return float(np.mean(np.abs(qx - qy) / (scale + EPS)))
 
 
 def _tv_score_from_hist(hist_g: np.ndarray, hist_p: np.ndarray) -> float:
@@ -529,7 +529,7 @@ def trajectory_occupancy_velocity(gt: Array3D, pred: Array3D) -> dict:
         (np.linalg.norm(vp[1:], axis=1) * np.linalg.norm(vp[:-1], axis=1)) + EPS
     )
     turn_score = score_from_distance(
-        _quantile_distance(turn_g, turn_p, qs=DISTRIBUTION_GRID_QUANTILES)
+        _quantile_distance(turn_g, turn_p, qs=(0.1, 0.3, 0.5, 0.7, 0.9))
     )
     return {"score": float(np.nanmean(occ_scores + [speed_score, turn_score]))}
 
@@ -649,10 +649,10 @@ def crosscorr_lagged_matrix(gt: Array3D, pred: Array3D) -> dict:
     e1g = Cg1.reshape(-1)
     e1p = Cp1.reshape(-1)
     score0 = 0.5 * correlation_score(e0g, e0p) + 0.5 * score_from_distance(
-        np.mean(np.abs(e0p - e0g)) / (robust_scale(e0g))
+        np.mean(np.abs(e0p - e0g)) / (robust_scale(e0g) + EPS)
     )
     score1 = 0.5 * correlation_score(e1g, e1p) + 0.5 * score_from_distance(
-        np.mean(np.abs(e1p - e1g)) / (robust_scale(e1g))
+        np.mean(np.abs(e1p - e1g)) / (robust_scale(e1g) + EPS)
     )
     return {"score": float(np.nanmean([score0, score1]))}
 
@@ -700,7 +700,7 @@ def crosscorr_topedge_profiles(gt: Array3D, pred: Array3D) -> dict:
         amp_g = cc_g[lag_g + max_lag]
         amp_p = cc_p[lag_p + max_lag]
         amp_score = score_from_distance(
-            abs(amp_p - amp_g) / (robust_scale(cc_g))
+            abs(amp_p - amp_g) / (robust_scale(cc_g) + EPS)
         )
         scores.append(np.nanmean([score_curve, lag_score, amp_score]))
     return {"score": float(np.nanmean(scores)) if scores else np.nan}

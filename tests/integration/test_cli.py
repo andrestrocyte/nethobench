@@ -7,6 +7,7 @@ but exercise the CLI against the small fixture datasets under
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -56,7 +57,13 @@ _NETHOBENCH_CMD = [sys.executable, "-m", "nethobench.cli.main"]
 
 def _run(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
     """Run a CLI command and return the completed process."""
-    return subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = (
+        str(_PROJECT_ROOT)
+        if not env.get("PYTHONPATH")
+        else str(_PROJECT_ROOT) + os.pathsep + env["PYTHONPATH"]
+    )
+    return subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, env=env)
 
 
 @pytest.mark.parametrize("gt,preds", NEURAL_FIXTURES)

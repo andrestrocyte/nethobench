@@ -3,8 +3,6 @@ __pycache__/
 *.py[cod]
 *.so
 
-data/*
-
 # Virtual envs
 .venv/
 env/

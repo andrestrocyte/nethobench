@@ -44,6 +44,33 @@ from nethobench.utils.evaluation_constants import (
 
 EPS = 1e-12
 
+LEGACY_SCORE_ALIASES = {
+    "KL_or_JSD_score": "KL_or_JSD_score01",
+    "QNT_score": "QNT_score01",
+    "MOM_score": "MOM_score01",
+    "Mean_score": "Mean_score01",
+    "TRJDIST_score": "TRJDIST_score01",
+    "GRAPH_score": "GRAPH_score01",
+    "CrossRegionMI_score": "CrossRegionMI_score01",
+    "LaggedCovariance_score": "LaggedCovariance_score01",
+    "ImpulseResponse_score": "ImpulseResponse_score01",
+    "MANI_score": "MANI_score01",
+    "SubspaceAngle_score": "SubspaceAngle_score01",
+    "LatentStateOccupancyK11_score": "LatentStateOccupancyK11_score01",
+    "LatentStateOccupancyK12_score": "LatentStateOccupancyK12_score01",
+    "LatentStateTransitionLag1K11_score": "LatentStateTransitionLag1K11_score01",
+    "LatentStateTransitionLag2K11_score": "LatentStateTransitionLag2K11_score01",
+    "LatentStateTransitionLag3K11_score": "LatentStateTransitionLag3K11_score01",
+}
+
+
+def add_legacy_score_aliases(scores: dict[str, float]) -> dict[str, float]:
+    """Expose pre-refactor ``*_score01`` metric keys alongside current names."""
+    for current_name, legacy_name in LEGACY_SCORE_ALIASES.items():
+        if current_name in scores and legacy_name not in scores:
+            scores[legacy_name] = scores[current_name]
+    return scores
+
 
 def _topq_mean(x: np.ndarray, q: float = 0.25) -> float:
     x = np.asarray(x, dtype=np.float64)
@@ -294,7 +321,7 @@ def calculate_neuro_composites(gt_arr: np.ndarray, pred_arr: np.ndarray) -> dict
     flat_scores["FINAL_COMPOSITE_SCORE"] = final_composite
     flat_scores["FINAL_NEURO_COMPOSITE_SCORE"] = final_composite
 
-    return flat_scores
+    return add_legacy_score_aliases(flat_scores)
 
 
 def _robust_median_mad(x: np.ndarray) -> tuple[float, float]:
@@ -417,7 +444,7 @@ def load_and_run_neuro_full_analysis(
     flat_scores["FINAL_NEURO_COMPOSITE_SCORE"] = final_composite
     flat_scores["composite_score"] = final_composite
 
-    return flat_scores
+    return add_legacy_score_aliases(flat_scores)
 
 
 def compute_composite_scores(

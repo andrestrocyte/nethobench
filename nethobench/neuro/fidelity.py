@@ -61,6 +61,8 @@ def compute_fidelity_scores(
         "Error_score": float(legacy_scores.get("Error_score", np.nan)),
         "MI_score": float(legacy_scores.get("MI_score", np.nan)),
     }
+    out["Error_score01"] = out["Error_score"]
+    out["MI_score01"] = out["MI_score"]
     fidelity = compute_fidelity_composite(out)
     out["family_fidelity"] = fidelity
     out["FIDELITY_SCORE"] = fidelity

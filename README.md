@@ -22,6 +22,47 @@ pip install --upgrade pip
 pip install -e .
 ```
 
+## Run the bundled test data
+The repository includes a small neural, behavioral, and multimodal test set under
+`data/`. These files use the default `sequenceId` / `itemPosition` schema, so no
+config file is needed.
+
+```bash
+mkdir -p outputs/quickstart
+```
+
+**Neural and fidelity scores**
+```bash
+nethobench neuro-scores \
+  --gt data/neural/gt/data-clean-300-1140-ba4.csv \
+  --preds data/neural/predictions/netho-seq-sl300-ba4-data100-seed102-epoch-10-predictions.csv \
+  --json-out outputs/quickstart/neuro-ba4.json
+
+nethobench fidelity-scores \
+  --gt data/neural/gt/data-clean-300-1140-ba4.csv \
+  --preds data/neural/predictions/netho-seq-sl300-ba4-data100-seed102-epoch-10-predictions.csv \
+  --json-out outputs/quickstart/fidelity-ba4.json
+```
+
+**Behavioral scores**
+```bash
+nethobench etho-scores \
+  --gt-dir data/behavioural/gt.parquet \
+  --inf-dir data/behavioural/predictions/sequifier-behav-seq-real-2-last-100-predictions.csv \
+  --json-out outputs/quickstart/behavior
+```
+
+**Cross-modal scores**
+```bash
+nethobench cross-scores \
+  --gt data/cross/gt/cross-gt-behavior-neuro.csv \
+  --preds data/cross/predictions/sequifier-cross-noisy-behavior-neuro-last-100.csv \
+  --json-out outputs/quickstart/cross
+```
+
+For a notebook version of the same workflow, open
+`notebooks/nethobench_quickstart.ipynb`.
+
 ## CLI Usage
 All commands output JSON scores; `-analysis` commands also generate figures.
 
@@ -34,9 +75,11 @@ nethobench neuro-analysis --gt gt.csv --preds pred.csv --config config.json
 
 **Behavioral**
 ```bash
-nethobench etho-scores --gt-dir gt/ --inf-dir inf/ --config config.json
-nethobench etho-analysis --gt-dir gt/ --inf-dir inf/ --config config.json
+nethobench etho-scores --gt-dir gt.parquet --inf-dir pred.csv --config config.json
+nethobench etho-analysis --gt-dir gt.parquet --inf-dir pred.csv --config config.json
 ```
+`--gt-dir` and `--inf-dir` accept either a single `.csv` / `.parquet` file or a
+directory containing `.csv` / `.parquet` files.
 
 **Multimodal**
 ```bash
@@ -160,6 +203,10 @@ Evaluates the structural, dynamic, and relational realism of generated neural tr
 **State Dynamics Family ($S$)**
 *   **`LatentStateOccupancy...`**: Similarity of state residence histograms using K-Means clustering (evaluated at $K=11, 12$).
 *   **`LatentStateTransition...`**: Transition matrix similarity mapping how states evolve over multiple temporal lags.
+
+For compatibility with earlier NethoBench releases, `neuro-scores` also emits
+legacy metric aliases ending in `_score01` (for example, `TRJDIST_score01`) in
+addition to the current names.
 
 ---
 

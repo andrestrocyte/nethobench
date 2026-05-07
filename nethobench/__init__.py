@@ -1,7 +1,7 @@
 from nethobench.cross.pipeline import compute_cross_scores, run_cross_full_analysis
 from nethobench.etho.pipeline import compute_etho_scores, run_etho_full_analysis
 from nethobench.neuro.fidelity import compute_fidelity_scores
-from nethobench.neuro.pipeline import compute_neuro_scores
+from nethobench.neuro.pipeline import compute_neuro_scores, run_neuro_full_analysis
 from nethobench.synthetic.validation import (
     DEFAULT_PERTURBATIONS,
     PerturbationSpec,
@@ -22,8 +22,10 @@ from nethobench.synthetic.biophysical import (
 __all__ = [
     "compute_neuro_scores",
     "compute_fidelity_scores",
+    "run_neuro_full_analysis",
     "compute_etho_scores",
     "run_etho_full_analysis",
+    "run_ethobench_notebook",
     "compute_cross_scores",
     "run_cross_full_analysis",
     "DEFAULT_PERTURBATIONS",
@@ -39,3 +41,8 @@ __all__ = [
     "run_synthetic_neuro_validation",
     "run_biophysical_synthetic_neuro_validation",
 ]
+
+
+def run_ethobench_notebook(*args, **kwargs):
+    """Backward-compatible alias for the native behavioral analysis pipeline."""
+    return run_etho_full_analysis(*args, **kwargs)

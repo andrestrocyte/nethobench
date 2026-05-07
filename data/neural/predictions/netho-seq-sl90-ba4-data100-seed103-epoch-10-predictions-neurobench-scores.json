@@ -1,0 +1,16 @@
+{
+    "neurobench-version": "0.1.0",
+    "paths": {
+        "gt": "/home/ubuntu/netho-seq-scaling/env/data/data-clean-300-1140-ba4.csv",
+        "predictions": "/home/ubuntu/netho-seq-scaling/env/outputs/predictions/netho-seq-sl90-ba4-data100-seed103-epoch-10-predictions.csv"
+    },
+    "scores": {
+        "mean_diff_score": 0.12465181301442098,
+        "kl_score": 0.6032833061564442,
+        "correlation_score": 0.8520019405241595,
+        "dimensionality_score": 0.9663080524731192,
+        "graph_score": 1.0,
+        "autocorr_score": 0.9906745300560529,
+        "composite_score": 0.061334818926858124
+    }
+}

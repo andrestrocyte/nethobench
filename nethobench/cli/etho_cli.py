@@ -59,10 +59,10 @@ def _run_etho_full(args: argparse.Namespace) -> None:
 def add_etho_subparsers(subparsers) -> None:
     etho = subparsers.add_parser("etho-scores", help="Compute behavior-only scores.")
     etho.add_argument(
-        "--gt-dir", required=True, help="Directory with GT pose parquet/CSV."
+        "--gt-dir", required=True, help="GT pose parquet/CSV file or directory."
     )
     etho.add_argument(
-        "--inf-dir", required=True, help="Directory with inference pose parquet/CSV."
+        "--inf-dir", required=True, help="Inference pose parquet/CSV file or directory."
     )
     etho.add_argument(
         "--config",
@@ -76,10 +76,10 @@ def add_etho_subparsers(subparsers) -> None:
         help="Run full EthoBench analysis and save figures natively.",
     )
     etho_full.add_argument(
-        "--gt-dir", required=True, help="Directory with GT pose parquet/CSV."
+        "--gt-dir", required=True, help="GT pose parquet/CSV file or directory."
     )
     etho_full.add_argument(
-        "--inf-dir", required=True, help="Directory with inference pose parquet/CSV."
+        "--inf-dir", required=True, help="Inference pose parquet/CSV file or directory."
     )
     etho_full.add_argument(
         "--config",
