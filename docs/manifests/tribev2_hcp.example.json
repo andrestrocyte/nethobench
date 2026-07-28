@@ -1,0 +1,36 @@
+{
+  "name": "tribev2-hcp-zero-shot",
+  "dataset": "HCP",
+  "track": "B",
+  "tribev2_root": "/ABSOLUTE/PATH/TO/tribev2",
+  "tribev2_checkpoint": "facebook/tribev2",
+  "tribev2_cache_folder": "./cache/tribev2",
+  "tribev2_device": "auto",
+  "resample_frequency_hz": 1.0,
+  "hemodynamic_lag_seconds": 5.0,
+  "apply_hemodynamic_shift": true,
+  "zscore": true,
+  "detrend": true,
+  "parcel_space": "hcp_mmp1_360_fsaverage5",
+  "random_seed": 7,
+  "stimuli": [
+    {
+      "sequence_id": "hcp_movie",
+      "video_path": "/ABSOLUTE/PATH/TO/hcp_movie.mp4"
+    }
+  ],
+  "subjects": [
+    {
+      "sequence_id": "hcp_movie",
+      "subject_id": "100307",
+      "volume_path": "/ABSOLUTE/PATH/TO/subject-100307_movie_bold.nii.gz",
+      "tr_seconds": 1.0
+    },
+    {
+      "sequence_id": "hcp_movie",
+      "subject_id": "100408",
+      "volume_path": "/ABSOLUTE/PATH/TO/subject-100408_movie_bold.nii.gz",
+      "tr_seconds": 1.0
+    }
+  ]
+}

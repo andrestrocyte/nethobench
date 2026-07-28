@@ -1,0 +1,55 @@
+{
+  "name": "ibl-repeated-site-24",
+  "base_url": "https://openalyx.internationalbrainlab.org",
+  "username": null,
+  "password": "international",
+  "release_tag": "RepeatedSite",
+  "project": null,
+  "spike_sorting_revision": "2024-05-06",
+  "alignment_event": "stimOn_times",
+  "window_seconds": [
+    -0.5,
+    1.5
+  ],
+  "bin_size_seconds": 0.02,
+  "context_bins": 25,
+  "target_bins": 75,
+  "min_fr_hz": 0.2,
+  "max_fr_hz": 100.0,
+  "cluster_label_keep": [
+    1
+  ],
+  "target_n_regions": 12,
+  "min_n_regions": 8,
+  "min_units_per_region": 5,
+  "max_sessions": 24,
+  "max_trials": 128,
+  "max_unit_sessions": 5,
+  "unit_level_top_n": 128,
+  "disk_policy": "clean_raw_after_binning",
+  "min_free_disk_gb": 8.0,
+  "feature_cache_dir": null,
+  "split_policy": "within_session,cross_session,cross_lab",
+  "model_suite": [
+    "psth",
+    "glm_poisson",
+    "var",
+    "lds_var",
+    "gru",
+    "transformer",
+    "transformer_nb_reg"
+  ],
+  "neural_seeds": [
+    7,
+    11,
+    19
+  ],
+  "max_epochs": 100,
+  "patience": 10,
+  "batch_size": 64,
+  "bootstrap_samples": 500,
+  "random_seed": 7,
+  "output_root": null,
+  "session_eids": [],
+  "predictions_csv": null
+}

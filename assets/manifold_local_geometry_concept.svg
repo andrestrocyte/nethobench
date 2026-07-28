@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="980" viewBox="0 0 1500 980" role="img" aria-labelledby="title desc">
+  <title id="title">Conceptual diagram of the local geometry term in the manifold score</title>
+  <desc id="desc">A diagram showing how GT and predicted point clouds are compared through shared latent-space local neighborhood geometry using k-nearest-neighbor distance profiles.</desc>
+  <defs>
+    <style>
+      .bg { fill: #fbfaf7; }
+      .panel { fill: #fffdf8; stroke: #d9d1c6; stroke-width: 2; }
+      .title { font: 700 34px Georgia, 'Times New Roman', serif; fill: #15202b; }
+      .subtitle { font: 400 19px Georgia, 'Times New Roman', serif; fill: #455564; }
+      .label { font: 700 20px Georgia, 'Times New Roman', serif; fill: #15202b; }
+      .body { font: 400 17px Georgia, 'Times New Roman', serif; fill: #22313f; }
+      .small { font: 400 15px Georgia, 'Times New Roman', serif; fill: #5a6977; }
+      .mono { font: 400 17px 'Menlo', 'Consolas', monospace; fill: #22313f; }
+      .gtpt { fill: #1f77b4; opacity: 0.95; }
+      .predpt { fill: #d95f02; opacity: 0.88; }
+      .nbr { fill: #4daf4a; opacity: 0.95; }
+      .ringgt { stroke: #1f77b4; stroke-width: 2.4; fill: rgba(31,119,180,0.06); }
+      .ringpred { stroke: #d95f02; stroke-width: 2.4; fill: rgba(217,95,2,0.06); stroke-dasharray: 7 6; }
+      .edgegt { stroke: #1f77b4; stroke-width: 2.5; opacity: 0.9; }
+      .edgepred { stroke: #d95f02; stroke-width: 2.5; opacity: 0.88; stroke-dasharray: 7 6; }
+      .axis { stroke: #4e5d6c; stroke-width: 2.2; }
+      .grid { stroke: #e8e2d8; stroke-width: 1.2; }
+      .linegt { stroke: #1f77b4; fill: none; stroke-width: 4; }
+      .linepred { stroke: #d95f02; fill: none; stroke-width: 4; stroke-dasharray: 9 7; }
+      .bargt { fill: #6ea8d7; }
+      .barpred { fill: #efb07c; }
+      .arrow { stroke: #7d8790; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7d8790"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1500" height="980"/>
+
+  <text class="title" x="60" y="64">Local Geometry Term in the Manifold Score</text>
+  <text class="subtitle" x="60" y="98">This term asks: in the shared GT latent space, do predicted points have the same local neighborhood structure as ground-truth points?</text>
+
+  <text class="label" x="78" y="155">a</text>
+  <text class="label" x="110" y="155">Shared latent point clouds</text>
+  <rect class="panel" x="60" y="175" width="430" height="330" rx="16" ry="16"/>
+  <line class="axis" x1="105" y1="455" x2="450" y2="455"/>
+  <line class="axis" x1="105" y1="455" x2="105" y2="215"/>
+  <text class="small" x="350" y="480">latent dim 1</text>
+  <text class="small" x="70" y="250" transform="rotate(-90 70 250)">latent dim 2</text>
+
+  <circle class="gtpt" cx="170" cy="360" r="7"/>
+  <circle class="nbr" cx="205" cy="330" r="7"/>
+  <circle class="nbr" cx="225" cy="390" r="7"/>
+  <circle class="nbr" cx="245" cy="345" r="7"/>
+  <circle class="gtpt" cx="285" cy="275" r="7"/>
+  <circle class="gtpt" cx="320" cy="360" r="7"/>
+  <circle class="gtpt" cx="360" cy="300" r="7"/>
+  <circle class="gtpt" cx="405" cy="385" r="7"/>
+
+  <circle class="predpt" cx="165" cy="348" r="6"/>
+  <circle class="predpt" cx="216" cy="338" r="6"/>
+  <circle class="predpt" cx="235" cy="404" r="6"/>
+  <circle class="predpt" cx="257" cy="354" r="6"/>
+  <circle class="predpt" cx="292" cy="288" r="6"/>
+  <circle class="predpt" cx="330" cy="374" r="6"/>
+  <circle class="predpt" cx="369" cy="314" r="6"/>
+  <circle class="predpt" cx="398" cy="395" r="6"/>
+
+  <circle class="ringgt" cx="170" cy="360" r="74"/>
+  <circle class="ringpred" cx="165" cy="348" r="82"/>
+
+  <line class="edgegt" x1="170" y1="360" x2="205" y2="330"/>
+  <line class="edgegt" x1="170" y1="360" x2="225" y2="390"/>
+  <line class="edgegt" x1="170" y1="360" x2="245" y2="345"/>
+
+  <line class="edgepred" x1="165" y1="348" x2="216" y2="338"/>
+  <line class="edgepred" x1="165" y1="348" x2="235" y2="404"/>
+  <line class="edgepred" x1="165" y1="348" x2="257" y2="354"/>
+
+  <text class="body" x="120" y="228">Blue = GT cloud</text>
+  <text class="body" x="120" y="252">Orange dashed = predicted cloud</text>
+  <text class="body" x="120" y="276">Green points = GT anchor point's nearest neighbors</text>
+
+  <text class="label" x="545" y="155">b</text>
+  <text class="label" x="578" y="155">k-nearest-neighbor distance profile</text>
+  <rect class="panel" x="530" y="175" width="390" height="330" rx="16" ry="16"/>
+  <line class="axis" x1="590" y1="445" x2="880" y2="445"/>
+  <line class="axis" x1="590" y1="445" x2="590" y2="220"/>
+  <line class="grid" x1="590" y1="390" x2="880" y2="390"/>
+  <line class="grid" x1="590" y1="335" x2="880" y2="335"/>
+  <line class="grid" x1="590" y1="280" x2="880" y2="280"/>
+  <text class="small" x="715" y="478">neighbor rank k</text>
+  <text class="small" x="548" y="310" transform="rotate(-90 548 310)">distance</text>
+  <path class="linegt" d="M 620 410 L 690 355 L 760 315 L 830 255"/>
+  <path class="linepred" d="M 620 398 L 690 348 L 760 300 L 830 235"/>
+  <circle class="gtpt" cx="620" cy="410" r="5"/>
+  <circle class="gtpt" cx="690" cy="355" r="5"/>
+  <circle class="gtpt" cx="760" cy="315" r="5"/>
+  <circle class="gtpt" cx="830" cy="255" r="5"/>
+  <circle class="predpt" cx="620" cy="398" r="5"/>
+  <circle class="predpt" cx="690" cy="348" r="5"/>
+  <circle class="predpt" cx="760" cy="300" r="5"/>
+  <circle class="predpt" cx="830" cy="235" r="5"/>
+  <text class="body" x="610" y="235">For each anchor point, compare:</text>
+  <text class="body" x="610" y="260">distance to 1st, 2nd, ..., kth nearest neighbor</text>
+  <text class="mono" x="610" y="296">d<tspan baseline-shift="sub" font-size="12">GT</tspan>(1), d<tspan baseline-shift="sub" font-size="12">GT</tspan>(2), ..., d<tspan baseline-shift="sub" font-size="12">GT</tspan>(k)</text>
+  <text class="mono" x="610" y="320">d<tspan baseline-shift="sub" font-size="12">Pred</tspan>(1), d<tspan baseline-shift="sub" font-size="12">Pred</tspan>(2), ..., d<tspan baseline-shift="sub" font-size="12">Pred</tspan>(k)</text>
+
+  <text class="label" x="970" y="155">c</text>
+  <text class="label" x="1003" y="155">Aggregate local mismatch across many anchors</text>
+  <rect class="panel" x="955" y="175" width="485" height="330" rx="16" ry="16"/>
+  <line class="axis" x1="1015" y1="445" x2="1380" y2="445"/>
+  <line class="axis" x1="1015" y1="445" x2="1015" y2="220"/>
+  <line class="grid" x1="1015" y1="388" x2="1380" y2="388"/>
+  <line class="grid" x1="1015" y1="331" x2="1380" y2="331"/>
+  <line class="grid" x1="1015" y1="274" x2="1380" y2="274"/>
+  <text class="small" x="1130" y="478">anchor points</text>
+  <text class="small" x="975" y="320" transform="rotate(-90 975 320)">local profile distance</text>
+  <rect class="bargt" x="1040" y="375" width="22" height="70"/>
+  <rect class="bargt" x="1080" y="350" width="22" height="95"/>
+  <rect class="bargt" x="1120" y="402" width="22" height="43"/>
+  <rect class="bargt" x="1160" y="320" width="22" height="125"/>
+  <rect class="bargt" x="1200" y="362" width="22" height="83"/>
+  <rect class="bargt" x="1240" y="390" width="22" height="55"/>
+  <rect class="bargt" x="1280" y="338" width="22" height="107"/>
+  <rect class="bargt" x="1320" y="372" width="22" height="73"/>
+  <text class="body" x="1040" y="248">If predicted neighborhoods match GT neighborhoods,</text>
+  <text class="body" x="1040" y="273">the profile distances stay small across anchors.</text>
+  <text class="mono" x="1040" y="312">D<tspan baseline-shift="sub" font-size="12">local</tspan> = mean anchor-wise kNN profile mismatch</text>
+  <text class="mono" x="1040" y="340">s<tspan baseline-shift="sub" font-size="12">local</tspan> = 1 / (1 + D<tspan baseline-shift="sub" font-size="12">local</tspan>)</text>
+
+  <text class="label" x="78" y="560">d</text>
+  <text class="label" x="110" y="560">How this complements persistent topology</text>
+  <rect class="panel" x="60" y="580" width="1380" height="340" rx="16" ry="16"/>
+  <path class="arrow" d="M 265 645 C 360 645, 420 645, 510 645"/>
+  <path class="arrow" d="M 760 645 C 855 645, 915 645, 1005 645"/>
+
+  <text class="body" x="90" y="635">Persistent homology term:</text>
+  <text class="body" x="90" y="662">captures coarse global shape</text>
+  <text class="small" x="90" y="694">loops, connected components, large-scale topology</text>
+  <circle class="ringgt" cx="220" cy="760" r="72"/>
+  <circle class="gtpt" cx="220" cy="688" r="6"/>
+  <circle class="gtpt" cx="282" cy="718" r="6"/>
+  <circle class="gtpt" cx="292" cy="785" r="6"/>
+  <circle class="gtpt" cx="246" cy="828" r="6"/>
+  <circle class="gtpt" cx="188" cy="828" r="6"/>
+  <circle class="gtpt" cx="148" cy="782" r="6"/>
+  <circle class="gtpt" cx="160" cy="718" r="6"/>
+
+  <text class="body" x="560" y="635">Local geometry term:</text>
+  <text class="body" x="560" y="662">captures fine neighborhood structure</text>
+  <text class="small" x="560" y="694">how dense, stretched, compressed, or distorted the cloud is locally</text>
+  <circle class="gtpt" cx="640" cy="760" r="7"/>
+  <circle class="nbr" cx="676" cy="738" r="7"/>
+  <circle class="nbr" cx="690" cy="780" r="7"/>
+  <circle class="nbr" cx="667" cy="807" r="7"/>
+  <circle class="predpt" cx="636" cy="750" r="6"/>
+  <circle class="predpt" cx="688" cy="733" r="6"/>
+  <circle class="predpt" cx="712" cy="786" r="6"/>
+  <circle class="predpt" cx="677" cy="822" r="6"/>
+  <circle class="ringgt" cx="640" cy="760" r="67"/>
+  <circle class="ringpred" cx="636" cy="750" r="86"/>
+
+  <text class="body" x="1055" y="635">Final manifold score:</text>
+  <text class="mono" x="1055" y="675">MANI = 0.75 · s<tspan baseline-shift="sub" font-size="12">topology</tspan> + 0.25 · s<tspan baseline-shift="sub" font-size="12">local</tspan></text>
+  <text class="small" x="1055" y="716">Topology gives the coarse skeleton of the manifold.</text>
+  <text class="small" x="1055" y="742">Local geometry stabilizes the score and rejects clouds</text>
+  <text class="small" x="1055" y="768">that have the same global topology but wrong local structure.</text>
+  <text class="small" x="1055" y="806">Examples of local failures:</text>
+  <text class="small" x="1080" y="836">• neighborhoods too spread out</text>
+  <text class="small" x="1080" y="862">• neighborhoods too compressed</text>
+  <text class="small" x="1080" y="888">• anisotropic local distortion</text>
+</svg>

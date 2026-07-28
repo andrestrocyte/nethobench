@@ -1,0 +1,38 @@
+{
+  "name": "tribev2-lahner-shakedown",
+  "dataset": "Lahner2024Bold",
+  "track": "A",
+  "tribev2_root": "/ABSOLUTE/PATH/TO/tribev2",
+  "tribev2_checkpoint": "facebook/tribev2",
+  "tribev2_cache_folder": "./cache/tribev2",
+  "tribev2_device": "auto",
+  "resample_frequency_hz": 1.0,
+  "hemodynamic_lag_seconds": 5.0,
+  "apply_hemodynamic_shift": true,
+  "zscore": true,
+  "detrend": true,
+  "parcel_space": "hcp_mmp1_360_fsaverage5",
+  "random_seed": 7,
+  "stimuli": [
+    {
+      "sequence_id": "lahner_test_run01",
+      "events_csv": "/ABSOLUTE/PATH/TO/lahner_test_run01_events.csv"
+    }
+  ],
+  "subjects": [
+    {
+      "sequence_id": "lahner_test_run01",
+      "subject_id": "sub-01",
+      "surface_left_path": "/ABSOLUTE/PATH/TO/sub-01_hemi-L_space-fsaverage_bold.func.gii",
+      "surface_right_path": "/ABSOLUTE/PATH/TO/sub-01_hemi-R_space-fsaverage_bold.func.gii",
+      "tr_seconds": 1.75
+    },
+    {
+      "sequence_id": "lahner_test_run01",
+      "subject_id": "sub-02",
+      "surface_left_path": "/ABSOLUTE/PATH/TO/sub-02_hemi-L_space-fsaverage_bold.func.gii",
+      "surface_right_path": "/ABSOLUTE/PATH/TO/sub-02_hemi-R_space-fsaverage_bold.func.gii",
+      "tr_seconds": 1.75
+    }
+  ]
+}

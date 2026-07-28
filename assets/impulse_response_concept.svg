@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="980" viewBox="0 0 1500 980" role="img" aria-labelledby="title desc">
+  <title id="title">Conceptual diagram of the impulse response metric</title>
+  <desc id="desc">A scientific diagram explaining how the impulse response score compares one-step directed coupling matrices estimated from ground-truth and predicted neural activity.</desc>
+  <defs>
+    <style>
+      .bg { fill: #fbfaf7; }
+      .panel { fill: #fffdf8; stroke: #d9d1c6; stroke-width: 2; }
+      .title { font: 700 34px Georgia, 'Times New Roman', serif; fill: #15202b; }
+      .subtitle { font: 400 19px Georgia, 'Times New Roman', serif; fill: #455564; }
+      .paneltitle { font: 700 24px Georgia, 'Times New Roman', serif; fill: #15202b; }
+      .body { font: 400 18px Georgia, 'Times New Roman', serif; fill: #22313f; }
+      .small { font: 400 15px Georgia, 'Times New Roman', serif; fill: #5a6977; }
+      .mono { font: 400 18px 'Menlo', 'Consolas', monospace; fill: #22313f; }
+      .axis { stroke: #4e5d6c; stroke-width: 2.2; }
+      .grid { stroke: #e8e2d8; stroke-width: 1.2; }
+      .gtline { stroke: #1f77b4; fill: none; stroke-width: 4; }
+      .predline { stroke: #d95f02; fill: none; stroke-width: 4; stroke-dasharray: 9 7; }
+      .arrowBlue { stroke: #1f77b4; stroke-width: 3.4; fill: none; marker-end: url(#arrowBlue); }
+      .arrowOrange { stroke: #d95f02; stroke-width: 3.4; fill: none; marker-end: url(#arrowOrange); }
+      .softBlue { fill: #eaf2fb; stroke: #1f77b4; stroke-width: 1.5; }
+      .softOrange { fill: #fdf0e6; stroke: #d95f02; stroke-width: 1.5; }
+      .cellText { font: 700 16px 'Menlo', 'Consolas', monospace; fill: #15202b; text-anchor: middle; dominant-baseline: middle; }
+      .metric { font: 700 22px Georgia, 'Times New Roman', serif; fill: #15202b; }
+    </style>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1f77b4"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d95f02"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1500" height="980"/>
+
+  <text class="title" x="70" y="65">Impulse Response: What One-Step Interaction Map Does the Data Imply?</text>
+  <text class="subtitle" x="70" y="100">The metric fits a one-step linear transition model to GT and prediction separately, then compares the resulting directed coupling matrices.</text>
+
+  <rect class="softBlue" x="1120" y="42" rx="10" ry="10" width="110" height="36"/>
+  <text class="body" x="1157" y="66">GT</text>
+  <rect class="softOrange" x="1245" y="42" rx="10" ry="10" width="160" height="36"/>
+  <text class="body" x="1282" y="66">Prediction</text>
+
+  <rect class="panel" x="60" y="145" width="620" height="315" rx="18" ry="18"/>
+  <text class="paneltitle" x="90" y="186">1. Fit a one-step linear dynamical law</text>
+  <text class="mono" x="92" y="232">x<tspan baseline-shift="sub" font-size="13">t+1</tspan> ≈ A x<tspan baseline-shift="sub" font-size="13">t</tspan></text>
+  <text class="body" x="92" y="274">For GT and prediction separately, estimate the matrix</text>
+  <text class="body" x="92" y="300">that best maps the full neural state at time t to the next step.</text>
+  <text class="mono" x="92" y="348">A = (XᵀX + λI)<tspan baseline-shift="super" font-size="13">-1</tspan> XᵀY</text>
+  <text class="small" x="92" y="390">Here, X contains states x<tspan baseline-shift="sub" font-size="11">t</tspan> and Y contains states x<tspan baseline-shift="sub" font-size="11">t+1</tspan>.</text>
+  <text class="small" x="92" y="416">The ridge term λI stabilizes the estimate.</text>
+
+  <rect class="panel" x="720" y="145" width="720" height="315" rx="18" ry="18"/>
+  <text class="paneltitle" x="750" y="186">2. Read A as a directed coupling / impulse-response matrix</text>
+
+  <circle cx="815" cy="315" r="34" fill="#edf4fb" stroke="#1f77b4" stroke-width="2"/>
+  <circle cx="960" cy="248" r="34" fill="#edf4fb" stroke="#1f77b4" stroke-width="2"/>
+  <circle cx="960" cy="382" r="34" fill="#edf4fb" stroke="#1f77b4" stroke-width="2"/>
+  <text class="body" x="806" y="321">R1</text>
+  <text class="body" x="951" y="254">R2</text>
+  <text class="body" x="951" y="388">R3</text>
+  <path class="arrowBlue" d="M 846 298 C 882 278, 906 267, 925 258"/>
+  <path class="arrowBlue" d="M 844 334 C 880 353, 904 364, 925 372"/>
+  <path class="arrowBlue" d="M 960 282 C 960 315, 960 338, 960 347"/>
+  <text class="small" x="874" y="269">A<tspan baseline-shift="sub" font-size="11">2,1</tspan></text>
+  <text class="small" x="872" y="370">A<tspan baseline-shift="sub" font-size="11">3,1</tspan></text>
+  <text class="small" x="975" y="321">A<tspan baseline-shift="sub" font-size="11">3,2</tspan></text>
+  <text class="body" x="1030" y="255">Entry A<tspan baseline-shift="sub" font-size="12">j,i</tspan> says:</text>
+  <text class="body" x="1030" y="285">how much region i at time t contributes</text>
+  <text class="body" x="1030" y="315">to region j at time t+1.</text>
+  <text class="small" x="1030" y="360">This is more direct and mechanistic than lagged covariance,</text>
+  <text class="small" x="1030" y="386">because all regions are fitted jointly in the same transition model.</text>
+
+  <rect class="panel" x="60" y="500" width="650" height="395" rx="18" ry="18"/>
+  <text class="paneltitle" x="90" y="540">3. Estimate GT and predicted transition maps</text>
+  <text class="metric" x="110" y="585">GT matrix A<tspan baseline-shift="sub" font-size="13">gt</tspan></text>
+  <rect x="108" y="610" width="210" height="210" fill="#eef5fc" stroke="#1f77b4" stroke-width="2"/>
+  <line x1="178" y1="610" x2="178" y2="820" stroke="#b7cee6" stroke-width="1.5"/>
+  <line x1="248" y1="610" x2="248" y2="820" stroke="#b7cee6" stroke-width="1.5"/>
+  <line x1="108" y1="680" x2="318" y2="680" stroke="#b7cee6" stroke-width="1.5"/>
+  <line x1="108" y1="750" x2="318" y2="750" stroke="#b7cee6" stroke-width="1.5"/>
+  <rect x="108" y="610" width="70" height="70" fill="#5f9ed1" opacity="0.55"/>
+  <rect x="178" y="610" width="70" height="70" fill="#7bb6e6" opacity="0.40"/>
+  <rect x="248" y="610" width="70" height="70" fill="#b5d3ee" opacity="0.25"/>
+  <rect x="108" y="680" width="70" height="70" fill="#93c2e8" opacity="0.45"/>
+  <rect x="178" y="680" width="70" height="70" fill="#4b90c6" opacity="0.60"/>
+  <rect x="248" y="680" width="70" height="70" fill="#81b8e0" opacity="0.42"/>
+  <rect x="108" y="750" width="70" height="70" fill="#d5e5f5" opacity="0.18"/>
+  <rect x="178" y="750" width="70" height="70" fill="#7db2dc" opacity="0.36"/>
+  <rect x="248" y="750" width="70" height="70" fill="#568fc0" opacity="0.52"/>
+  <text class="cellText" x="143" y="645">0.78</text>
+  <text class="cellText" x="213" y="645">0.22</text>
+  <text class="cellText" x="283" y="645">0.05</text>
+  <text class="cellText" x="143" y="715">0.31</text>
+  <text class="cellText" x="213" y="715">0.83</text>
+  <text class="cellText" x="283" y="715">0.28</text>
+  <text class="cellText" x="143" y="785">0.04</text>
+  <text class="cellText" x="213" y="785">0.25</text>
+  <text class="cellText" x="283" y="785">0.71</text>
+  <text class="small" x="112" y="845">rows = effect on next-step target region</text>
+  <text class="small" x="112" y="868">columns = current source region</text>
+
+  <text class="metric" x="385" y="585">Predicted matrix A<tspan baseline-shift="sub" font-size="13">pred</tspan></text>
+  <rect x="383" y="610" width="210" height="210" fill="#fdf2e8" stroke="#d95f02" stroke-width="2"/>
+  <line x1="453" y1="610" x2="453" y2="820" stroke="#efc7a7" stroke-width="1.5"/>
+  <line x1="523" y1="610" x2="523" y2="820" stroke="#efc7a7" stroke-width="1.5"/>
+  <line x1="383" y1="680" x2="593" y2="680" stroke="#efc7a7" stroke-width="1.5"/>
+  <line x1="383" y1="750" x2="593" y2="750" stroke="#efc7a7" stroke-width="1.5"/>
+  <rect x="383" y="610" width="70" height="70" fill="#e38137" opacity="0.52"/>
+  <rect x="453" y="610" width="70" height="70" fill="#efac74" opacity="0.34"/>
+  <rect x="523" y="610" width="70" height="70" fill="#f4cda6" opacity="0.22"/>
+  <rect x="383" y="680" width="70" height="70" fill="#f0b47f" opacity="0.40"/>
+  <rect x="453" y="680" width="70" height="70" fill="#d66d1d" opacity="0.60"/>
+  <rect x="523" y="680" width="70" height="70" fill="#efaa72" opacity="0.35"/>
+  <rect x="383" y="750" width="70" height="70" fill="#f7deca" opacity="0.16"/>
+  <rect x="453" y="750" width="70" height="70" fill="#efbb8e" opacity="0.30"/>
+  <rect x="523" y="750" width="70" height="70" fill="#df7a2d" opacity="0.48"/>
+  <text class="cellText" x="418" y="645">0.71</text>
+  <text class="cellText" x="488" y="645">0.18</text>
+  <text class="cellText" x="558" y="645">0.07</text>
+  <text class="cellText" x="418" y="715">0.27</text>
+  <text class="cellText" x="488" y="715">0.76</text>
+  <text class="cellText" x="558" y="715">0.23</text>
+  <text class="cellText" x="418" y="785">0.03</text>
+  <text class="cellText" x="488" y="785">0.19</text>
+  <text class="cellText" x="558" y="785">0.64</text>
+  <text class="small" x="387" y="845">same pattern = similar one-step directed couplings</text>
+
+  <rect class="panel" x="745" y="500" width="695" height="395" rx="18" ry="18"/>
+  <text class="paneltitle" x="775" y="540">4. Compare GT and prediction matrices</text>
+  <text class="body" x="775" y="586">The score uses a matrix-similarity blend:</text>
+  <text class="mono" x="775" y="630">score = 0.6 · corr-sim(vec(A<tspan baseline-shift="sub" font-size="13">gt</tspan>), vec(A<tspan baseline-shift="sub" font-size="13">pred</tspan>))</text>
+  <text class="mono" x="775" y="666">      + 0.4 · rmse-sim(vec(A<tspan baseline-shift="sub" font-size="13">gt</tspan>), vec(A<tspan baseline-shift="sub" font-size="13">pred</tspan>))</text>
+  <text class="body" x="775" y="720">So the metric is high when:</text>
+  <text class="body" x="805" y="755">• the same source-target couplings are strong or weak</text>
+  <text class="body" x="805" y="787">• and the coupling magnitudes are numerically close</text>
+  <text class="body" x="775" y="835">Narrative meaning:</text>
+  <text class="small" x="775" y="866">Does the prediction preserve the approximate one-step directed interaction map</text>
+  <text class="small" x="775" y="890">that best propagates neural activity from time t to time t+1?</text>
+  <text class="small" x="775" y="920">This differs from lagged covariance, which measures delayed association, not a fitted transition operator.</text>
+</svg>

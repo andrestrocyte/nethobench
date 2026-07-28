@@ -1,0 +1,36 @@
+{
+  "name": "tribev2-narratives-zero-shot",
+  "dataset": "Narratives",
+  "track": "B",
+  "tribev2_root": "/ABSOLUTE/PATH/TO/tribev2",
+  "tribev2_checkpoint": "facebook/tribev2",
+  "tribev2_cache_folder": "./cache/tribev2",
+  "tribev2_device": "auto",
+  "resample_frequency_hz": 1.0,
+  "hemodynamic_lag_seconds": 5.0,
+  "apply_hemodynamic_shift": true,
+  "zscore": true,
+  "detrend": true,
+  "parcel_space": "hcp_mmp1_360_fsaverage5",
+  "random_seed": 7,
+  "stimuli": [
+    {
+      "sequence_id": "narratives_story",
+      "audio_path": "/ABSOLUTE/PATH/TO/narratives_story.wav"
+    }
+  ],
+  "subjects": [
+    {
+      "sequence_id": "narratives_story",
+      "subject_id": "sub-001",
+      "volume_path": "/ABSOLUTE/PATH/TO/sub-001_story_bold.nii.gz",
+      "tr_seconds": 1.5
+    },
+    {
+      "sequence_id": "narratives_story",
+      "subject_id": "sub-002",
+      "volume_path": "/ABSOLUTE/PATH/TO/sub-002_story_bold.nii.gz",
+      "tr_seconds": 1.5
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual envs
+.venv/
+env/
+venv/
+
+# Packaging / build
+*.egg-info/
+build/
+dist/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Outputs
+outputs/
+data/
+experiments/
+paper/
+rebuttal_neurips_2026/
+tmp/
+.cache/
+.pytest_cache/
+
+# OS
+.DS_Store

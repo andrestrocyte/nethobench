@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+  <title id="title">Conceptual diagram of the neuro distribution family</title>
+  <desc id="desc">An explanatory figure showing ground-truth and predicted activity distributions and the aspects measured by KL or JSD, quantiles, moments, and mean.</desc>
+  <defs>
+    <style>
+      .bg { fill: #fbfaf7; }
+      .panel { fill: #fffdf8; stroke: #d8d2c8; stroke-width: 2; }
+      .title { font: 700 34px Georgia, 'Times New Roman', serif; fill: #17202a; }
+      .subtitle { font: 400 20px Georgia, 'Times New Roman', serif; fill: #415161; }
+      .paneltitle { font: 700 24px Georgia, 'Times New Roman', serif; fill: #17202a; }
+      .body { font: 400 18px Georgia, 'Times New Roman', serif; fill: #243746; }
+      .small { font: 400 16px Georgia, 'Times New Roman', serif; fill: #506070; }
+      .gt { stroke: #1f77b4; fill: none; stroke-width: 5; }
+      .pred { stroke: #d95f02; fill: none; stroke-width: 5; stroke-dasharray: 10 8; }
+      .axis { stroke: #4c5a67; stroke-width: 2.5; }
+      .grid { stroke: #e7e2d8; stroke-width: 1.5; }
+      .mark-gt { stroke: #1f77b4; stroke-width: 3; }
+      .mark-pred { stroke: #d95f02; stroke-width: 3; stroke-dasharray: 6 5; }
+      .arrow { stroke: #7b8794; stroke-width: 2.5; fill: none; marker-end: url(#arrowhead); }
+      .bullet { fill: #17202a; }
+      .chipgt { fill: #e8f1fb; stroke: #1f77b4; stroke-width: 1.5; }
+      .chippred { fill: #fdf0e5; stroke: #d95f02; stroke-width: 1.5; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7b8794"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1400" height="900"/>
+
+  <text class="title" x="70" y="70">Distribution Family in the Neuro Score</text>
+  <text class="subtitle" x="70" y="108">This family asks one question: if you ignore time order and only look at activity values, does the prediction have the same value distribution as the real neural data?</text>
+
+  <rect class="chipgt" x="980" y="50" rx="10" ry="10" width="130" height="38"/>
+  <text class="body" x="1014" y="75">GT</text>
+  <rect class="chippred" x="1130" y="50" rx="10" ry="10" width="180" height="38"/>
+  <text class="body" x="1162" y="75">Prediction</text>
+
+  <rect class="panel" x="60" y="150" width="780" height="680" rx="18" ry="18"/>
+  <text class="paneltitle" x="90" y="195">Conceptual view of one region’s activity-value distribution</text>
+
+  <line class="grid" x1="140" y1="690" x2="780" y2="690"/>
+  <line class="grid" x1="140" y1="585" x2="780" y2="585"/>
+  <line class="grid" x1="140" y1="480" x2="780" y2="480"/>
+  <line class="grid" x1="140" y1="375" x2="780" y2="375"/>
+  <line class="grid" x1="140" y1="270" x2="780" y2="270"/>
+
+  <line class="axis" x1="140" y1="720" x2="780" y2="720"/>
+  <line class="axis" x1="140" y1="230" x2="140" y2="720"/>
+  <text class="body" x="400" y="770">Activity value</text>
+  <text class="body" x="42" y="490" transform="rotate(-90 42 490)">Density / frequency</text>
+
+  <path class="gt" d="M 150 710
+                       C 220 700, 235 660, 265 560
+                       C 295 430, 335 290, 395 255
+                       C 455 220, 490 310, 515 430
+                       C 545 585, 595 675, 770 710"/>
+
+  <path class="pred" d="M 150 709
+                         C 225 704, 255 665, 300 575
+                         C 340 490, 395 360, 455 325
+                         C 505 295, 555 355, 590 500
+                         C 620 615, 655 685, 770 709"/>
+
+  <text class="small" x="610" y="260" fill="#1f77b4">GT distribution</text>
+  <text class="small" x="575" y="315" fill="#d95f02">Predicted distribution</text>
+
+  <line class="mark-gt" x1="400" y1="250" x2="400" y2="720"/>
+  <line class="mark-pred" x1="470" y1="320" x2="470" y2="720"/>
+  <text class="small" x="355" y="742">GT mean</text>
+  <text class="small" x="445" y="742">Pred mean</text>
+
+  <line class="mark-gt" x1="315" y1="430" x2="315" y2="720"/>
+  <line class="mark-gt" x1="510" y1="430" x2="510" y2="720"/>
+  <line class="mark-pred" x1="350" y1="500" x2="350" y2="720"/>
+  <line class="mark-pred" x1="575" y1="500" x2="575" y2="720"/>
+  <text class="small" x="246" y="410">GT q25 / q75</text>
+  <text class="small" x="334" y="525">Pred q25 / q75</text>
+
+  <path class="arrow" d="M 555 385 C 610 350, 655 330, 900 255"/>
+  <path class="arrow" d="M 575 475 C 620 500, 700 530, 900 430"/>
+  <path class="arrow" d="M 470 620 C 610 650, 710 650, 900 610"/>
+
+  <circle class="bullet" cx="910" cy="245" r="5"/>
+  <text class="paneltitle" x="930" y="252">KL_or_JSD_score01</text>
+  <text class="body" x="930" y="282">Compares the full GT and predicted distributions.</text>
+  <text class="small" x="930" y="309">Most sensitive to overall shape mismatch:</text>
+  <text class="small" x="930" y="332">peak shifts, missing modes, tail over/under-mass.</text>
+
+  <circle class="bullet" cx="910" cy="420" r="5"/>
+  <text class="paneltitle" x="930" y="427">QNT_score01</text>
+  <text class="body" x="930" y="457">Checks where key quantile cutoffs fall.</text>
+  <text class="small" x="930" y="484">Sensitive to percentile structure and tail placement:</text>
+  <text class="small" x="930" y="507">for example, whether the upper tail is too heavy.</text>
+
+  <circle class="bullet" cx="910" cy="600" r="5"/>
+  <text class="paneltitle" x="930" y="607">Mean_score01</text>
+  <text class="body" x="930" y="637">Looks only at first-order location.</text>
+  <text class="small" x="930" y="664">Asks whether the prediction is globally shifted</text>
+  <text class="small" x="930" y="687">left or right relative to the real activity values.</text>
+
+  <rect class="panel" x="60" y="845" width="1280" height="1" rx="0" ry="0" style="opacity:0"/>
+
+  <rect class="panel" x="60" y="790" width="1280" height="70" rx="16" ry="16"/>
+  <text class="paneltitle" x="90" y="825">MOM_score01</text>
+  <text class="body" x="240" y="825">Summarizes variance, skewness, and kurtosis: spread, asymmetry, and tail-heaviness. It asks whether the prediction has the right width and shape even when the mean is similar.</text>
+</svg>

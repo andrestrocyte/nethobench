@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="880" viewBox="0 0 1400 880">
+  <defs>
+    <style>
+      .title { font: 700 32px Arial, sans-serif; fill: #122033; }
+      .subtitle { font: 400 16px Arial, sans-serif; fill: #46556a; }
+      .section { font: 700 22px Arial, sans-serif; fill: #17324d; }
+      .label { font: 700 18px Arial, sans-serif; fill: #17324d; }
+      .body { font: 400 15px Arial, sans-serif; fill: #314154; }
+      .small { font: 400 13px Arial, sans-serif; fill: #5a697d; }
+      .chip { font: 700 14px Arial, sans-serif; fill: #17324d; }
+      .box { fill: #ffffff; stroke: #cfd8e3; stroke-width: 2; rx: 18; }
+      .soft { fill: #f6f8fb; stroke: #d9e1ea; stroke-width: 2; rx: 18; }
+      .blue { fill: #eaf3ff; stroke: #91baf5; stroke-width: 2; rx: 18; }
+      .green { fill: #edf8f1; stroke: #8cc8a1; stroke-width: 2; rx: 18; }
+      .amber { fill: #fff6e6; stroke: #efc36e; stroke-width: 2; rx: 18; }
+      .line { stroke: #8ea0b5; stroke-width: 3; stroke-linecap: round; }
+      .dash { stroke: #8ea0b5; stroke-width: 2.5; stroke-dasharray: 7 7; }
+      .axis { stroke: #5d7087; stroke-width: 3; }
+      .tick { stroke: #5d7087; stroke-width: 2; }
+      .dot1 { fill: #5b8def; }
+      .dot2 { fill: #2cbe8d; }
+      .dot3 { fill: #f0a53a; }
+      .dot4 { fill: #d65f5f; }
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#6f8299"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="880" fill="#fbfcfe"/>
+
+  <text x="70" y="64" class="title">AR-1 / AR-2 baselines, ceiling, and oracle</text>
+  <text x="70" y="94" class="subtitle">Why these reference experiments are useful when interpreting neural realism scores</text>
+
+  <rect x="70" y="130" width="1260" height="210" class="soft"/>
+  <text x="100" y="170" class="section">Question</text>
+  <text x="100" y="205" class="body">How much of the benchmark can be explained by simple short-memory prediction, and what does near-maximal realism look like?</text>
+
+  <rect x="100" y="240" width="250" height="70" class="blue"/>
+  <text x="125" y="282" class="label">AR-1</text>
+  <text x="190" y="282" class="body">x(t+1) from x(t)</text>
+
+  <rect x="395" y="240" width="250" height="70" class="blue"/>
+  <text x="420" y="282" class="label">AR-2</text>
+  <text x="485" y="282" class="body">x(t+1) from x(t), x(t-1)</text>
+
+  <rect x="690" y="240" width="250" height="70" class="green"/>
+  <text x="715" y="282" class="label">Ceiling</text>
+  <text x="792" y="282" class="body">best realistic upper reference</text>
+
+  <rect x="985" y="240" width="250" height="70" class="amber"/>
+  <text x="1010" y="282" class="label">Oracle</text>
+  <text x="1080" y="282" class="body">near-ideal structure-preserving case</text>
+
+  <line x1="350" y1="275" x2="392" y2="275" class="line" marker-end="url(#arrow)"/>
+  <line x1="645" y1="275" x2="687" y2="275" class="line" marker-end="url(#arrow)"/>
+  <line x1="940" y1="275" x2="982" y2="275" class="line" marker-end="url(#arrow)"/>
+
+  <rect x="70" y="375" width="600" height="430" class="box"/>
+  <text x="100" y="415" class="section">Baselines: what simple memory can explain</text>
+
+  <rect x="100" y="445" width="255" height="145" class="blue"/>
+  <text x="122" y="478" class="label">AR-1 rationale</text>
+  <text x="122" y="510" class="body">Minimal temporal null model.</text>
+  <text x="122" y="537" class="body">Tests whether first-order persistence</text>
+  <text x="122" y="560" class="body">already explains much of the score.</text>
+  <text x="122" y="587" class="small">If strong, realism may be driven by local smoothness.</text>
+
+  <rect x="385" y="445" width="255" height="145" class="blue"/>
+  <text x="407" y="478" class="label">AR-2 rationale</text>
+  <text x="407" y="510" class="body">Adds one more lag of memory.</text>
+  <text x="407" y="537" class="body">Checks whether modestly richer linear</text>
+  <text x="407" y="560" class="body">history closes the gap to real dynamics.</text>
+  <text x="407" y="587" class="small">Separates first-order from second-order temporal structure.</text>
+
+  <text x="100" y="640" class="label">Interpretation</text>
+  <text x="100" y="673" class="body">If AR-1 / AR-2 do well on fidelity but poorly on geometry, relational structure, or state dynamics,</text>
+  <text x="100" y="698" class="body">then the benchmark is detecting more than trivial persistence.</text>
+
+  <line x1="130" y1="752" x2="610" y2="752" class="axis"/>
+  <line x1="150" y1="744" x2="150" y2="760" class="tick"/>
+  <line x1="300" y1="744" x2="300" y2="760" class="tick"/>
+  <line x1="450" y1="744" x2="450" y2="760" class="tick"/>
+  <line x1="590" y1="744" x2="590" y2="760" class="tick"/>
+  <text x="120" y="785" class="small">short-memory baseline</text>
+  <text x="520" y="785" class="small">richer dynamics</text>
+  <circle cx="205" cy="752" r="10" class="dot1"/>
+  <circle cx="300" cy="752" r="10" class="dot2"/>
+  <text x="188" y="730" class="chip">AR-1</text>
+  <text x="283" y="730" class="chip">AR-2</text>
+
+  <rect x="730" y="375" width="600" height="430" class="box"/>
+  <text x="760" y="415" class="section">Upper references: what near-maximal realism looks like</text>
+
+  <rect x="760" y="445" width="255" height="145" class="green"/>
+  <text x="782" y="478" class="label">Ceiling rationale</text>
+  <text x="782" y="510" class="body">Defines the best realistic score under</text>
+  <text x="782" y="537" class="body">the actual data and preprocessing pipeline.</text>
+  <text x="782" y="560" class="body">Acknowledges noise and finite samples.</text>
+  <text x="782" y="587" class="small">Upper bound expected in practice, not perfection.</text>
+
+  <rect x="1045" y="445" width="255" height="145" class="amber"/>
+  <text x="1067" y="478" class="label">Oracle rationale</text>
+  <text x="1067" y="510" class="body">Uses ground-truth structure or an</text>
+  <text x="1067" y="537" class="body">effectively idealized construction.</text>
+  <text x="1067" y="560" class="body">Shows benchmark behavior near perfect match.</text>
+  <text x="1067" y="587" class="small">Reference for near-ideal structure preservation.</text>
+
+  <text x="760" y="640" class="label">Interpretation</text>
+  <text x="760" y="673" class="body">These anchor the top end of the scale, so model scores can be judged relative to both trivial baselines</text>
+  <text x="760" y="698" class="body">and near-maximal realism.</text>
+
+  <line x1="790" y1="752" x2="1270" y2="752" class="axis"/>
+  <line x1="810" y1="744" x2="810" y2="760" class="tick"/>
+  <line x1="960" y1="744" x2="960" y2="760" class="tick"/>
+  <line x1="1110" y1="744" x2="1110" y2="760" class="tick"/>
+  <line x1="1250" y1="744" x2="1250" y2="760" class="tick"/>
+  <text x="800" y="785" class="small">realistic upper bound</text>
+  <text x="1178" y="785" class="small">near-ideal</text>
+  <circle cx="930" cy="752" r="10" class="dot3"/>
+  <circle cx="1160" cy="752" r="10" class="dot4"/>
+  <text x="900" y="730" class="chip">Ceiling</text>
+  <text x="1136" y="730" class="chip">Oracle</text>
+
+  <line x1="670" y1="590" x2="728" y2="590" class="dash" marker-end="url(#arrow)"/>
+  <text x="602" y="575" class="small">interpret model position</text>
+  <text x="610" y="595" class="small">between these anchors</text>
+</svg>

@@ -1,0 +1,199 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="920" viewBox="0 0 1500 920" role="img" aria-labelledby="title desc">
+  <title id="title">State dynamics concept diagram</title>
+  <desc id="desc">A clean conceptual figure showing GT-defined latent states, occupancy distributions, and transition matrices for the NethoBench state dynamics family.</desc>
+  <defs>
+    <style>
+      .bg { fill: #fbfaf7; }
+      .panel { fill: #fffdf8; stroke: #d9d1c6; stroke-width: 2; }
+      .title { font: 700 32px Georgia, 'Times New Roman', serif; fill: #16222d; }
+      .paneltitle { font: 700 22px Georgia, 'Times New Roman', serif; fill: #16222d; }
+      .small { font: 400 15px Georgia, 'Times New Roman', serif; fill: #5e6a75; }
+      .body { font: 400 17px Georgia, 'Times New Roman', serif; fill: #253746; }
+      .axis { stroke: #4f5c68; stroke-width: 2.2; }
+      .grid { stroke: #ebe5db; stroke-width: 1.2; }
+      .gt { fill: #1f77b4; opacity: 0.9; }
+      .pred { fill: #d95f02; opacity: 0.88; }
+      .stateA { fill: #dceef8; stroke: #86b7d8; stroke-width: 1.5; }
+      .stateB { fill: #e6f3df; stroke: #9fc48b; stroke-width: 1.5; }
+      .stateC { fill: #fbe7d7; stroke: #d7a67e; stroke-width: 1.5; }
+      .stateD { fill: #efe4f8; stroke: #b39acf; stroke-width: 1.5; }
+      .trajgt { stroke: #1f77b4; stroke-width: 3.5; fill: none; opacity: 0.95; }
+      .trajpred { stroke: #d95f02; stroke-width: 3.5; fill: none; opacity: 0.90; stroke-dasharray: 8 6; }
+      .arrowgt { stroke: #1f77b4; stroke-width: 3; fill: none; marker-end: url(#arrowBlue); }
+      .arrowpred { stroke: #d95f02; stroke-width: 3; fill: none; marker-end: url(#arrowOrange); stroke-dasharray: 8 6; }
+      .barGT { fill: #6ea9d6; }
+      .barPred { fill: #efb07b; }
+      .heatGT1 { fill: #edf5fb; }
+      .heatGT2 { fill: #cfe3f4; }
+      .heatGT3 { fill: #a8cae6; }
+      .heatGT4 { fill: #6d9fcc; }
+      .heatPred1 { fill: #fdf1e7; }
+      .heatPred2 { fill: #f7d5b6; }
+      .heatPred3 { fill: #eeae77; }
+      .heatPred4 { fill: #dc7a2e; }
+      .celltxt { font: 700 14px 'Menlo', 'Consolas', monospace; fill: #16222d; text-anchor: middle; dominant-baseline: middle; }
+      .legendtxt { font: 400 16px Georgia, 'Times New Roman', serif; fill: #253746; }
+    </style>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1f77b4"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d95f02"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1500" height="920"/>
+  <text class="title" x="60" y="62">State Dynamics: GT-defined latent states, occupancy, and transitions</text>
+
+  <circle class="gt" cx="1085" cy="52" r="8"/>
+  <text class="legendtxt" x="1102" y="58">GT</text>
+  <circle class="pred" cx="1170" cy="52" r="8"/>
+  <text class="legendtxt" x="1187" y="58">Prediction</text>
+
+  <rect class="panel" x="50" y="95" width="620" height="760" rx="18" ry="18"/>
+  <text class="paneltitle" x="80" y="130">1. GT latent space defines discrete states</text>
+
+  <line class="axis" x1="110" y1="600" x2="615" y2="600"/>
+  <line class="axis" x1="110" y1="600" x2="110" y2="170"/>
+
+  <ellipse class="stateA" cx="225" cy="285" rx="95" ry="72"/>
+  <ellipse class="stateB" cx="470" cy="280" rx="115" ry="82"/>
+  <ellipse class="stateC" cx="255" cy="500" rx="120" ry="86"/>
+  <ellipse class="stateD" cx="470" cy="500" rx="105" ry="78"/>
+
+  <text class="body" x="213" y="287">S1</text>
+  <text class="body" x="458" y="282">S2</text>
+  <text class="body" x="243" y="502">S3</text>
+  <text class="body" x="458" y="502">S4</text>
+
+  <path class="trajgt" d="M 190 320 C 210 300, 240 285, 280 260 C 330 230, 390 220, 430 245 C 470 268, 508 330, 515 398 C 520 450, 500 470, 470 500 C 430 538, 370 565, 320 560 C 268 555, 218 540, 205 500 C 195 468, 198 430, 230 395"/>
+  <path class="trajpred" d="M 175 335 C 205 300, 248 300, 295 275 C 350 245, 403 238, 442 260 C 485 285, 515 340, 523 410 C 528 455, 500 487, 463 520 C 420 555, 355 575, 302 570 C 250 565, 205 550, 188 510 C 178 480, 187 437, 220 402"/>
+
+  <circle class="gt" cx="195" cy="315" r="6"/>
+  <circle class="gt" cx="282" cy="260" r="6"/>
+  <circle class="gt" cx="434" cy="246" r="6"/>
+  <circle class="gt" cx="518" cy="402" r="6"/>
+  <circle class="gt" cx="469" cy="501" r="6"/>
+  <circle class="gt" cx="321" cy="560" r="6"/>
+  <circle class="gt" cx="230" cy="395" r="6"/>
+
+  <circle class="pred" cx="176" cy="335" r="5"/>
+  <circle class="pred" cx="294" cy="276" r="5"/>
+  <circle class="pred" cx="441" cy="260" r="5"/>
+  <circle class="pred" cx="523" cy="409" r="5"/>
+  <circle class="pred" cx="463" cy="520" r="5"/>
+  <circle class="pred" cx="301" cy="570" r="5"/>
+  <circle class="pred" cx="220" cy="402" r="5"/>
+
+  <text class="small" x="130" y="645">GT k-means states are fit in latent space.</text>
+  <text class="small" x="130" y="670">Prediction is assigned to the same GT-defined states.</text>
+
+  <rect class="panel" x="705" y="95" width="320" height="355" rx="18" ry="18"/>
+  <text class="paneltitle" x="735" y="130">2. Occupancy</text>
+  <line class="axis" x1="760" y1="390" x2="980" y2="390"/>
+  <line class="axis" x1="760" y1="390" x2="760" y2="170"/>
+  <line class="grid" x1="760" y1="335" x2="980" y2="335"/>
+  <line class="grid" x1="760" y1="280" x2="980" y2="280"/>
+  <line class="grid" x1="760" y1="225" x2="980" y2="225"/>
+
+  <rect class="barGT" x="785" y="255" width="22" height="135"/>
+  <rect class="barPred" x="810" y="270" width="22" height="120"/>
+  <rect class="barGT" x="845" y="210" width="22" height="180"/>
+  <rect class="barPred" x="870" y="225" width="22" height="165"/>
+  <rect class="barGT" x="905" y="305" width="22" height="85"/>
+  <rect class="barPred" x="930" y="292" width="22" height="98"/>
+  <rect class="barGT" x="965" y="235" width="22" height="155"/>
+  <rect class="barPred" x="990" y="245" width="22" height="145"/>
+
+  <text class="small" x="790" y="417">S1</text>
+  <text class="small" x="850" y="417">S2</text>
+  <text class="small" x="910" y="417">S3</text>
+  <text class="small" x="970" y="417">S4</text>
+  <text class="small" x="735" y="442">visit distribution</text>
+
+  <rect class="panel" x="1055" y="95" width="385" height="355" rx="18" ry="18"/>
+  <text class="paneltitle" x="1085" y="130">3. Transitions</text>
+
+  <text class="small" x="1105" y="170">GT</text>
+  <rect x="1090" y="185" width="140" height="140" fill="#ffffff" stroke="#cfd6dd" stroke-width="1.5"/>
+  <line x1="1125" y1="185" x2="1125" y2="325" stroke="#d8dfe6" stroke-width="1"/>
+  <line x1="1160" y1="185" x2="1160" y2="325" stroke="#d8dfe6" stroke-width="1"/>
+  <line x1="1195" y1="185" x2="1195" y2="325" stroke="#d8dfe6" stroke-width="1"/>
+  <line x1="1090" y1="220" x2="1230" y2="220" stroke="#d8dfe6" stroke-width="1"/>
+  <line x1="1090" y1="255" x2="1230" y2="255" stroke="#d8dfe6" stroke-width="1"/>
+  <line x1="1090" y1="290" x2="1230" y2="290" stroke="#d8dfe6" stroke-width="1"/>
+  <rect class="heatGT4" x="1090" y="185" width="35" height="35"/>
+  <rect class="heatGT2" x="1125" y="185" width="35" height="35"/>
+  <rect class="heatGT1" x="1160" y="185" width="35" height="35"/>
+  <rect class="heatGT1" x="1195" y="185" width="35" height="35"/>
+  <rect class="heatGT2" x="1090" y="220" width="35" height="35"/>
+  <rect class="heatGT4" x="1125" y="220" width="35" height="35"/>
+  <rect class="heatGT2" x="1160" y="220" width="35" height="35"/>
+  <rect class="heatGT1" x="1195" y="220" width="35" height="35"/>
+  <rect class="heatGT1" x="1090" y="255" width="35" height="35"/>
+  <rect class="heatGT2" x="1125" y="255" width="35" height="35"/>
+  <rect class="heatGT3" x="1160" y="255" width="35" height="35"/>
+  <rect class="heatGT2" x="1195" y="255" width="35" height="35"/>
+  <rect class="heatGT1" x="1090" y="290" width="35" height="35"/>
+  <rect class="heatGT1" x="1125" y="290" width="35" height="35"/>
+  <rect class="heatGT2" x="1160" y="290" width="35" height="35"/>
+  <rect class="heatGT4" x="1195" y="290" width="35" height="35"/>
+
+  <text class="small" x="1265" y="170">Prediction</text>
+  <rect x="1250" y="185" width="140" height="140" fill="#ffffff" stroke="#cfd6dd" stroke-width="1.5"/>
+  <line x1="1285" y1="185" x2="1285" y2="325" stroke="#ead7c7" stroke-width="1"/>
+  <line x1="1320" y1="185" x2="1320" y2="325" stroke="#ead7c7" stroke-width="1"/>
+  <line x1="1355" y1="185" x2="1355" y2="325" stroke="#ead7c7" stroke-width="1"/>
+  <line x1="1250" y1="220" x2="1390" y2="220" stroke="#ead7c7" stroke-width="1"/>
+  <line x1="1250" y1="255" x2="1390" y2="255" stroke="#ead7c7" stroke-width="1"/>
+  <line x1="1250" y1="290" x2="1390" y2="290" stroke="#ead7c7" stroke-width="1"/>
+  <rect class="heatPred4" x="1250" y="185" width="35" height="35"/>
+  <rect class="heatPred2" x="1285" y="185" width="35" height="35"/>
+  <rect class="heatPred1" x="1320" y="185" width="35" height="35"/>
+  <rect class="heatPred1" x="1355" y="185" width="35" height="35"/>
+  <rect class="heatPred2" x="1250" y="220" width="35" height="35"/>
+  <rect class="heatPred3" x="1285" y="220" width="35" height="35"/>
+  <rect class="heatPred2" x="1320" y="220" width="35" height="35"/>
+  <rect class="heatPred1" x="1355" y="220" width="35" height="35"/>
+  <rect class="heatPred1" x="1250" y="255" width="35" height="35"/>
+  <rect class="heatPred2" x="1285" y="255" width="35" height="35"/>
+  <rect class="heatPred4" x="1320" y="255" width="35" height="35"/>
+  <rect class="heatPred2" x="1355" y="255" width="35" height="35"/>
+  <rect class="heatPred1" x="1250" y="290" width="35" height="35"/>
+  <rect class="heatPred1" x="1285" y="290" width="35" height="35"/>
+  <rect class="heatPred2" x="1320" y="290" width="35" height="35"/>
+  <rect class="heatPred4" x="1355" y="290" width="35" height="35"/>
+
+  <text class="small" x="1085" y="353">lag-1 state transition matrix</text>
+
+  <rect class="panel" x="705" y="490" width="735" height="365" rx="18" ry="18"/>
+  <text class="paneltitle" x="735" y="525">4. What the state-dynamics family checks</text>
+
+  <path class="arrowgt" d="M 830 630 C 880 590, 940 565, 1000 590"/>
+  <path class="arrowgt" d="M 1000 590 C 1080 620, 1110 690, 1080 755"/>
+  <path class="arrowgt" d="M 1080 755 C 1010 810, 930 808, 855 760"/>
+  <path class="arrowgt" d="M 855 760 C 800 715, 790 670, 810 630"/>
+
+  <path class="arrowpred" d="M 845 645 C 900 600, 955 585, 1015 605"/>
+  <path class="arrowpred" d="M 1015 605 C 1090 638, 1115 700, 1095 748"/>
+  <path class="arrowpred" d="M 1095 748 C 1030 800, 950 798, 872 752"/>
+  <path class="arrowpred" d="M 872 752 C 822 708, 808 676, 825 642"/>
+
+  <circle class="stateA" cx="815" cy="628" r="42"/>
+  <circle class="stateB" cx="1010" cy="592" r="42"/>
+  <circle class="stateC" cx="1090" cy="755" r="42"/>
+  <circle class="stateD" cx="855" cy="760" r="42"/>
+  <text class="body" x="804" y="634">S1</text>
+  <text class="body" x="999" y="598">S2</text>
+  <text class="body" x="1079" y="761">S3</text>
+  <text class="body" x="844" y="766">S4</text>
+
+  <text class="body" x="1165" y="610">Occupancy:</text>
+  <text class="small" x="1165" y="640">How often each GT-defined state is visited</text>
+  <text class="body" x="1165" y="695">Transitions:</text>
+  <text class="small" x="1165" y="725">How probability mass moves between states</text>
+  <text class="small" x="1165" y="751">at lag 1, lag 2, and lag 3</text>
+  <text class="body" x="1165" y="805">Scores:</text>
+  <text class="small" x="1165" y="835">LatentStateOccupancyK11, K12</text>
+  <text class="small" x="1165" y="861">LatentStateTransitionLag1,2,3 K11</text>
+</svg>
