@@ -4,6 +4,19 @@ NethoBench evaluates neural, behavioural and multimodal neural-behavioural gener
 
 The project is licensed under the MIT license.
 
+## Published-score compatibility and reproducible installation
+
+Release **0.2.1** preserves the complete 0.2.0 scoring implementation pinned by
+the ICLR V2 manuscript at `4075d2fe13b354de910d0cd1bb22826b94296594`.
+Use the [locked Python environment and compatibility instructions](docs/reproducibility_and_compatibility.md)
+for reproducible scoring. CI checks Linux/macOS, package installation and numerical
+outputs against that commit. Additional sequence-aware/directed and conditional-state
+diagnostics are **opt-in** and never change existing CLI scores or composites.
+
+The maintained GitHub repository is `andrestrocyte/nethobench`; the earlier 0.1.0
+repository is retained as `andrestrocyte/nethobench_legacy`. Use the pinned commit
+when reproducing the paper, regardless of repository name.
+
 
 
 ![NethoBench Logo](assets/nethobench.png)

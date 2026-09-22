@@ -1,0 +1,74 @@
+name: Tests and published-score compatibility
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MPLBACKEND: Agg
+  NUMBA_NUM_THREADS: "1"
+  OMP_NUM_THREADS: "1"
+  OPENBLAS_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+  VECLIB_MAXIMUM_THREADS: "1"
+
+jobs:
+  locked:
+    name: Locked Python 3.10 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-14]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.10.13"
+      - name: Install locked runtime
+        run: |
+          python -m pip install uv==0.11.28
+          uv venv .venv --python "$(which python)"
+          uv pip install --python .venv/bin/python --require-hashes -r requirements/bootstrap.lock
+          uv pip sync --python .venv/bin/python --no-build-isolation --require-hashes requirements/py310.lock
+          uv pip install --python .venv/bin/python --no-deps --no-build-isolation -e .
+      - name: Unit and integration tests
+        run: .venv/bin/python -m pytest -q --junitxml=outputs/test-results.xml
+      - name: Build source and wheel distributions
+        run: .venv/bin/python -m build --no-isolation
+      - name: Install and inspect wheel outside checkout
+        run: |
+          uv pip install --python .venv/bin/python --no-deps --reinstall dist/*.whl
+          .venv/bin/python scripts/check_distribution.py dist/*.whl --python .venv/bin/python
+      - name: Compare published CLI outputs with installed wheel
+        run: .venv/bin/python scripts/compare_published_release.py --python .venv/bin/python --report outputs/compatibility.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: validation-${{ matrix.os }}
+          path: |
+            outputs/test-results.xml
+            outputs/compatibility.json
+            dist/*
+  current-dependencies:
+    name: Python 3.12 with current compatible dependencies
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install '.[test]'
+      - run: python -m pytest tests/unit -q

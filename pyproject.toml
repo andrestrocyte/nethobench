@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nethobench"
-version = "0.2.0"
+version = "0.2.1"
 description = "Unified benchmark for neural, behavioral, and cross-modal (neural↔behavior) plausibility."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -30,5 +30,11 @@ test = [
 nethobench = "nethobench.cli:main"
 
 [tool.setuptools]
-packages = {find = {}}
 include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["nethobench", "nethobench.*"]
+exclude = ["tests", "tests.*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

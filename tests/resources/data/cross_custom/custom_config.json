@@ -1,0 +1,34 @@
+{
+  "sequence_key": "trial_id",
+  "time_key": "frame_idx",
+  "neuro_cols": [
+    "neuro_1",
+    "neuro_2",
+    "neuro_3",
+    "neuro_4",
+    "neuro_5",
+    "neuro_6",
+    "neuro_7",
+    "neuro_8",
+    "neuro_9",
+    "neuro_10",
+    "neuro_11",
+    "neuro_12",
+    "neuro_13",
+    "neuro_14",
+    "neuro_15",
+    "neuro_16"
+  ],
+  "behavior_parts": [
+    "BODY",
+    "HEAD",
+    "LEFT_E",
+    "RIGHT_E",
+    "TAIL"
+  ],
+  "body_axis": [
+    "HEAD",
+    "TAIL"
+  ],
+  "center_part": "BODY"
+}

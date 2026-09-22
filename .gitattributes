@@ -1,0 +1,2 @@
+# Keep restored scientific fixtures byte-identical, including their CRLF endings.
+tests/resources/data/**/*.csv -text whitespace=cr-at-eol

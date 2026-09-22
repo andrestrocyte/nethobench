@@ -1,0 +1,13 @@
+# Numerical-library versions from the environment used for the V2 source audit.
+# These constrain the reproducibility lock, not downstream package installations.
+numpy==2.2.6
+pandas==2.3.3
+scipy==1.15.3
+scikit-learn==1.7.2
+matplotlib==3.10.8
+umap-learn==0.5.11
+numba==0.64.0
+llvmlite==0.46.0
+ripser==0.6.14
+pyarrow==23.0.1
+pytest==9.0.2

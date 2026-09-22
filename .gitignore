@@ -19,6 +19,8 @@ dist/
 # Outputs
 outputs/
 data/
+!tests/resources/data/
+!tests/resources/data/**
 experiments/
 paper/
 rebuttal_neurips_2026/
