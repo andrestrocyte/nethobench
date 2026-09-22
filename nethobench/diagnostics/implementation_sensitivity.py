@@ -1,4 +1,4 @@
-"""Explicit alternatives to the ICLR V2 pinned scoring definitions.
+"""Explicit alternatives to the pinned scoring definitions.
 
 Adapted from the V2 implementation-sensitivity analysis. Existing metrics and
 composites remain unchanged. These diagnostics must be reported separately;

@@ -2,7 +2,7 @@
 
 ## Published scores
 
-The ICLR V2 manuscript pins commit
+The manuscript pins commit
 `4075d2fe13b354de910d0cd1bb22826b94296594` (package 0.2.0).
 The engineering release 0.2.1 preserves all 52 Python source files present in
 that commit byte for byte. The default API, CLI, metric names, legacy aliases,

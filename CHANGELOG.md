@@ -2,7 +2,7 @@
 
 ## 0.2.1 — 2026-09-22
 
-- Preserve all 52 existing package source files from the ICLR V2 scoring commit.
+- Preserve all 52 existing package source files from the reference scoring commit.
 - Add hashed Python 3.10 scoring/test/build locks and pinned build bootstrap tools.
 - Add CI for Linux/macOS, Python 3.12 compatibility, installed-wheel validation,
   and numerical comparisons with the published CLI.

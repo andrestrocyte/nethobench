@@ -7,7 +7,7 @@ The project is licensed under the MIT license.
 ## Published-score compatibility and reproducible installation
 
 Release **0.2.1** preserves the complete 0.2.0 scoring implementation pinned by
-the ICLR V2 manuscript at `4075d2fe13b354de910d0cd1bb22826b94296594`.
+the manuscript at `4075d2fe13b354de910d0cd1bb22826b94296594`.
 Use the [locked Python environment and compatibility instructions](docs/reproducibility_and_compatibility.md)
 for reproducible scoring. CI checks Linux/macOS, package installation and numerical
 outputs against that commit. Additional sequence-aware/directed and conditional-state

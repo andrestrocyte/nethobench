@@ -4,7 +4,7 @@
 
 - All **52** original package Python files match the paper commit
   `4075d2fe13b354de910d0cd1bb22826b94296594` byte for byte. The reference
-  is retained under the annotated tag `paper-iclr-v2`.
+  remains available by its full commit identifier.
 - Fresh locked CPython 3.10.13 environment on Apple Silicon: **162 tests passed**.
   One expected warning comes from a deliberately short multimodal sequence.
   The core lock does not include PyTorch; this is not a validation of optional
