@@ -28,18 +28,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-15-intel]
+        include:
+          - os: ubuntu-22.04
+            bootstrap-python: "3.10.13"
+          - os: macos-14
+            bootstrap-python: "3.12"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
-          python-version: "3.10.13"
+          python-version: ${{ matrix.bootstrap-python }}
       - name: Install locked runtime
         run: |
           python -m pip install uv==0.11.28
-          uv venv .venv --python "$(which python)"
+          # uv supplies the exact ARM macOS build absent from setup-python.
+          # Intel macOS cannot install the pinned llvmlite binary release.
+          uv venv .venv --python 3.10.13
           uv pip install --python .venv/bin/python --require-hashes -r requirements/bootstrap.lock
           uv pip sync --python .venv/bin/python --no-build-isolation --require-hashes requirements/py310.lock
           uv pip install --python .venv/bin/python --no-deps --no-build-isolation -e .
