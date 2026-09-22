@@ -1,5 +1,38 @@
 # Release validation
 
+## 0.2.1 engineering validation — 2026-09-22
+
+- All **52** original package Python files match the paper commit
+  `4075d2fe13b354de910d0cd1bb22826b94296594` byte for byte. The reference
+  is retained under the annotated tag `paper-iclr-v2`.
+- Fresh locked CPython 3.10.13 environment on Apple Silicon: **162 tests passed**.
+  One expected warning comes from a deliberately short multimodal sequence.
+  The core lock does not include PyTorch; this is not a validation of optional
+  GPU/training configurations (the inherited PyTorch-only test returns early
+  when that optional dependency is absent).
+- Installed-wheel comparison against the paper commit: **251 numerical values**
+  across six neural/fidelity/behavior/cross-modal CLI cases matched, with maximum
+  observed absolute difference **0.0** and matching numerical keys/missing values.
+  Tolerances are rtol=1e-10, atol=1e-12; these fixtures are regression evidence,
+  not a guarantee of identical results for every dataset or runtime.
+- Opt-in diagnostics versus the V2 sensitivity script on three finite-input
+  cases (seeds 17/29/43): **15 values matched exactly**. The new API additionally
+  validates shapes/support and rejects gaps for conditional state diagnostics.
+- The wheel contains **60 entries**, includes the new diagnostic API, and excludes
+  test modules and fixtures. The source distribution contains the test suite,
+  compatibility manifest, and **14** fixture CSV/JSON files. Import and CLI help
+  were tested from outside the checkout using the installed wheel.
+- Hosted validation passed: **162 tests on Linux**, **162 on macOS**, and **69
+  unit tests on Python 3.12** with current compatible dependencies. Both locked
+  jobs also passed wheel checks and the six-case numerical comparison.
+  [CI record](https://github.com/andrestrocyte/nethobench/actions/runs/35675393655).
+
+See [reproduction instructions and scientific boundaries](docs/reproducibility_and_compatibility.md).
+The default score definition and manuscript computations have not been replaced
+by the optional sensitivity variants.
+
+## 0.2.0 release validation
+
 Validation was performed on 2026-07-28 using Python 3.10.
 
 ## Test coverage
