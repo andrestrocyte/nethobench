@@ -1,267 +1,226 @@
 # NethoBench
 
-NethoBench evaluates neural, behavioural and multimodal neural-behavioural generative models by measuring the realism or plausibility of generated traces. Each of the three modes is covered by its own command, and which is appropriate depends on the nature of the generated traces: synthetic neural traces should be evaluated using `neuro-scores`, `fidelity-scores` and `neuro-analysis`, synthetic behavioural traces should use `etho-scores` and `etho-analysis` and multimodal traces `cross-scores` and `cross-analysis`.
+**Compare the structure of generated neural activity, behavior, and their interaction.**
 
-The project is licensed under the MIT license.
+A forecast can have a small pointwise error while losing variability, temporal structure, or relationships between channels. Conversely, a stochastic sample can preserve those properties without matching the observed trajectory point by point. NethoBench measures structural agreement and predictive fidelity separately, so you can see what a model preserves and where it fails.
 
-## Published-score compatibility and reproducible installation
+Use it to compare forecasting models, inspect long rollouts, or characterize the effect of a model or input change on a fixed evaluation set. The package provides command-line scoring, a Python interface, and diagnostic plots.
 
-Release **0.2.1** preserves the complete 0.2.0 scoring implementation pinned by
-the manuscript at `4075d2fe13b354de910d0cd1bb22826b94296594`.
-Use the [locked Python environment and compatibility instructions](docs/reproducibility_and_compatibility.md)
-for reproducible scoring. CI checks Linux/macOS, package installation and numerical
-outputs against that commit. Additional sequence-aware/directed and conditional-state
-diagnostics are **opt-in** and never change existing CLI scores or composites.
+## Choose an evaluation
 
-The maintained GitHub repository is `andrestrocyte/nethobench`; the earlier 0.1.0
-repository is retained as `andrestrocyte/nethobench_legacy`. Use the pinned commit
-when reproducing the paper, regardless of repository name.
+| Your generated output | Command | What it measures |
+| --- | --- | --- |
+| Neural activity | `neuro-scores` | Five families of structural agreement and a weighted composite |
+| Neural activity aligned to an observed trajectory | `fidelity-scores` | Pointwise error and mutual-information agreement, reported separately |
+| Tracked body positions | `etho-scores` | Spatial, kinematic, trajectory, and movement-geometry agreement |
+| Neural activity and behavior together | `cross-scores` | Neural and behavioral scores plus cross-modal coupling |
 
-
-
-![NethoBench Logo](assets/nethobench.png)
-
-**Outputs:**
-1. **Neuro:** Structural neural realism (Distribution, Temporal, Relational, Geometry, State Dynamics).
-2. **Fidelity:** Direct trace-alignment (Error, Mutual Information).
-3. **Behavior:** Pose and kinematics realism.
-4. **Cross-modal:** Neural-behavioral coupling (CCA, Predictive $R^2$, Lead-Lag).
-5. **Multimodal Composite:** Average across available domains.
+Choose the mode by **what the model produces**. A neural model conditioned on behavior still uses neural scoring; behavioral scoring evaluates generated behavior itself. Cross-modal scoring requires both neural and behavioral output streams.
 
 ## Install
+
+Python **3.10 or newer** is required. From the root of a downloaded or cloned source checkout:
+
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install --upgrade pip
-pip install -e .
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+nethobench --help
 ```
 
-## Run the compact test fixtures
-The repository includes small neural, behavioral, and multimodal fixtures under
-`tests/resources/data/`. These files use the default `sequenceId` /
-`itemPosition` schema, so no config file is needed.
+On Windows PowerShell, activate the environment with `.venv\Scripts\Activate.ps1`.
+
+For a pinned CPU scoring environment, use the [locked installation instructions](docs/reproducibility_and_compatibility.md#locked-scoring-and-test-environment). A normal installation resolves compatible dependency versions; the lock fixes the dependency set for repeatable evaluations.
+
+## Quickstart with included data
+
+The source checkout contains small datasets in [`tests/resources/data/`](tests/resources/data/). No external download or model training is needed. These fixtures exercise the scoring workflow; they are not a model-performance benchmark. Fixtures are not installed with the wheel.
+
+### Neural structure
 
 ```bash
 mkdir -p outputs/quickstart
-```
 
-**Neural and fidelity scores**
-```bash
 nethobench neuro-scores \
   --gt tests/resources/data/neural/ground-truth/gt-ba4.csv \
   --preds tests/resources/data/neural/predictions/preds-ba4.csv \
-  --json-out outputs/quickstart/neuro-ba4.json
+  --json-out outputs/quickstart/neural.json
+```
 
+Scores are printed in the terminal and saved under the JSON `scores` key. Inspect the family profile before relying on its composite:
+
+```python
+import json
+from pathlib import Path
+
+scores = json.loads(Path("outputs/quickstart/neural.json").read_text())["scores"]
+for family in ("distribution", "temporal_spectral", "relational", "geometry", "state_dynamics"):
+    print(f"{family}: {scores[f'family_{family}']:.3f}")
+print(f"composite: {scores['FINAL_COMPOSITE_SCORE']:.3f}")
+```
+
+### Pointwise fidelity
+
+Evaluate the same prediction against the observed trajectory:
+
+```bash
 nethobench fidelity-scores \
   --gt tests/resources/data/neural/ground-truth/gt-ba4.csv \
   --preds tests/resources/data/neural/predictions/preds-ba4.csv \
-  --json-out outputs/quickstart/fidelity-ba4.json
+  --json-out outputs/quickstart/fidelity.json
 ```
 
-**Behavioral scores**
+### Behavior and cross-modal coupling
+
 ```bash
 nethobench etho-scores \
   --gt-dir tests/resources/data/behavioural/behav-ground-truth.csv \
   --inf-dir tests/resources/data/behavioural/behav-predictions.csv \
   --json-out outputs/quickstart/behavior
-```
 
-**Cross-modal scores**
-```bash
 nethobench cross-scores \
   --gt tests/resources/data/cross/cross-ground-truth.csv \
   --preds tests/resources/data/cross/cross-predictions.csv \
   --json-out outputs/quickstart/cross
 ```
 
-The full test suite can be run with `pytest -q`.
+For `neuro-scores` and `fidelity-scores`, `--json-out` is a **file path**. For `etho-scores` and `cross-scores`, it is a **directory**, with results written to `scores.json` inside it. Behavioral inputs can be individual CSV/Parquet files or directories containing them.
 
-## CLI Usage
-All commands output JSON scores; `-analysis` commands also generate figures.
+## Use your own data
 
-**Neural**
-```bash
-nethobench neuro-scores --gt gt.csv --preds pred.csv --config config.json
-nethobench fidelity-scores --gt gt.csv --preds pred.csv --config config.json
-nethobench neuro-analysis --gt gt.csv --preds pred.csv --config config.json
+### Neural tables
+
+Provide reference and prediction CSVs with sequence IDs, time indices, and matching neural channels:
+
+```csv
+sequenceId,itemPosition,region_1,region_2
+0,0,0.12,0.41
+0,1,0.18,0.39
+1,0,0.09,0.44
+1,1,0.15,0.40
 ```
 
-**Behavioral**
-```bash
-nethobench etho-scores --gt-dir gt.parquet --inf-dir pred.csv --config config.json
-nethobench etho-analysis --gt-dir gt.parquet --inf-dir pred.csv --config config.json
-```
-`--gt-dir` and `--inf-dir` accept either a single `.csv` / `.parquet` file or a
-directory containing `.csv` / `.parquet` files.
+This illustrates the column layout, not a sufficient dataset for all metrics. Use sufficiently long sequences and multiple windows for meaningful structural estimates. Keep time steps ordered, use a consistent sampling rate, and preserve channel correspondence between reference and prediction.
 
-**Multimodal**
-```bash
-nethobench cross-scores --gt gt.csv --preds pred.csv --config config.json
-nethobench cross-analysis --gt gt.csv --preds pred.csv --config config.json
-```
+By default, the keys are `sequenceId` and `itemPosition`. Neural scoring treats other columns as neural features; use an explicit channel list when tables contain metadata.
 
+### Behavioral and multimodal tables
 
+Behavioral coordinates use paired `_X` and `_Y` suffixes, such as `CENTER_X`, `CENTER_Y`, `NOSE_X`, and `NOSE_Y`. The default center is `CENTER`, and the default body axis is `NOSE` to `TAIL_BASE`. Multimodal tables contain neural channels and these coordinates on the same sequence/time grid.
 
-### Config Schema (`config.json`)
+### Configuration
 
-Configuration is optional if the data contains the columns "sequenceId" and "itemPosition", and specific rules apply for different CLIs:
+Pass a JSON file to override column names, select features, or set data-dependent parameters:
 
-- `neuro`: any column that isn't `sequenceId` or `itemPosition` is considered a neuro column
-- `etho`: all body part coordinates end in `_X` and `_Y`, `CENTER`, `NOSE` and `TAIL_BASE` are part of the body part coordinate stems
-- `cross`: same as etho for coordinate variables, any columns that aren't `sequenceId` or `itemPosition` and don't end in `_X` or `_Y` are inferred to be neuro columns
-
-The configuration options are broadly divided into two categories:
-- **Data Schema Mappings** (which tell NethoBench how to read your multimodal datasets)
-- **Data-Dependent Hyperparameters** (which adjust evaluation bounds based on your dataset's frame rate, length, or available compute).
-
-### 1. Data Schema Mappings
-These options map your dataset's columns to the semantic features NethoBench expects. If omitted, NethoBench will attempt to auto-infer them from the dataset headers.
-
-*   **`sequence_key`**: *(string)* The column name identifying discrete sequences or trials. Defaults to `"sequenceId"`.
-*   **`time_key`**: *(string)* The column name tracking the chronological frame or time step within a sequence. Defaults to `"itemPosition"`.
-*   **`neuro_cols`**: *(array of strings)* A list of column names corresponding to continuous neural regions, sensors, or ROIs.
-*   **`behavior_parts`**: *(array of strings)* A list of tracked body parts. NethoBench expects these to have `_X` and `_Y` coordinate suffixes in the data (e.g., `["CENTER", "NOSE", "TAIL_BASE"]`).
-*   **`center_part`**: *(string)* The primary point used for tracking global speed and trajectory kinematics. Defaults to `"CENTER"`.
-*   **`body_axis`**: *(array of strings)* A two-element list defining the front and back of the subject for directional heading calculations. Defaults to `["NOSE", "TAIL_BASE"]`.
-
-### 2. Data-Dependent Hyperparameters
-These values fine-tune the statistical bounds and metrics algorithms. They are typically adjusted based on your dataset's sampling frequency, memory constraints, or expected physiological bounds.
-
-**Time & Frame-Rate Settings**
-*   **`WELCH_SAMPLING_FREQUENCY`**: *(float)* Base sampling rate used for PSD and bandpower estimations. Default: `30.0`.
-*   **`WELCH_NPERSEG`**: *(int)* Window size for Welch's spectral density estimation. Default: `256`.
-*   **`LEAD_LAG_DEFAULT_MAX_LAG`**: *(int)* The maximum frame offset searched when calculating cross-modal neural-behavioral lead/lag relationships. Default: `30`.
-*   **`CROSS_CORR_MAX_LAG_SMALL`**: *(int)* Maximum lag for targeted top-edge cross-correlation profiles. Default: `16`.
-*   **`AUTOCORR_MAX_LAG`**: *(int)* Maximum lag calculated for autocorrelation agreement. Default: `48`.
-*   **`DFC_STATE_CONFIGS`**: *(list of tuples)* Defines `(window_size, step_size, n_states)` for Dynamic Functional Connectivity calculations. Default: `[[45, 15, 8], [60, 30, 8], [90, 30, 8]]`.
-*   **`CHUNK_SIZE_EMBEDDINGS`**: *(int)* Frame window size used to generate movement manifold embeddings. Default: `5`.
-
-**Compute & Subsampling Limits**
-*   **`MAX_TIME_STEPS_SUBSAMPLE`**: *(int)* Maximum time steps sampled for heavy distribution bounds (like Quantile and MI scores) to prevent memory overload. Default: `1200`.
-*   **`LATENT_SUBSAMPLE_SIZE`**: *(int)* Number of points sampled for global topology/manifold metrics. Default: `96`.
-*   **`N_POINTS_MANIFOLD_PH_KNN`**: *(int)* Points sampled for K-Nearest Neighbors manifold comparisons. Default: `128`.
-*   **`MAX_SEQUENCES_STRATIFIED`**: *(int)* Number of sequences evaluated during stratified topology metrics. Default: `48`.
-*   **`MAX_POINTS_MANIFOLD_ALIGNMENT`**: *(int)* Upper point limit for MMD similarity tracking. Default: `2000`.
-*   **`MI_MAX_POINTS`**: *(int)* Point limit evaluated when generating pairwise Mutual Information matrices. Default: `1500`.
-
-**Algorithm Heuristics & Thresholds**
-*   **`PCA_VARIANCE_THRESHOLD`**: *(float)* The target explained variance used to dynamically select the number of principal components. Default: `0.85`.
-*   **`STATIONARY_THRESHOLD_PERCENTILE`**: *(int)* The global speed percentile below which a subject is considered "stationary". Default: `10`.
-*   **`SPEED_OUTLIER_PERCENTILE`**: *(int)* Used to cap extreme velocity outliers in histograms. Default: `99`.
-*   **`HISTOGRAM_BINS_DEFAULT`**: *(int)* Bin counts for standard marginal distributions. Default: `12`.
-*   **`KMEANS_K_TRAJECTORY`**: *(int)* Target cluster count for whole-sequence trajectory shape scoring. Default: `6`.
-*   **`KMEANS_K_SYLLABLE`**: *(int)* Target cluster count for local kinematic "syllable" scoring. Default: `8`.
-*   **`MI_N_NEIGHBORS`**: *(int)* The number of neighbors used in continuous Mutual Information regression. Default: `5`.
-*   **`LEAD_LAG_MIN_ARRAY_SIZE`**: *(int)* Minimum valid overlap window needed to compute lead/lag cross-correlation. Default: `5`.
-
----
-
-### Example `config.json`
 ```json
 {
   "sequence_key": "trial_id",
   "time_key": "frame_idx",
   "neuro_cols": ["vis_ctx_1", "vis_ctx_2", "motor_ctx"],
-  "behavior_parts": ["HEAD", "BODY", "TAIL"],
-  "center_part": "BODY",
-  "body_axis": ["HEAD", "TAIL"],
-  "WELCH_SAMPLING_FREQUENCY": 60.0,
-  "LEAD_LAG_DEFAULT_MAX_LAG": 60,
-  "PCA_VARIANCE_THRESHOLD": 0.90
+  "WELCH_SAMPLING_FREQUENCY": 60.0
 }
 ```
 
+```bash
+nethobench neuro-scores \
+  --gt reference.csv --preds forecast.csv \
+  --config config.json --json-out outputs/neural.json
+```
 
-## Metric Composites
+Set `WELCH_SAMPLING_FREQUENCY` to the **actual sampling rate in Hz**; its default is 30.0. The setting affects physical-time autocorrelation lags and spectral calculations. For behavioral data, `behavior_parts`, `center_part`, and `body_axis` configure the tracked landmarks. Keep evaluation settings fixed across models.
 
-The active neural benchmark bounds all scores to `[0, 1]` (higher is better) and computes a weighted final score:
+See [temporal and spectral definitions](docs/psd_integration.md) and [configuration defaults](nethobench/utils/evaluation_constants.py) for available parameters.
 
-- **Distribution ($D$):** KL/JSD, Quantiles, Moments, Mean.
-- **Temporal / spectral ($T$):** Equal average of trajectory-distribution,
-  autocorrelation, and power-spectral-density agreement.
-- **Relational ($R$):** Graph, Cross-region MI, Lagged Covariance, Impulse Response.
-- **Geometry ($G$):** Manifold persistence, Subspace Angle.
-- **State Dynamics ($S$):** Occupancy and Transition.
+## Python interface
 
-$$ \mathrm{Neuro} = 0.22D + 0.18T + 0.24R + 0.18G + 0.18S $$
+Neural scoring also accepts NumPy arrays with shape **`(sequence, time, channel)`**. Reference and prediction must describe corresponding channels and evaluation windows.
 
-Fidelity is calculated separately:
+```python
+import numpy as np
 
-$$ \mathrm{Fidelity} = 0.65 \, s_{Error} + 0.35 \, s_{MI} $$
+from nethobench.neuro.metrics.composites import calculate_neuro_composites
+from nethobench.utils.evaluation_constants import config
 
+# Illustrative arrays; replace these with aligned reference and forecast data.
+rng = np.random.default_rng(42)
+reference = rng.normal(size=(8, 128, 4))
+prediction = 0.8 * reference + rng.normal(scale=0.25, size=reference.shape)
 
-## Metric Dictionary
+config.update_from_dict({"WELCH_SAMPLING_FREQUENCY": 30.0})
+scores = calculate_neuro_composites(reference, prediction)
 
-### 1. Neuro Metrics (`neuro-scores`)
-Evaluates the structural, dynamic, and relational realism of generated neural traces.
+print(scores["family_relational"])
+print(scores["family_temporal_spectral"])
+print(scores["FINAL_COMPOSITE_SCORE"])
+```
 
-**Distribution Family ($D$)**
-*   **`KL_or_JSD_score`**: Measures the tail-binned histogram overlap between ground truth and predicted traces using Symmetric KL Divergence.
-*   **`Mean_score`**: Region-wise mean shift, normalized by the robust Interquartile Range (IQR).
-*   **`QNT_score`**: Quantile distance focusing on the tail distributions.
-*   **`MOM_score`**: Agreement across statistical moments (variance, skewness, and kurtosis).
+The configuration object is shared within the Python process. Set it explicitly before an evaluation when switching between datasets or sampling rates.
 
-**Temporal / Spectral Family ($T$)**
-*   **`TRJDIST_score`**: Pooled latent occupancy and velocity-distribution agreement stabilized by latent path features (speed, turning, path length).
-*   **`ACF_score`**: Agreement of raw-trace and increment autocorrelation curves at fixed physical lags, computed within each sequence.
-*   **`PSD_score`**: Geometric combination of Welch spectral-shape overlap and total-power agreement, computed within each sequence and region.
+## Understand the neural scores
 
-The three headline temporal scores have fixed equal weight. NethoBench also
-reports `PSDShape_score`, `PSDPower_score`, and
-`DirectionalDynamics_score` as diagnostics; these sidecars do not receive
-additional composite weight. See
-[`docs/psd_integration.md`](docs/psd_integration.md) for the exact definition,
-aggregation, and configuration.
+The neural structural score uses **18 components grouped into five families**. Finite similarity scores lie in `[0, 1]`, with larger values indicating closer agreement under that metric.
 
-**Relational Family ($R$)**
-*   **`GRAPH_score`**: Graph network similarity evaluating top-edge topology, weighted degree, and local clustering agreement based on functional connectivity.
-*   **`CrossRegionMI_score`**: Pairwise mutual information matrix similarity between regions.
-*   **`LaggedCovariance_score`**: Cross-region lagged covariance similarity at multiple time steps.
-*   **`ImpulseResponse_score`**: Similarity of Vector Autoregressive (VAR(1)) system coefficients.
+| Family | Question | Components | Composite weight |
+| --- | --- | --- | ---: |
+| Distributional | Are activity values distributed similarly? | Histogram divergence, quantiles, moments, means | 0.22 |
+| Temporal-spectral | Are temporal organization and spectral content preserved? | Trajectory distribution, autocorrelation, power spectrum | 0.18 |
+| Relational | Are relationships between channels preserved? | Graph agreement, cross-region mutual information, lagged covariance, VAR(1) response proxy | 0.24 |
+| Geometric | Is population geometry preserved? | Persistent-homology/local-neighborhood agreement, subspace angles | 0.18 |
+| State-dynamical | Are state occupancy and transitions similar? | Two occupancy and three transition comparisons | 0.18 |
 
-**Geometry Family ($G$)**
-*   **`MANI_score`**: Persistent-homology lifetime agreement stabilized by local-neighborhood geometry (K-Nearest Neighbors).
-*   **`SubspaceAngle_score`**: Principal angle similarity between the PCA-derived subspaces.
+Components have equal weight **within** each family. With all families available:
 
-**State Dynamics Family ($S$)**
-*   **`LatentStateOccupancy...`**: Similarity of state residence histograms using K-Means clustering (evaluated at $K=11, 12$).
-*   **`LatentStateTransition...`**: Transition matrix similarity mapping how states evolve over multiple temporal lags.
+```text
+structural composite = 0.22 × distributional
+                     + 0.18 × temporal-spectral
+                     + 0.24 × relational
+                     + 0.18 × geometric
+                     + 0.18 × state-dynamical
+```
 
-For compatibility with earlier NethoBench releases, `neuro-scores` also emits
-legacy metric aliases ending in `_score01` (for example, `TRJDIST_score01`) in
-addition to the current names.
+Pointwise fidelity is separate: `0.65 × Error_score + 0.35 × MI_score`. It does not enter the neural structural composite. Cross-modal output also includes a separate aggregate over the available evaluation domains.
 
----
+Short or degenerate inputs can leave components undefined. Aggregation renormalizes weights over available components or families, so inspect missing values before comparing composites. Diagnostic outputs such as `PSDShape_score`, `PSDPower_score`, and `DirectionalDynamics_score` do not receive extra composite weight. Keys ending in `_score01` are compatibility aliases, not additional metrics.
 
-### 2. Fidelity Metrics (`fidelity-scores`)
-Measures the direct, frame-by-frame alignment of predicted traces to ground truth.
+The [metric definitions](nethobench/neuro/metrics/definitions.py) specify membership and weights; the [temporal guide](docs/psd_integration.md) explains ACF and PSD scoring.
 
-*   **`Error_score`**: Trace-level Normalized Root Mean Square Error (nRMSE), scaled by the IQR of the ground truth.
-*   **`MI_score`**: Trace-level Mutual Information to assess direct predictive dependency.
+## Generate diagnostic figures
 
----
+The analysis commands produce plots and reports for the same input domains:
 
-### 3. Behavioral Metrics (`etho-scores`)
-Evaluates the kinematic, spatial, and sequence-level realism of generated body poses.
+```bash
+nethobench neuro-analysis \
+  --gt tests/resources/data/neural/ground-truth/gt-ba4.csv \
+  --preds tests/resources/data/neural/predictions/preds-ba4.csv \
+  --output-root outputs/neural-analysis
+```
 
-*   **`position_kl_score`**: 2D spatial position density overlap (measured via KL divergence).
-*   **`quadrant_score`**: Distribution agreement across four geometric spatial quadrants.
-*   **`stationary_score`**: Agreement on the fraction of time the subject spends strictly stationary.
-*   **`velocity_score` / `acceleration_score`**: Distributional similarities for 1st-order (speed) and 2nd-order (acceleration) kinematic magnitudes.
-*   **`direction_score`**: Similarity of movement heading orientation (cosine similarity between velocity vector and body axis).
-*   **`syllable_score`**: K-Means clustering overlap of local kinematic features (speed and acceleration syllables).
-*   **`trajectory_shape_score`**: Similarity of geometric path characteristics (path length, net displacement, straightness, turn angles).
-*   **`dtw_similarity_score`**: Dynamic Time Warping (DTW) distance measuring overall trajectory alignment.
-*   **`procrustes_similarity` / `mmd_similarity`**: Local movement manifold alignment leveraging Procrustes analysis and Maximum Mean Discrepancy (MMD).
+Use `etho-analysis` or `cross-analysis` for behavioral or multimodal inputs. Each accepts `--output-root`; run `nethobench <command> --help` for its input arguments.
 
----
+## Compare models carefully
 
-### 4. Cross-Modal Metrics (`cross-scores`)
-Evaluates how well the generated data captures the latent coupling between neural activity and behavior.
+- **Score the same support.** Match channels, preprocessing, sampling rate, sequence lengths, and evaluation windows. When evaluating forecasts, exclude the observed context unless including it is an explicit part of the protocol.
+- **Inspect families alongside the composite.** Similar totals can hide different structural failures. Report component availability as well as score values.
+- **Separate structure from conditional accuracy.** A realistic independent trajectory need not predict the observed future. Pair structural metrics with MAE/MSE, proper probabilistic scores for stochastic predictions, and task-specific endpoints where relevant.
+- **Distinguish samples from their average.** The mean score of stochastic draws is generally different from the score of their mean trajectory. Record which quantity you evaluate.
+- **Keep the scoring definition fixed.** Default lagged-covariance and VAR comparisons pool sequence rows and compare one matrix triangle. Explicit within-sequence, directed alternatives are available through the [implementation-sensitivity diagnostics](docs/reproducibility_and_compatibility.md#opt-in-implementation-sensitivity); they do not replace default CLI outputs. Do not mix definitions in one comparison.
 
-*   **`cca_alignment_score`**: Canonical Correlation Analysis (CCA) similarity, measuring the shared linear spatial subspace between neural and behavioral streams.
-*   **`neural_to_behavior_similarity`**: The difference in predictive $R^2$ when mapping neural sequences to behavioral states via linear regression.
-*   **`behavior_to_neural_similarity`**: The difference in predictive $R^2$ when mapping behavioral sequences back to neural activity.
-*   **`lead_lag_score`**: Agreement on the optimal temporal offset (lead/lag) measured via cross-correlation between the first neural principal component (PC1) and behavioral speed.
+Structural agreement is a descriptive measurement, not evidence of causal connectivity, biological mechanism, or downstream usefulness. Split-half reference comparisons and clearly specified perturbations help interpret the scores on a particular dataset; they do not define universal ceilings or floors.
+
+## Reproducibility and development
+
+Record the package version, dependency environment, input files, preprocessing, evaluation configuration, and stochastic seeds with every run. Version 0.2.1 retains the default scoring definitions of 0.2.0; optional diagnostics remain separate.
+
+To install the test dependencies and run the suite:
+
+```bash
+python -m pip install -e '.[test]'
+python -m pytest -q
+```
+
+Automated checks cover unit and integration tests, installed-package behavior, and numerical compatibility. See [reproducibility and compatibility](docs/reproducibility_and_compatibility.md), the [dependency locks](requirements/), and the [changelog](CHANGELOG.md) for details.
 
 ## License
-MIT License. See `LICENSE`.
+
+NethoBench is distributed under the [MIT License](LICENSE).
