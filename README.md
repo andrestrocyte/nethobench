@@ -1,5 +1,7 @@
 # NethoBench
 
+![NethoBench logo](assets/nethobench.png)
+
 **Compare the structure of generated neural activity, behavior, and their interaction.**
 
 A forecast can have a small pointwise error while losing variability, temporal structure, or relationships between channels. Conversely, a stochastic sample can preserve those properties without matching the observed trajectory point by point. NethoBench measures structural agreement and predictive fidelity separately, so you can see what a model preserves and where it fails.
