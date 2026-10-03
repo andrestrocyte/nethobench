@@ -120,7 +120,9 @@ scores, per_sequence, means, stds = compute_etho_scores(
 
 The example requests a one-second duration horizon at 20 Hz. Choose that horizon
 before comparing models. Without supplied calibration, v2 fits only the reference
-poses. It requires at least two tracked points and enough temporal support;
+poses. The additions require at least two tracked points; the full pipeline also
+requires the original core landmarks (`CENTER`, `NOSE`, `TAIL_BASE`,
+`LEFT_EAR`, `RIGHT_EAR`, with configurable center/body axis) and enough temporal support;
 **an unavailable component makes the v2 composite unavailable**, rather than
 silently dropping that component. Small smoke-test fixtures need not support all
 components. Inspect the two duration coverage values and the detail file.

@@ -22,6 +22,21 @@ def _version(cfg):
     return version
 
 
+def _validate_core_landmarks(paired_df, cfg):
+    # The preserved feature extractor requires these columns. Its historical
+    # fallback allocates uninitialized features; never enter that path in v2.
+    axis = cfg.get('body_axis', ['NOSE', 'TAIL_BASE'])
+    if len(axis) != 2:
+        raise ValueError('body_axis must name two tracked parts')
+    parts = {cfg.get('center_part', 'CENTER'), *axis, 'LEFT_EAR', 'RIGHT_EAR'}
+    required = {f'{part}_{coordinate}_{source}' for part in parts
+                for coordinate in ('X','Y') for source in ('gt','inf')}
+    missing = sorted(required.difference(paired_df.columns))
+    if missing:
+        raise ValueError('Etho v2 requires legacy core landmarks: ' + ', '.join(missing)
+                         + '. Use compute_extended_etho_metrics for standalone additions.')
+
+
 def _extend(scores, paired_df, cfg):
     extra, details = compute_extended_etho_metrics(paired_df, cfg)
     scores = dict(scores)
@@ -66,6 +81,7 @@ def compute_etho_scores(gt_dir=None, inf_dir=None, *, paired_df=None, cfg=None):
             raise ValueError("Must provide paired_df or both gt_dir and inf_dir")
         gt, pred = load_gt_and_preds(gt_dir,inf_dir,sequence_key=cfg.get("sequence_key","sequenceId"))
         paired_df = merge_aligned(gt,pred,cfg)
+    _validate_core_landmarks(paired_df, cfg)
     old, sequence, means, stds = legacy_pipeline.compute_etho_scores(paired_df=paired_df,cfg=cfg)
     scores, _ = _extend(old,paired_df,cfg)
     return scores, sequence, means, stds
@@ -75,11 +91,12 @@ def run_etho_full_analysis(gt_dir, inf_dir, *, output_root=None, cfg=None):
     """Retain existing diagnostic plots and save the versioned score and support."""
     cfg = dict(cfg or {})
     version = _version(cfg)
-    outdir = legacy_pipeline.run_etho_full_analysis(gt_dir,inf_dir,output_root=output_root,cfg=cfg)
     if version == "legacy_v1":
-        return outdir
+        return legacy_pipeline.run_etho_full_analysis(gt_dir,inf_dir,output_root=output_root,cfg=cfg)
     gt, pred = load_gt_and_preds(gt_dir,inf_dir,sequence_key=cfg.get("sequence_key","sequenceId"))
     paired = merge_aligned(gt,pred,cfg)
+    _validate_core_landmarks(paired, cfg)
+    outdir = legacy_pipeline.run_etho_full_analysis(gt_dir,inf_dir,output_root=output_root,cfg=cfg)
     path = outdir/"scores.json"
     payload = json.loads(path.read_text())
     payload["global_scores"], details = _extend(payload["global_scores"],paired,cfg)

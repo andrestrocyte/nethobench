@@ -83,7 +83,10 @@ def main():
                 output = tmp / f"{name}-{source}"
                 legacy_args = []
                 if name == "etho-scores" and source == "wheel":
-                    config = tmp / "etho-legacy.json"
+                    # Keep explicit settings out of cwd: other CLI cases
+                    # auto-discover a lone JSON there as their configuration.
+                    config = tmp / "configs" / "etho-legacy.json"
+                    config.parent.mkdir(exist_ok=True)
                     config.write_text(json.dumps({"etho_score_version":"legacy_v1"}))
                     legacy_args = ["--config",str(config)]
                 subprocess.run([str(args.python.absolute()), "-m", "nethobench.cli.main",

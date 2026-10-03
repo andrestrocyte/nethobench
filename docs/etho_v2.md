@@ -121,6 +121,14 @@ is silently discarded. `legacy_composite_score` always preserves the old
 aggregation, including its original missing-component behavior. Equal weights
 are a transparent default, not an empirically optimized claim of importance.
 
+The full pipeline retains the original core feature schema: center and body-axis
+points plus LEFT_EAR and RIGHT_EAR. V2 validates those columns before invoking
+the legacy feature extractor, whose missing-landmark fallback can produce
+uninitialized values. It raises a clear error for missing core landmarks rather
+than producing arbitrary scores. For other skeletons, the new standalone
+`compute_extended_etho_metrics` function needs only the calibrated pairs and
+center. Do not invent anatomical aliases merely to satisfy the full pipeline.
+
 The return tuple and original component values are unchanged. Per-sequence
 outputs continue to contain only the original summaries; the new components
 compare distributions pooled across sequences. Full analysis saves detailed

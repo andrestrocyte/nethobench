@@ -157,6 +157,9 @@ def test_finite_ten_component_identity():
             f[part+'_Y']=np.sin(np.arange(100)*(.12+i*.02))
         f['NOSE_X']=f.TIP_X;f['NOSE_Y']=f.TIP_Y
         f['TAIL_BASE_X']=f.CENTER_X-.5;f['TAIL_BASE_Y']=f.CENTER_Y
+        for ear,sign in [('LEFT_EAR',1),('RIGHT_EAR',-1)]:
+            f[ear+'_X']=f.CENTER_X+.2
+            f[ear+'_Y']=f.CENTER_Y+sign*(.3+.02*np.sin(np.arange(100)*.3))
         frames.append(f)
     reference=pd.concat(frames,ignore_index=True)
     scores,*_=compute_etho_scores(paired_df=merge_aligned(reference,reference,{}),
@@ -177,3 +180,9 @@ def test_degenerate_distance_calibration():
     ref=poses(np.zeros(30));cal=fit_etho_calibration(ref)
     assert inter_limb_distance_score(ref,ref,cal)['score']==1
     assert inter_limb_distance_score(ref,poses(np.ones(30)),cal)['score']==0
+
+
+def test_v2_rejects_missing_core_landmarks_before_legacy_features():
+    ref=poses(np.ones(30))
+    with pytest.raises(ValueError,match='legacy core landmarks'):
+        compute_etho_scores(paired_df=merge_aligned(ref,ref,{}))
