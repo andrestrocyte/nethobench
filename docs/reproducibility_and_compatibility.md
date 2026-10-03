@@ -4,11 +4,14 @@
 
 The manuscript pins commit
 `4075d2fe13b354de910d0cd1bb22826b94296594` (package 0.2.0).
-The engineering release 0.2.1 preserves all 52 Python source files present in
-that commit byte for byte. The default API, CLI, metric names, legacy aliases,
-family membership, weights, missing-component policy and scoring formulas are
-unchanged. Package version and opt-in diagnostics are separate from the score
-definition. Renaming a GitHub repository does not change its commit identities.
+The engineering release 0.2.1 preserved all 52 Python source files present in
+that commit byte for byte. Version 0.3.0 introduces an explicitly versioned
+behavioral pipeline: `v2` is the default and `legacy_v1` reproduces the original
+behavioral API and numerical outputs. The original behavioral pipeline is
+preserved byte for byte as `nethobench/etho/legacy_pipeline.py`; the source-hash
+check maps that one file to its preserved copy. All other pinned source files,
+including neural and cross-modal scoring, remain unchanged. The hash manifest
+itself has not been regenerated. See [Etho v2](etho_v2.md).
 
 `tests/resources/published_source_hashes.json` records the original hashes.
 The corresponding test prevents an unnoticed edit to the pinned implementation.
@@ -54,7 +57,7 @@ unit-test job checks installation with current compatible dependencies.
 
 `scripts/compare_published_release.py` compares six CLI cases against the actual
 paper commit in the same environment: neural and fidelity scoring for two
-fixtures, behavioral scoring and cross-modal scoring. It checks numerical key
+fixtures, behavioral scoring explicitly configured as `legacy_v1`, and unchanged cross-modal scoring. It checks numerical key
 sets, missing values and every numerical leaf (relative tolerance 1e-10,
 absolute tolerance 1e-12). This is regression evidence, not proof for every
 possible dataset. The archived baseline is read from local Git history, so use

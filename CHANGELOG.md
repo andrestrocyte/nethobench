@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 — 2026-10-03
+
+- Add versioned Etho v2: the original eight components plus calibrated pair-distance distributions and state-conditional, censoring-aware bout duration.
+- Fit reusable geometry and kinematic-state calibration on training/reference poses.
+- Report duration support and return an unavailable composite when any component is unmeasurable.
+- Preserve the original behavioral pipeline and key set through `etho_score_version="legacy_v1"`; expose `legacy_composite_score` alongside v2.
+- Keep neural, cross-modal and per-sequence scoring unchanged.
+- Add controlled implementation comparisons and a 318-record rescore of saved MuJoCo forecasts, including unavailable-tail diagnostics.
+
 ## 0.2.1 — 2026-09-22
 
 - Preserve all 52 existing package source files from the reference scoring commit.

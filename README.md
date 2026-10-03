@@ -89,6 +89,53 @@ nethobench cross-scores \
 
 For `neuro-scores` and `fidelity-scores`, `--json-out` is a **file path**. For `etho-scores` and `cross-scores`, it is a **directory**, with results written to `scores.json` inside it. Behavioral inputs can be individual CSV/Parquet files or directories containing them.
 
+## Behavioral score versions
+
+Version 0.3.0 makes **Etho v2** the default for `etho-scores` and the behavioral
+Python pipeline. Its equal-weight geometric mean includes the original eight
+components plus **inter-part distance distributions** and **state-conditional
+bout duration**. The new duration comparison handles bouts cut off by recording
+boundaries and reports whether the data support the requested duration range.
+
+Use one training-fitted calibration for every compared model. It fixes distance
+scales, speed/acceleration states and duration normalization:
+
+```python
+import json
+import pandas as pd
+from nethobench.etho.pipeline import fit_etho_calibration, compute_etho_scores
+
+calibration = fit_etho_calibration(
+    pd.read_csv("training_poses.csv"),
+    {"sampling_interval": 0.05, "duration_horizon_frames": 20},
+)
+with open("etho_calibration.json", "w") as handle:
+    json.dump(calibration, handle, indent=2)
+scores, per_sequence, means, stds = compute_etho_scores(
+    "reference_poses.csv", "forecast_poses.csv",
+    cfg={"etho_calibration": "etho_calibration.json",
+         "etho_details_path": "etho_details.json"},
+)
+```
+
+The example requests a one-second duration horizon at 20 Hz. Choose that horizon
+before comparing models. Without supplied calibration, v2 fits only the reference
+poses. It requires at least two tracked points and enough temporal support;
+**an unavailable component makes the v2 composite unavailable**, rather than
+silently dropping that component. Small smoke-test fixtures need not support all
+components. Inspect the two duration coverage values and the detail file.
+
+For exact reproduction of the original API, keys and eight-component composite,
+pass `cfg={"etho_score_version": "legacy_v1"}`. For the CLI, put
+`{"etho_score_version": "legacy_v1"}` in a JSON file and pass `--config`.
+The default v2 result also retains `legacy_composite_score`. Existing per-sequence
+summaries are unchanged; the two additions compare pooled distributions.
+`cross-scores` retains its existing behavioral definition, and neural scoring is
+unchanged. Do not mix score versions in a comparison.
+
+See [definitions, limitations and validation](docs/etho_v2.md) for the formulas,
+configuration and comparisons with the earlier implementations.
+
 ## Use your own data
 
 ### Neural tables
@@ -212,7 +259,7 @@ Structural agreement is a descriptive measurement, not evidence of causal connec
 
 ## Reproducibility and development
 
-Record the package version, dependency environment, input files, preprocessing, evaluation configuration, and stochastic seeds with every run. Version 0.2.1 retains the default scoring definitions of 0.2.0; optional diagnostics remain separate.
+Record the package version, dependency environment, input files, preprocessing, evaluation configuration, and stochastic seeds with every run. Version 0.3.0 versions the behavioral composite explicitly; neural definitions and optional neural diagnostics remain unchanged. Select `legacy_v1` to reproduce earlier behavioral scores.
 
 To install the test dependencies and run the suite:
 

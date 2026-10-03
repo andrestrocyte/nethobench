@@ -81,9 +81,14 @@ def main():
                 if source == "baseline":
                     env["PYTHONPATH"] = str(baseline)
                 output = tmp / f"{name}-{source}"
+                legacy_args = []
+                if name == "etho-scores" and source == "wheel":
+                    config = tmp / "etho-legacy.json"
+                    config.write_text(json.dumps({"etho_score_version":"legacy_v1"}))
+                    legacy_args = ["--config",str(config)]
                 subprocess.run([str(args.python.absolute()), "-m", "nethobench.cli.main",
                                 command, gtflag, str(gt), predflag, str(pred),
-                                "--json-out", str(output)], cwd=tmp, env=env, check=True,
+                                "--json-out", str(output), *legacy_args], cwd=tmp, env=env, check=True,
                                capture_output=True, text=True)
                 payload = json.loads((output / "scores.json" if directory else output).read_text())
                 values.append(numeric_leaves(payload))

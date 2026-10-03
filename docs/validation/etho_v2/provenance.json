@@ -1,0 +1,37 @@
+{
+  "baseline_commit": "b7350eb3ace7558f5236c72e3dd4f16a65febc0f",
+  "protocol": "etho-v2",
+  "archive_sha256": "8af98dae75e2a89a5f9dd269d2a0fb04d7700dad6bc1c91c8960cc3be1dc7a25",
+  "old_scores_sha256": "2bdaefb26db0ab7e5e4b6fb0941eb2d28201564ef891786fa379daedc98d2a73",
+  "study_source_sha256": "12ab6bf0355897da23cde57084a040449e97d41db8e2d5facf733088c88c7e45",
+  "python": "3.10.13",
+  "dependencies": {
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scipy": "1.15.3",
+    "scikit-learn": "1.7.2"
+  },
+  "settings": {
+    "sampling_interval": 0.05,
+    "duration_horizon_frames": 20,
+    "duration_states": 8,
+    "distance_pairs": "all 36 unique pairs of 9 tracked points"
+  },
+  "notes": [
+    "No model retraining. Rescored best-checkpoint saved predictions only.",
+    "The eight existing components are reused from saved score records.",
+    "Aggregations preserve missing values; draws then seeds then populations are averaged.",
+    "Raw MuJoCo archive is external to this source distribution. Controlled comparisons are self-contained."
+  ],
+  "files": {
+    "calibration_17.json": "78f3dfb53e233fc6499edd73fff05aec60c8380443349d8efb333ba2739715e4",
+    "calibration_29.json": "7a648d18cb05dad186019b209c12e601bfc675b7e4ad378d7c3a1830ecc50e61",
+    "calibration_43.json": "c106791eecfc90f339895937a87ba350e04e4a0f959f2688cb680ca5b44e0607",
+    "controlled_checks.csv": "1355c17fa83cc5f36ed4f6cad3018f2a396208d3045b569cda34ea5b97801b5f",
+    "controlled_ratings.csv": "137086844ebcd2a557bfdbd68be15844aae23cc64f7a8ca3d46a19790fc516e2",
+    "duration_support.csv": "153f273133c8704b51ce719cb814fd798646356cb689e3fb233c8a74abf61c30",
+    "model_summary.csv": "48d2394e7b4877a84d9f96c8bf1ec670dce7d603fd51912383ddb187c9be7616",
+    "population_summary.csv": "655cbcbe4d81301981f62f6813571edc0f302afafe6d0a221da09e9083e5ac7c",
+    "rescored_rows.csv": "4dc676c832b9eab23c9d68ceb06e94e86419591383105d89285e7b51309f1431"
+  }
+}

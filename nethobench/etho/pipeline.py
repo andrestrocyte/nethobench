@@ -1,251 +1,89 @@
+"""Versioned behavioral evaluation with an explicit eight-component legacy path."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
-
 import numpy as np
-import pandas as pd
-from nethobench.utils.helpers import (
-    load_gt_and_preds,
-    timestamped_outdir,
-    clip_fn,
-    geometric_mean_scores,
-)
+
+from nethobench.etho import legacy_pipeline
+from nethobench.etho.extended import compute_extended_etho_metrics, fit_etho_calibration
 from nethobench.utils.calculation import merge_aligned
-from nethobench.etho.metrics import (
-    stationary_score,
-    velocity_distribution_score,
-    acceleration_distribution_score,
-    direction_score,
-    quadrant_score,
-    position_kl_score,
-    syllable_score,
-    trajectory_shape_score,
-    body_part_errors,
-    inter_limb_distances,
-    dtw_trajectory_similarity,
-    manifold_alignment_metrics,
-    get_chunked_embeddings,
-)
-from nethobench.utils.evaluation_constants import config
+from nethobench.utils.helpers import geometric_mean_scores, load_gt_and_preds
+
+CORE_V1 = ("position_kl_score", "stationary_score", "velocity_score", "acceleration_score",
+           "direction_score", "quadrant_score", "syllable_score", "trajectory_shape_score")
+CORE_V2 = CORE_V1 + ("inter_limb_distance_score", "bout_duration_score")
 
 
-def compute_etho_scores(
-    gt_dir: Optional[Path] = None,
-    inf_dir: Optional[Path] = None,
-    *,
-    paired_df: Optional[pd.DataFrame] = None,
-    cfg: Optional[dict] = None,
-) -> Tuple[
-    Dict[str, float], Dict[str, List[float]], Dict[str, float], Dict[str, float]
-]:
+def _version(cfg):
+    version = cfg.get("etho_score_version", "v2")
+    if version not in ("v2", "legacy_v1"):
+        raise ValueError("etho_score_version must be 'v2' or 'legacy_v1'")
+    return version
+
+
+def _extend(scores, paired_df, cfg):
+    extra, details = compute_extended_etho_metrics(paired_df, cfg)
+    scores = dict(scores)
+    scores["legacy_composite_score"] = scores["composite_score"]
+    scores.update(extra)
+    values = [scores[k] for k in CORE_V2]
+    available = np.isfinite(values)
+    # v2 must not look better simply because a component could not be measured.
+    composite = geometric_mean_scores(values) if available.all() else float("nan")
+    scores.update(composite_score=composite, composite_score_v2=composite,
+                  component_availability_fraction=float(available.mean()),
+                  duration_reference_coverage=details["duration"]["reference_coverage"],
+                  duration_comparison_coverage=details["duration"]["comparison_coverage"])
+    details["components"] = list(CORE_V2)
+    details["missing_components"] = [k for k in CORE_V2 if not np.isfinite(scores[k])]
+    if cfg.get("etho_details_path"):
+        path = Path(cfg["etho_details_path"])
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text(json.dumps(details,indent=2)+"\n")
+    return scores, details
+
+
+def compute_etho_scores(gt_dir=None, inf_dir=None, *, paired_df=None, cfg=None):
+    """Return global scores and the unchanged legacy per-sequence summaries.
+
+    Default ``cfg['etho_score_version']='v2'`` adds calibrated inter-part distance
+    distributions and censored, state-conditional bout duration to the geometric
+    mean. ``legacy_composite_score`` retains the previous eight-component value.
+    New components are population-distribution scores, not per-sequence scores.
+
+    Set ``etho_score_version='legacy_v1'`` for the exact previous four-tuple,
+    including the previous dictionary keys and missing-component policy.
+    Supply ``etho_calibration`` (dictionary or JSON path) to reuse training-fitted
+    geometry scales and kinematic states; otherwise reference poses calibrate
+    these additions. ``etho_details_path`` optionally saves support/calibration.
     """
-    Compute behavioral (ethological) scores from paired ground-truth and
-    prediction data.
-
-    Args:
-        gt_dir: Path to the ground-truth data directory. Required if
-            ``paired_df`` is not provided.
-        inf_dir: Path to the inference/prediction data directory. Required if
-            ``paired_df`` is not provided.
-        paired_df: Optional pre-merged DataFrame of ground-truth and prediction
-            data. If supplied, ``gt_dir`` and ``inf_dir`` are ignored.
-        cfg: Optional configuration dictionary with keys such as
-            ``sequence_key``, ``time_key``, ``center_part``, and ``body_axis``.
-
-    Returns:
-        A 4-tuple of:
-        - **scores**: Global score dictionary including position, velocity,
-          acceleration, direction, quadrant, syllable, trajectory shape,
-          DTW similarity, manifold alignment, and a ``composite_score``.
-        - **sequence_level_scores**: Per-sequence raw values for each metric.
-        - **sequence_means**: Weighted mean of each metric across sequences.
-        - **sequence_stds**: Weighted standard deviation of each metric across
-          sequences.
-    """
-    cfg = cfg or {}
-    config.update_from_dict(cfg)
-
-    # Avoid redundant loading if already passed from run_etho_full_analysis
+    cfg = dict(cfg or {})
+    if _version(cfg) == "legacy_v1":
+        return legacy_pipeline.compute_etho_scores(gt_dir,inf_dir,paired_df=paired_df,cfg=cfg)
     if paired_df is None:
         if gt_dir is None or inf_dir is None:
-            raise ValueError(
-                "Must provide either paired_df, or both gt_dir and inf_dir."
-            )
-        gt_df, inf_df = load_gt_and_preds(
-            gt_dir, inf_dir, sequence_key=cfg.get("sequence_key", "sequenceId")
-        )
-        paired_df = merge_aligned(gt_df, inf_df, cfg)
-
-    pos_res = position_kl_score(paired_df, cfg=cfg)
-    stat_res = stationary_score(paired_df, cfg=cfg)
-    vel_res = velocity_distribution_score(paired_df, cfg=cfg)
-    acc_res = acceleration_distribution_score(paired_df, cfg=cfg)
-    dir_res = direction_score(paired_df, cfg=cfg)
-    quad_res = quadrant_score(paired_df, cfg=cfg)
-    syll_res = syllable_score(paired_df, cfg=cfg)
-    traj_res = trajectory_shape_score(paired_df, cfg=cfg)
-
-    # Calculate memory-optimized DTW similarity
-    dtw_score, dtw_seq_scores = dtw_trajectory_similarity(paired_df, cfg=cfg)
-
-    # Calculate memory-optimized Manifold similarities
-    manifold_res = manifold_alignment_metrics(paired_df, cfg=cfg)
-
-    scores = {
-        "position_kl_score": float(pos_res[0]) if np.isfinite(pos_res[0]) else np.nan,
-        "stationary_score": float(stat_res[0]) if np.isfinite(stat_res[0]) else np.nan,
-        "velocity_score": float(vel_res[0]) if np.isfinite(vel_res[0]) else np.nan,
-        "acceleration_score": float(acc_res[0]) if np.isfinite(acc_res[0]) else np.nan,
-        "direction_score": float(dir_res[0]) if np.isfinite(dir_res[0]) else np.nan,
-        "quadrant_score": float(quad_res[0]) if np.isfinite(quad_res[0]) else np.nan,
-        "syllable_score": float(syll_res[0]) if np.isfinite(syll_res[0]) else np.nan,
-        "trajectory_shape_score": (
-            float(traj_res[0]) if np.isfinite(traj_res[0]) else np.nan
-        ),
-        "dtw_similarity_score": dtw_score,
-        "procrustes_similarity": manifold_res["procrustes_sim"],
-        "mmd_similarity": manifold_res["mmd_sim"],
-    }
-
-    # Only core structural metrics go into composite logic
-    core_scores = {
-        k: v
-        for k, v in scores.items()
-        if k not in ["procrustes_similarity", "mmd_similarity", "dtw_similarity_score"]
-    }
-    scores["composite_score"] = geometric_mean_scores(list(core_scores.values()))
-
-    all_seq_dicts = {
-        "position_kl_score": pos_res[1],
-        "stationary_score": stat_res[1],
-        "velocity_score": vel_res[1],
-        "acceleration_score": acc_res[1],
-        "direction_score": dir_res[1],
-        "quadrant_score": quad_res[1],
-        "syllable_score": syll_res[1],
-        "trajectory_shape_score": traj_res[1],
-        "dtw_similarity_score": dtw_seq_scores,
-    }
-
-    # Generate weights dictionary (for DTW, default to 1 since it's sequence-level)
-    all_weight_dicts = {
-        "position_kl_score": pos_res[2],
-        "stationary_score": stat_res[2],
-        "velocity_score": vel_res[2],
-        "acceleration_score": acc_res[2],
-        "direction_score": dir_res[2],
-        "quadrant_score": quad_res[2],
-        "syllable_score": syll_res[2],
-        "trajectory_shape_score": traj_res[2],
-        "dtw_similarity_score": {seq: 1 for seq in dtw_seq_scores},
-    }
-
-    all_keys = set()
-    for d in all_seq_dicts.values():
-        all_keys.update(d.keys())
-    sorted_seq_ids = sorted(list(all_keys))
-
-    sequence_level_scores = {
-        "sequence_length": [
-            int(v)
-            for v in paired_df.groupby("sequenceId")
-            .size()
-            .reindex(sorted_seq_ids, fill_value=0)
-        ]
-    }
-    sequence_means = {}
-    sequence_stds = {}
-
-    for metric_name in all_seq_dicts.keys():
-        d_scores = all_seq_dicts[metric_name]
-        d_weights = all_weight_dicts[metric_name]
-        sequence_level_scores[metric_name] = [
-            float(d_scores[k]) if k in d_scores and np.isfinite(d_scores[k]) else np.nan
-            for k in sorted_seq_ids
-        ]
-        vals = []
-        wts = []
-        for k in d_scores.keys():
-            if k in d_weights and np.isfinite(d_scores[k]):
-                vals.append(d_scores[k])
-                wts.append(d_weights[k])
-        if vals and sum(wts) > 0:
-            weighted_mean = np.average(vals, weights=wts)
-            sequence_means[metric_name] = float(weighted_mean)
-            variance = np.average((np.array(vals) - weighted_mean) ** 2, weights=wts)
-            sequence_stds[metric_name] = float(np.sqrt(variance))
-        else:
-            sequence_means[metric_name] = np.nan
-            sequence_stds[metric_name] = np.nan
-
-    return scores, sequence_level_scores, sequence_means, sequence_stds
+            raise ValueError("Must provide paired_df or both gt_dir and inf_dir")
+        gt, pred = load_gt_and_preds(gt_dir,inf_dir,sequence_key=cfg.get("sequence_key","sequenceId"))
+        paired_df = merge_aligned(gt,pred,cfg)
+    old, sequence, means, stds = legacy_pipeline.compute_etho_scores(paired_df=paired_df,cfg=cfg)
+    scores, _ = _extend(old,paired_df,cfg)
+    return scores, sequence, means, stds
 
 
-def run_etho_full_analysis(
-    gt_dir: Path, inf_dir: Path, *, output_root: Path | None = None, cfg: Optional[dict] = None
-) -> Path:
-    """
-    Executes the full behavioral analysis pipeline headlessly, saves metrics,
-    and generates visualization figures directly into the specified output directory.
-    """
-    import json
-
-    try:
-        from nethobench.etho.reporting import generate_full_etho_report
-    except ImportError:
-
-        def generate_full_etho_report(*args, **kwargs):
-            pass  # Failsafe if reporting module has not been fully implemented yet
-
-    cfg = cfg or {}
-    config.update_from_dict(cfg)
-
-    outdir = timestamped_outdir(output_root, prefix="etho-analysis")
-
-    # 1. Load Data
-    gt_df, inf_df = load_gt_and_preds(
-        gt_dir, inf_dir, sequence_key=cfg.get("sequence_key", "sequenceId")
-    )
-    paired_df = merge_aligned(gt_df, inf_df, cfg)
-
-    # 2. Extract Additional Features for the Report
-    coord_pairs = []
-    for col in gt_df.columns:
-        if col.endswith("_X"):
-            base = col[:-2]
-            if f"{base}_Y" in gt_df.columns:
-                coord_pairs.append((base, col, f"{base}_Y"))
-
-    errors_df = body_part_errors(paired_df, coord_pairs)
-
-    center_part = (cfg.get("center_part", "CENTER") if cfg else "CENTER")
-    axis = cfg.get("body_axis", ["NOSE", "TAIL_BASE"]) if cfg else ["NOSE", "TAIL_BASE"]
-    nose_part, tail_part = axis if len(axis) == 2 else ("NOSE", "TAIL_BASE")
-    pairs_to_check = [
-        (nose_part, tail_part),
-        ("LEFT_EAR", "RIGHT_EAR"),
-        (nose_part, center_part),
-    ]
-    distances_df = inter_limb_distances(paired_df, pairs_to_check)
-    chunk_data = get_chunked_embeddings(paired_df, chunk_size=5, cfg=cfg)
-
-    # 3. Compute Structural Scores (Pass paired_df to avoid double-loading!)
-    scores, seq_scores, seq_means, seq_stds = compute_etho_scores(paired_df=paired_df, cfg=cfg)
-
-    # 4. Save JSON
-    payload = {
-        "global_scores": scores,
-        "per_sequence": seq_scores,
-        "per_sequence_mean": seq_means,
-        "per_sequence_std": seq_stds,
-    }
-    with (outdir / "scores.json").open("w") as f:
-        json.dump(payload, f, indent=2)
-
-    # 5. Generate Matplotlib Figures
-    generate_full_etho_report(
-        gt_df, inf_df, paired_df, errors_df, distances_df, chunk_data, outdir
-    )
-
+def run_etho_full_analysis(gt_dir, inf_dir, *, output_root=None, cfg=None):
+    """Retain existing diagnostic plots and save the versioned score and support."""
+    cfg = dict(cfg or {})
+    version = _version(cfg)
+    outdir = legacy_pipeline.run_etho_full_analysis(gt_dir,inf_dir,output_root=output_root,cfg=cfg)
+    if version == "legacy_v1":
+        return outdir
+    gt, pred = load_gt_and_preds(gt_dir,inf_dir,sequence_key=cfg.get("sequence_key","sequenceId"))
+    paired = merge_aligned(gt,pred,cfg)
+    path = outdir/"scores.json"
+    payload = json.loads(path.read_text())
+    payload["global_scores"], details = _extend(payload["global_scores"],paired,cfg)
+    payload["etho_score_version"] = "v2"
+    path.write_text(json.dumps(payload,indent=2)+"\n")
+    (outdir/"etho_metadata.json").write_text(json.dumps(details,indent=2)+"\n")
     return outdir

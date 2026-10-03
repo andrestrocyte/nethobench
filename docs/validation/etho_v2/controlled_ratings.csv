@@ -1,0 +1,7 @@
+metric,implementation,sum,count,score_out_of_10
+distance,mujoco,4,5,8.0
+distance,repository,3,5,6.0
+distance,v2,5,5,10.0
+duration,mujoco,4,5,8.0
+duration,repository,2,5,4.0
+duration,v2,5,5,10.0

@@ -1,0 +1,31 @@
+metric,check,implementation,passed,observed,interpretation
+distance,identity,repository,True,1.0,Identical distributions have identical summaries or unit agreement.
+distance,equal_mean_and_variance,repository,False,0.0,Reference and forecast have equal mean/variance but different distance distributions.
+distance,stretch_sensitivity,repository,True,4.0,"Distance summary changes, or agreement falls, as limbs stretch."
+distance,rigid_transform_invariance,repository,True,2.220446049250313e-16,Translation and rotation do not alter distances.
+distance,unit_free_score,repository,False,,Same normalized agreement after changing coordinate units; repository summary has no scalar score.
+distance,identity,mujoco,True,1.0,Identical distributions have identical summaries or unit agreement.
+distance,equal_mean_and_variance,mujoco,True,0.7387961250362586,Reference and forecast have equal mean/variance but different distance distributions.
+distance,stretch_sensitivity,mujoco,True,0.5,"Distance summary changes, or agreement falls, as limbs stretch."
+distance,rigid_transform_invariance,mujoco,True,2.220446049250313e-16,Translation and rotation do not alter distances.
+distance,unit_free_score,mujoco,False,0.33333333333333337,Same normalized agreement after changing coordinate units; repository summary has no scalar score.
+distance,identity,v2,True,1.0,Identical distributions have identical summaries or unit agreement.
+distance,equal_mean_and_variance,v2,True,0.7387961250362586,Reference and forecast have equal mean/variance but different distance distributions.
+distance,stretch_sensitivity,v2,True,0.5,"Distance summary changes, or agreement falls, as limbs stretch."
+distance,rigid_transform_invariance,v2,True,2.220446049250313e-16,Translation and rotation do not alter distances.
+distance,unit_free_score,v2,True,0.0,Same normalized agreement after changing coordinate units; repository summary has no scalar score.
+duration,identity_with_onsets,repository,True,1.0,Identity with observable complete bouts.
+duration,shorter_bouts,repository,True,0.5519397299995599,Shorter bouts should reduce agreement.
+duration,state_specific_lengths,repository,False,1.0,"Pooled lengths are identical, but the states exchange their durations."
+duration,censored_boundaries,repository,False,,Exclude unknown left onsets; retain right censoring in risk sets.
+duration,unsupported_tail_unavailable,repository,False,0.585786437626905,Do not infer a positive survival tail beyond all observed follow-up.
+duration,identity_with_onsets,mujoco,True,1.0,Identity with observable complete bouts.
+duration,shorter_bouts,mujoco,True,0.6938384998086491,Shorter bouts should reduce agreement.
+duration,state_specific_lengths,mujoco,True,0.505863539445629,"Pooled lengths are identical, but the states exchange their durations."
+duration,censored_boundaries,mujoco,True,1.1102230246251565e-16,Exclude unknown left onsets; retain right censoring in risk sets.
+duration,unsupported_tail_unavailable,mujoco,False,1.0,Do not infer a positive survival tail beyond all observed follow-up.
+duration,identity_with_onsets,v2,True,1.0,Identity with observable complete bouts.
+duration,shorter_bouts,v2,True,0.6938384998086491,Shorter bouts should reduce agreement.
+duration,state_specific_lengths,v2,True,0.505863539445629,"Pooled lengths are identical, but the states exchange their durations."
+duration,censored_boundaries,v2,True,1.1102230246251565e-16,Exclude unknown left onsets; retain right censoring in risk sets.
+duration,unsupported_tail_unavailable,v2,True,,Do not infer a positive survival tail beyond all observed follow-up.
